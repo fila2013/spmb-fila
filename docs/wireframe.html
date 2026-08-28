@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Wireframe — Sistem SPMB SDIT Fitrah Insani</title>
+<style>
+  :root{
+    --ink:#2b2b2b; --sub:#767676; --line:#b9b9b9; --line-soft:#dcdcdc;
+    --bg:#f4f4f2; --panel:#ffffff; --accent:#4a4a4a;
+    --ok-bg:#eef3ea; --ok-tx:#436b34;
+    --warn-bg:#f6f0e2; --warn-tx:#8a6a20;
+    --bad-bg:#f6e9e9; --bad-tx:#9c3b3b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#e4e4e0;}
+  .app{display:flex;min-height:100vh;}
+
+  /* ===== NAV KIRI ===== */
+  nav{width:250px;flex-shrink:0;background:#2f2f2f;color:#ddd;padding:20px 0;overflow-y:auto;}
+  nav h1{font-size:13px;color:#fff;padding:0 18px 14px;margin:0;border-bottom:1px solid #4a4a4a;letter-spacing:.3px;}
+  .nav-group-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#999;padding:16px 18px 6px;}
+  .nav-btn{display:block;width:100%;text-align:left;background:none;border:none;color:#ccc;padding:8px 18px;font-size:12.5px;cursor:pointer;border-left:3px solid transparent;}
+  .nav-btn:hover{background:#3a3a3a;color:#fff;}
+  .nav-btn.active{background:#3a3a3a;color:#fff;border-left-color:#e0a95c;}
+
+  /* ===== MAIN ===== */
+  main{flex:1;padding:28px;overflow-y:auto;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+  .frame{max-width:900px;margin:0 auto;background:var(--panel);border:1px solid var(--line);}
+  .frame.wide{max-width:1100px;}
+  .browserbar{background:#e8e8e5;border-bottom:1px solid var(--line);padding:8px 14px;font-size:11px;color:var(--sub);display:flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;}
+  .content{padding:28px 32px;}
+  .screen-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;}
+  .screen-title{font-size:19px;margin:0 0 20px;font-weight:bold;}
+
+  /* ===== WIREFRAME PRIMITIVES ===== */
+  .wf-box{border:1px dashed var(--line);padding:14px;margin-bottom:14px;background:#fafafa;}
+  .wf-label{font-size:11px;color:var(--sub);margin-bottom:4px;display:block;}
+  .wf-input{border:1px solid var(--line);background:#fff;height:34px;width:100%;padding:0 10px;font-size:13px;color:var(--sub);margin-bottom:12px;}
+  .wf-textarea{border:1px solid var(--line);background:#fff;width:100%;padding:8px 10px;font-size:13px;color:var(--sub);margin-bottom:12px;height:64px;}
+  .wf-btn{border:1px solid var(--accent);background:#fff;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--ink);}
+  .wf-btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .wf-btn-row{display:flex;gap:10px;margin-top:16px;}
+  .wf-imgph{border:1px dashed var(--line);background:
+      repeating-linear-gradient(45deg,#fff,#fff 8px,#eee 8px,#eee 16px);
+    height:70px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--sub);margin-bottom:10px;}
+  .wf-badge{display:inline-block;font-size:11px;padding:3px 10px;border-radius:2px;border:1px solid;}
+  .b-ok{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-tx);}
+  .b-warn{background:var(--warn-bg);color:var(--warn-tx);border-color:var(--warn-tx);}
+  .b-bad{background:var(--bad-bg);color:var(--bad-tx);border-color:var(--bad-tx);}
+  .b-neutral{background:#eee;color:#555;border-color:#999;}
+
+  .steps{display:flex;gap:4px;margin-bottom:22px;flex-wrap:wrap;}
+  .step{font-size:10.5px;padding:6px 10px;border:1px solid var(--line-soft);color:var(--sub);background:#f4f4f2;}
+  .step.now{border-color:var(--ink);color:#fff;background:var(--ink);font-weight:bold;}
+  .step.done{border-color:var(--ok-tx);color:var(--ok-tx);background:var(--ok-bg);}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .card{border:1px solid var(--line-soft);padding:16px;background:#fff;}
+  .card h4{margin:0 0 6px;font-size:14px;}
+  .card p{margin:0 0 10px;font-size:11.5px;color:var(--sub);}
+  .card.selected{border:2px solid var(--ink);}
+  .radio-row{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line-soft);margin-bottom:8px;font-size:13px;background:#fff;}
+  .radio-dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--ink);display:inline-block;flex-shrink:0;}
+  .radio-dot.on{background:var(--ink);}
+
+  table.wf-table{width:100%;border-collapse:collapse;font-size:12px;}
+  table.wf-table th{text-align:left;background:#eee;padding:8px 10px;border-bottom:1px solid var(--line);font-size:11px;color:var(--sub);}
+  table.wf-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);}
+  .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .chip{font-size:11px;border:1px solid var(--line-soft);padding:5px 10px;color:var(--sub);background:#fff;}
+
+  .admin-shell{display:flex;min-height:460px;}
+  .admin-side{width:170px;flex-shrink:0;border-right:1px solid var(--line-soft);padding:14px 0;background:#fafafa;}
+  .admin-side .item{font-size:12px;padding:8px 16px;color:var(--sub);border-left:3px solid transparent;}
+  .admin-side .item.on{color:var(--ink);font-weight:bold;border-left-color:var(--ink);background:#fff;}
+  .admin-main{flex:1;padding:20px 24px;}
+
+  .autofill{background:#f1f4ef;border-color:#a9c39a;color:#436b34;}
+  .lockicon::after{content:" 🔒";font-size:10px;}
+  .note{font-size:11px;color:var(--sub);margin-top:-6px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <h1>SPMB — Wireframe Map</h1>
+    <div class="nav-group-title">Wali Murid</div>
+    <button class="nav-btn active" data-screen="s1">1. Registrasi Akun</button>
+    <button class="nav-btn" data-screen="s2">2. Dashboard Anak Saya</button>
+    <button class="nav-btn" data-screen="s3">3. Pilih Jalur</button>
+    <button class="nav-btn" data-screen="s4">4. Pilih Kategori</button>
+    <button class="nav-btn" data-screen="s5">5. Bayar Pendaftaran (Midtrans)</button>
+    <button class="nav-btn" data-screen="s6">6a. Enrollment · Data Pribadi</button>
+    <button class="nav-btn" data-screen="s7">6b. Enrollment · Observasi</button>
+    <button class="nav-btn" data-screen="s8">7. Assessment</button>
+    <button class="nav-btn" data-screen="s9">8a. Announcement · Diterima</button>
+    <button class="nav-btn" data-screen="s9b">8b. Announcement · Menunggu Kuota</button>
+    <button class="nav-btn" data-screen="s10">9. Admission Fee (DU)</button>
+    <button class="nav-btn" data-screen="s11">10. Join With Us</button>
+    <div class="nav-group-title">Admin</div>
+    <button class="nav-btn" data-screen="a1">Dashboard Peserta</button>
+    <button class="nav-btn" data-screen="a2">Detail Peserta</button>
+    <button class="nav-btn" data-screen="a3">Kelola Jalur, Kuota & Fallback</button>
+    <button class="nav-btn" data-screen="a3b">Antrian Fallback</button>
+    <button class="nav-btn" data-screen="a4">Kelola Kategori & Kuota</button>
+    <button class="nav-btn" data-screen="a4b">Biaya Pendaftaran (Matrix)</button>
+    <button class="nav-btn" data-screen="a5">Form Builder</button>
+    <button class="nav-btn" data-screen="a6">CMS Konten Tahap</button>
+    <button class="nav-btn" data-screen="a7">Verifikasi Pembayaran</button>
+  </nav>
+
+  <main>
+
+  <!-- ============ S1 REGISTRASI ============ -->
+  <section class="screen active" id="s1">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/register</div>
+      <div class="content" style="max-width:420px;margin:0 auto;">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Buat akun</p>
+        <span class="wf-label">Email</span>
+        <input class="wf-input" placeholder="nama@email.com">
+        <span class="wf-label">Password</span>
+        <input class="wf-input" placeholder="Minimal 8 karakter">
+        <span class="wf-label">Konfirmasi password</span>
+        <input class="wf-input" placeholder="Ulangi password">
+        <div class="wf-btn-row"><button class="wf-btn wf-btn-primary" style="width:100%;">Daftar</button></div>
+        <p class="note" style="margin-top:14px;text-align:center;">Sudah punya akun? <u>Masuk</u></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S2 DASHBOARD ANAK ============ -->
+  <section class="screen" id="s2">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/dashboard</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Anak saya</p>
+        <div class="wf-btn-row" style="margin-top:-10px;margin-bottom:20px;">
+          <button class="wf-btn wf-btn-primary">+ Tambah anak</button>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <h4>Ahmad Fauzan</h4>
+            <p>Jalur: Reguler · Kategori: Alumni TKIT FI 1</p>
+            <span class="wf-badge b-warn">Menunggu verifikasi bayar</span>
+          </div>
+          <div class="card">
+            <h4>Zahra Aulia</h4>
+            <p>Jalur: TCP · Kategori: Eksternal (TK Melati)</p>
+            <span class="wf-badge b-ok">Diterima — lanjut ke DU</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S3 PILIH JALUR ============ -->
+  <section class="screen" id="s3">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/tambah</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid · Tambah anak</p>
+        <p class="screen-title">Pilih jalur pendaftaran</p>
+        <div class="steps">
+          <span class="step now">1. Jalur</span><span class="step">2. Kategori</span><span class="step">3. Bayar</span><span class="step">4. Enrollment</span><span class="step">5. Asesmen</span><span class="step">6. Pengumuman</span><span class="step">7. DU</span><span class="step">8. Join WA</span>
+        </div>
+        <div class="grid3">
+          <div class="card selected">
+            <h4>TCP</h4>
+            <p>Kuota: 18 / 30 terisi</p>
+            <span class="wf-badge b-ok">Dibuka</span>
+          </div>
+          <div class="card">
+            <h4>Reguler</h4>
+            <p>Kuota: 45 / 60 terisi</p>
+            <span class="wf-badge b-ok">Dibuka</span>
+          </div>
+          <div class="card">
+            <h4>Pindahan</h4>
+            <p>Kuota: 10 / 10 terisi</p>
+            <span class="wf-badge b-bad">Kuota penuh</span>
+          </div>
+        </div>
+        <div class="wf-btn-row"><button class="wf-btn wf-btn-primary">Lanjut →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S4 PILIH KATEGORI ============ -->
+  <section class="screen" id="s4">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/kategori</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid · Tambah anak</p>
+        <p class="screen-title">Pilih kategori pendaftar</p>
+        <div class="steps">
+          <span class="step done">1. Jalur ✓</span><span class="step now">2. Kategori</span><span class="step">3. Bayar</span><span class="step">4. Enrollment</span><span class="step">5. Asesmen</span><span class="step">6. Pengumuman</span><span class="step">7. DU</span><span class="step">8. Join WA</span>
+        </div>
+
+        <span class="wf-label">A. Alumni TKIT (kuota: 25/40, periode 1–14 Sept)</span>
+        <div class="radio-row"><span class="radio-dot on"></span> TKIT Fitrah Insani 1</div>
+        <div class="radio-row"><span class="radio-dot"></span> TKIT Fitrah Insani 2</div>
+        <p class="note">Dua pilihan ini tetap — tidak dapat diubah admin.</p>
+
+        <span class="wf-label" style="margin-top:10px;display:block;">B. Eksternal / Umum (kuota: 60/80, periode 15–26 Sept)</span>
+        <div class="wf-box" style="margin-bottom:14px;">
+          <span class="wf-label">Nama TK asal</span>
+          <input class="wf-input" style="margin-bottom:0;" placeholder="Contoh: TK Melati Bandar Lampung">
+        </div>
+        <div class="wf-btn-row"><button class="wf-btn">← Kembali</button><button class="wf-btn wf-btn-primary">Lanjut →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S5 BAYAR PENDAFTARAN (MIDTRANS) ============ -->
+  <section class="screen" id="s5">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/pembayaran-pendaftaran</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Pembayaran biaya pendaftaran</p>
+        <div class="steps">
+          <span class="step done">1. Jalur ✓</span><span class="step done">2. Kategori ✓</span><span class="step now">3. Bayar</span><span class="step">4. Enrollment</span><span class="step">5. Asesmen</span><span class="step">6. Pengumuman</span><span class="step">7. DU</span><span class="step">8. Join WA</span>
+        </div>
+        <div class="wf-box">
+          <strong style="font-size:13px;">Rincian pendaftaran</strong>
+          <p class="note" style="margin-top:6px;margin-bottom:2px;">Jalur: TCP · Kategori: Alumni TKIT FI 1</p>
+          <p style="margin:8px 0 0;font-size:20px;font-weight:bold;">Rp 450.000</p>
+          <p class="note" style="margin-top:2px;">Nominal otomatis dari tabel Biaya Pendaftaran (diatur admin) — Anda tidak perlu mengisi nominal sendiri.</p>
+        </div>
+        <div class="wf-btn-row"><button class="wf-btn wf-btn-primary" style="width:100%;">Bayar Rp 450.000 via Midtrans</button></div>
+        <p class="note" style="text-align:center;margin-top:10px;">Klik akan membuka popup Snap — pilih VA/QRIS/E-wallet di dalamnya.</p>
+        <div class="wf-box" style="margin-top:18px;background:#f1f4ef;border-color:#a9c39a;">
+          <span class="wf-badge b-ok">Status: Terverifikasi otomatis oleh Midtrans</span>
+          <p class="note" style="margin-top:8px;margin-bottom:0;">Begitu pembayaran sukses, status berubah otomatis lewat notifikasi Midtrans — tidak perlu menunggu verifikasi admin.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S6 ENROLLMENT DATA PRIBADI ============ -->
+  <section class="screen" id="s6">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/enrollment/data-pribadi</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid · Enrollment</p>
+        <p class="screen-title">Data pribadi anak & orang tua</p>
+        <div class="steps">
+          <span class="step done">1–3 ✓</span><span class="step now">4a. Data pribadi</span><span class="step">4b. Observasi</span><span class="step">5. Asesmen</span><span class="step">6. Pengumuman</span><span class="step">7. DU</span><span class="step">8. Join WA</span>
+        </div>
+        <div class="grid2">
+          <div><span class="wf-label">Nama lengkap</span><input class="wf-input" placeholder="Nama lengkap anak"></div>
+          <div><span class="wf-label">Nama panggilan</span><input class="wf-input" placeholder="Nama panggilan"></div>
+          <div><span class="wf-label">Tempat, tanggal lahir</span><input class="wf-input" placeholder="Bandar Lampung, 01-01-2021"></div>
+          <div><span class="wf-label">Nama ayah</span><input class="wf-input" placeholder="Nama ayah"></div>
+          <div><span class="wf-label">Nama ibu</span><input class="wf-input" placeholder="Nama ibu"></div>
+          <div><span class="wf-label lockicon">Email ayah/ibu (auto-fill dari akun)</span><input class="wf-input autofill" value="waliwali@email.com"></div>
+          <div><span class="wf-label">No. WA ayah</span><input class="wf-input" placeholder="08xxxxxxxxxx — format Indonesia"></div>
+          <div><span class="wf-label">No. WA bunda</span><input class="wf-input" placeholder="08xxxxxxxxxx — format Indonesia"></div>
+          <div style="grid-column:1/3;"><span class="wf-label lockicon">Asal TK (auto-fill dari pilihan kategori)</span><input class="wf-input autofill" value="TKIT Fitrah Insani 1" style="max-width:300px;"></div>
+        </div>
+        <p class="note">Field di atas + validasi + auto-fill diatur oleh Admin lewat Form Builder.</p>
+        <div class="wf-btn-row"><button class="wf-btn">Simpan draft</button><button class="wf-btn wf-btn-primary">Lanjut ke Observasi →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S7 ENROLLMENT OBSERVASI ============ -->
+  <section class="screen" id="s7">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/enrollment/observasi</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid · Enrollment</p>
+        <p class="screen-title">Data observasi orang tua</p>
+        <div class="steps">
+          <span class="step done">1–4a ✓</span><span class="step now">4b. Observasi</span><span class="step">5. Asesmen</span><span class="step">6. Pengumuman</span><span class="step">7. DU</span><span class="step">8. Join WA</span>
+        </div>
+        <span class="wf-label">1. Bagaimana Bapak/Ibu menyelaraskan aturan di rumah dengan nilai-nilai sekolah?</span>
+        <textarea class="wf-textarea" placeholder="Jawaban..."></textarea>
+        <span class="wf-label">2. Karakter dan kompetensi utama apa yang paling diharapkan terbentuk pada anak?</span>
+        <textarea class="wf-textarea" placeholder="Jawaban..."></textarea>
+        <p class="note">... 8 pertanyaan lainnya tampil dengan pola yang sama (total 10, dikelola Admin) ...</p>
+        <div class="wf-btn-row"><button class="wf-btn">Simpan draft</button><button class="wf-btn wf-btn-primary">Submit enrollment</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S8 ASSESSMENT ============ -->
+  <section class="screen" id="s8">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/assessment</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Assessment</p>
+        <div class="wf-box">
+          <p style="margin:0 0 6px;font-size:13px;"><strong>26 September 2026</strong> — TKIT FILA</p>
+          <p style="margin:0;font-size:13px;"><strong>3 Oktober 2026</strong> — Umum</p>
+        </div>
+        <p class="note">Konten di atas ditambahkan & dikelola penuh oleh Admin (judul, tanggal, teks, gambar).</p>
+        <span class="wf-badge b-neutral">Jadwal anak Anda: 3 Oktober 2026 (Umum)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S9 ANNOUNCEMENT ============ -->
+  <section class="screen" id="s9">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/pengumuman</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Announcement</p>
+        <span class="wf-badge b-ok" style="font-size:13px;padding:8px 16px;">Ananda Zahra Aulia — Diterima</span>
+        <div class="wf-box" style="margin-top:16px;">
+          <p style="margin:0;font-size:13px;">Alhamdulillah, Baarakallahu Fiikum. Selamat atas diterimanya Ananda di SDIT Fitrah Insani Langkapura. Selamat memasuki gerbang ilmu baru untuk membentuk karakter islami dan meraih prestasi...</p>
+        </div>
+        <p class="note">Teks & gambar di atas = konten CMS milik Admin. Status "Diterima/Tidak" diinput admin per anak & baru tampil setelah tanggal rilis (17 Okt 2026).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S9B ANNOUNCEMENT - MENUNGGU KUOTA ============ -->
+  <section class="screen" id="s9b">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/pengumuman</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Announcement</p>
+        <span class="wf-badge b-warn" style="font-size:13px;padding:8px 16px;">Ananda Ahmad Fauzan — Menunggu Kuota Jalur Reguler</span>
+        <div class="wf-box" style="margin-top:16px;">
+          <p style="margin:0;font-size:13px;">Pendaftaran Ananda di jalur TCP belum berhasil, dan saat ini sedang menunggu ketersediaan kuota di jalur Reguler untuk dipindahkan secara otomatis. Panitia akan memberi kabar begitu kuota tersedia. Mohon ditunggu.</p>
+        </div>
+        <p class="note">Status ini <strong>bukan</strong> "Tidak Diterima" — sistem otomatis mengantre calon murid ini (§5B) dan akan memindahkannya ke jalur Reguler begitu admin menambah kuota. Tidak ada batas waktu otomatis; menggantung sampai admin bertindak.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S10 ADMISSION FEE ============ -->
+  <section class="screen" id="s10">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/admission-fee</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Admission fee (Daftar ulang)</p>
+        <div class="wf-box">
+          <p style="margin:0;font-size:13px;">Daftar ulang (DU) tahap pertama sebesar <strong>50%</strong> wajib dibayarkan mulai <strong>19 Oktober s.d. 30 November 2026</strong>.</p>
+        </div>
+        <span class="wf-label">Unggah bukti pembayaran DU</span>
+        <div class="wf-imgph">[ area upload file ]</div>
+        <span class="wf-badge b-warn">Status: Menunggu verifikasi admin</span>
+        <div class="wf-btn-row"><button class="wf-btn wf-btn-primary">Kirim bukti pembayaran DU</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S11 JOIN WITH US ============ -->
+  <section class="screen" id="s11">
+    <div class="frame">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/anak/join-wa</div>
+      <div class="content">
+        <p class="screen-label">Wali Murid</p>
+        <p class="screen-title">Join with us</p>
+        <div class="wf-box">
+          <p style="margin:0;font-size:13px;">Bapak/Ibu yang telah menyelesaikan pembayaran DU, mohon menunggu untuk digabungkan ke Grup WhatsApp Murid Baru TP 2027/2028. Proses undangan dilakukan bertahap oleh Bendahara Sekolah.</p>
+        </div>
+        <span class="wf-badge b-warn">Status: Menunggu diundang ke grup</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A1 ADMIN DASHBOARD ============ -->
+  <section class="screen" id="a1">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/dashboard</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item on">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item">Form builder</div>
+          <div class="item">Konten tahap</div>
+          <div class="item">Verifikasi bayar</div>
+          <div class="item">Laporan / Export</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:14px;">Peserta terdaftar</p>
+          <div class="toolbar">
+            <span class="chip">Jalur: Semua ▾</span>
+            <span class="chip">Kategori: Semua ▾</span>
+            <span class="chip">Status bayar: Semua ▾</span>
+            <span class="chip">Status kelulusan: Semua ▾</span>
+            <button class="wf-btn" style="margin-left:auto;">Export Excel</button>
+          </div>
+          <table class="wf-table">
+            <tr><th>Nama anak</th><th>Jalur</th><th>Kategori</th><th>Bayar daftar</th><th>Enrollment</th><th>Kelulusan</th></tr>
+            <tr><td>Ahmad Fauzan</td><td>Reguler</td><td>Alumni TKFI 1</td><td><span class="wf-badge b-warn">Pending</span></td><td>-</td><td>-</td></tr>
+            <tr><td>Zahra Aulia</td><td>TCP</td><td>Eksternal</td><td><span class="wf-badge b-ok">Verified</span></td><td>Lengkap</td><td><span class="wf-badge b-ok">Diterima</span></td></tr>
+            <tr><td>Bilal Ramadhan</td><td>Pindahan</td><td>Alumni TKFI 2</td><td><span class="wf-badge b-bad">Ditolak</span></td><td>-</td><td>-</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A2 DETAIL PESERTA ============ -->
+  <section class="screen" id="a2">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/peserta/482</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item on">Detail peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item">Form builder</div>
+          <div class="item">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:4px;">Zahra Aulia</p>
+          <p class="note">Wali murid: ibu.aulia@email.com · TCP · Eksternal (TK Melati)</p>
+          <div class="toolbar">
+            <span class="chip">Data pribadi</span><span class="chip">Observasi</span><span class="chip">Pembayaran</span>
+          </div>
+          <div class="grid2">
+            <div class="wf-box"><strong style="font-size:12px;">Nama lengkap</strong><p class="note">Zahra Aulia Rahman</p></div>
+            <div class="wf-box"><strong style="font-size:12px;">No. WA ayah</strong><p class="note">0812xxxxxxxx</p></div>
+          </div>
+          <div class="wf-btn-row">
+            <button class="wf-btn wf-btn-primary">Tandai diterima</button>
+            <button class="wf-btn">Tandai tidak diterima</button>
+            <button class="wf-btn">Update status join WA</button>
+          </div>
+          <p class="note" style="margin-top:10px;max-width:420px;">Klik "Tandai tidak diterima" pada peserta jalur TCP akan otomatis mencoba memindahkan ke Reguler (atau masuk antrian jika kuota penuh). Pada jalur Reguler/Pindahan, aksi ini akan menghapus data pendaftaran peserta ini (setelah konfirmasi) — lihat Technical Spec §5B–§5C.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A3 KELOLA JALUR ============ -->
+  <section class="screen" id="a3">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/jalur</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item on">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item">Biaya pendaftaran</div>
+          <div class="item">Form builder</div>
+          <div class="item">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:14px;">Kelola jalur</p>
+          <table class="wf-table">
+            <tr><th>Jalur</th><th>Status</th><th>Periode</th><th>Kuota</th><th>Jika gagal</th><th></th></tr>
+            <tr><td>TCP</td><td><span class="wf-badge b-ok">Aktif</span></td><td>1 Sep – 26 Sep</td><td>18 / 30</td><td>→ Auto-pindah ke <strong>Reguler</strong></td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Reguler</td><td><span class="wf-badge b-ok">Aktif</span></td><td>1 Sep – 26 Sep</td><td>45 / 60</td><td>Hapus data calon murid</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Pindahan</td><td><span class="wf-badge b-bad">Nonaktif (kuota penuh)</span></td><td>1 Sep – 26 Sep</td><td>10 / 10</td><td>Hapus data calon murid</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+          </table>
+          <div class="wf-box" style="margin-top:16px;max-width:420px;">
+            <strong style="font-size:12px;">Edit jalur: TCP</strong>
+            <span class="wf-label" style="margin-top:10px;">Kuota maksimal</span>
+            <input class="wf-input" value="30">
+            <label style="font-size:12px;display:block;margin-bottom:10px;"><input type="checkbox" checked> Aktifkan jalur ini</label>
+            <span class="wf-label">Jika calon murid tidak diterima di jalur ini</span>
+            <select class="wf-input"><option>→ Otomatis pindah ke jalur: Reguler</option><option>Tidak ada aturan otomatis (tetap "Tidak Diterima")</option></select>
+            <label style="font-size:12px;"><input type="checkbox" disabled> Hapus data calon murid jika gagal di sini (nonaktif — jalur ini pakai auto-pindah)</label>
+          </div>
+          <div class="wf-btn-row">
+            <button class="wf-btn wf-btn-primary">+ Tambah jalur</button>
+            <button class="wf-btn" onclick="document.querySelector('[data-screen=a3b]').click()">Lihat antrian fallback →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A3B ANTRIAN FALLBACK ============ -->
+  <section class="screen" id="a3b">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/jalur/reguler/antrian-fallback</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item on">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item">Biaya pendaftaran</div>
+          <div class="item">Form builder</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:4px;">Antrian fallback — Jalur Reguler</p>
+          <p class="note">Kuota Reguler saat ini: 60 / 60 (penuh). Calon murid di bawah menunggu FIFO sejak TCP dinyatakan tidak diterima.</p>
+          <table class="wf-table" style="margin-top:10px;">
+            <tr><th>#</th><th>Nama anak</th><th>Jalur asal</th><th>Menunggu sejak</th></tr>
+            <tr><td>1</td><td>Ahmad Fauzan</td><td>TCP</td><td>20 Sept 2026</td></tr>
+            <tr><td>2</td><td>Siti Nur Aini</td><td>TCP</td><td>21 Sept 2026</td></tr>
+            <tr><td>3</td><td>Rizky Pratama</td><td>TCP</td><td>22 Sept 2026</td></tr>
+          </table>
+          <div class="wf-box" style="margin-top:16px;max-width:360px;">
+            <strong style="font-size:12px;">Tambah kuota Reguler</strong>
+            <span class="wf-label" style="margin-top:10px;">Kuota maksimal baru</span>
+            <input class="wf-input" value="65" style="margin-bottom:8px;">
+            <p class="note" style="margin-top:0;">Menyimpan akan otomatis memproses antrian di atas secara FIFO sampai kuota baru habis.</p>
+          </div>
+          <div class="wf-btn-row">
+            <button class="wf-btn wf-btn-primary">Simpan kuota & proses antrian</button>
+            <button class="wf-btn">Proses ulang antrian sekarang</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A4 KELOLA KATEGORI ============ -->
+  <section class="screen" id="a4">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/kategori</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item on">Kategori</div>
+          <div class="item">Form builder</div>
+          <div class="item">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:14px;">Kelola kategori pendaftar</p>
+          <table class="wf-table">
+            <tr><th>Kategori</th><th>Status</th><th>Periode</th><th>Kuota</th><th></th></tr>
+            <tr><td>Alumni TKIT</td><td><span class="wf-badge b-ok">Aktif</span></td><td>1–14 Sept</td><td>25 / 40</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Eksternal / Umum</td><td><span class="wf-badge b-ok">Aktif</span></td><td>15–26 Sept</td><td>60 / 80</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+          </table>
+          <p class="note" style="margin-top:14px;">Sub-pilihan "TKIT Fitrah Insani 1/2" untuk kategori Alumni bersifat tetap dan tidak muncul sebagai item yang bisa diedit di sini.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A4B BIAYA PENDAFTARAN MATRIX ============ -->
+  <section class="screen" id="a4b">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/biaya-pendaftaran</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item on">Biaya pendaftaran</div>
+          <div class="item">Form builder</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:4px;">Biaya pendaftaran (matrix Jalur × Kategori)</p>
+          <p class="note">Nominal ini otomatis dipakai sistem saat membuat transaksi Midtrans — wali murid tidak mengisi sendiri.</p>
+          <table class="wf-table" style="margin-top:10px;">
+            <tr><th>Jalur</th><th>Kategori</th><th>Nominal</th><th>Status</th><th></th></tr>
+            <tr><td>TCP</td><td>Alumni TKIT</td><td>Rp 450.000</td><td><span class="wf-badge b-ok">Aktif</span></td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>TCP</td><td>Eksternal / Umum</td><td>Rp 550.000</td><td><span class="wf-badge b-ok">Aktif</span></td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Reguler</td><td>Alumni TKIT</td><td>Rp 400.000</td><td><span class="wf-badge b-ok">Aktif</span></td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Reguler</td><td>Eksternal / Umum</td><td>Rp 500.000</td><td><span class="wf-badge b-ok">Aktif</span></td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Pindahan</td><td>Eksternal / Umum</td><td style="color:#9c3b3b;">Belum diatur</td><td><span class="wf-badge b-bad">Kosong</span></td><td><button class="wf-btn wf-btn-primary" style="padding:4px 10px;font-size:11px;">Atur nominal</button></td></tr>
+          </table>
+          <p class="note" style="margin-top:10px;">Kombinasi berstatus "Kosong" akan memblokir wali murid melanjutkan ke halaman pembayaran (pesan: "Biaya belum diatur, hubungi panitia").</p>
+          <button class="wf-btn wf-btn-primary" style="margin-top:6px;">+ Tambah kombinasi baru</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A5 FORM BUILDER ============ -->
+  <section class="screen" id="a5">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/form-builder</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item on">Form builder</div>
+          <div class="item">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:14px;">Form builder — Data pribadi</p>
+          <table class="wf-table">
+            <tr><th>Label field</th><th>Tipe</th><th>Wajib</th><th>Validasi / Auto-fill</th><th></th></tr>
+            <tr><td>Nama lengkap</td><td>Text</td><td>Ya</td><td>—</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>No. WA ayah</td><td>Tel</td><td>Ya</td><td>format_wa_indonesia</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Email ayah/ibu</td><td>Email</td><td>Ya</td><td>auto-fill: akun_email</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+            <tr><td>Asal TK</td><td>Text</td><td>Ya</td><td>auto-fill: kategori_asal_tk</td><td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Edit</button></td></tr>
+          </table>
+          <button class="wf-btn wf-btn-primary" style="margin-top:14px;">+ Tambah field</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A6 CMS KONTEN TAHAP ============ -->
+  <section class="screen" id="a6">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/konten/announcement</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item">Form builder</div>
+          <div class="item on">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <div class="toolbar">
+            <span class="chip">Assessment</span><span class="chip" style="border-color:#555;color:#222;font-weight:bold;">Announcement</span><span class="chip">Admission fee</span><span class="chip">Join with us</span>
+          </div>
+          <p class="screen-title" style="margin-bottom:14px;">Edit konten — Announcement</p>
+          <span class="wf-label">Judul</span>
+          <input class="wf-input" value="Pengumuman Kelulusan SPMB 2026/2027">
+          <span class="wf-label">Tanggal rilis</span>
+          <input class="wf-input" value="17-10-2026" style="max-width:180px;">
+          <span class="wf-label">Isi teks</span>
+          <textarea class="wf-textarea" style="height:90px;">Alhamdulillah, Baarakallahu Fiikum. Selamat atas diterimanya Ananda di SDIT Fitrah Insani Langkapura...</textarea>
+          <span class="wf-label">Gambar</span>
+          <div class="wf-imgph">[ upload gambar pendamping ]</div>
+          <div class="wf-btn-row"><button class="wf-btn wf-btn-primary">Simpan & publish</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A7 VERIFIKASI PEMBAYARAN ============ -->
+  <section class="screen" id="a7">
+    <div class="frame wide">
+      <div class="browserbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; spmb.fitrahinsani.sch.id/admin/pembayaran</div>
+      <div class="admin-shell">
+        <div class="admin-side">
+          <div class="item">Dashboard peserta</div>
+          <div class="item">Jalur</div>
+          <div class="item">Kategori</div>
+          <div class="item on">Verifikasi bayar</div>
+          <div class="item">Konten tahap</div>
+        </div>
+        <div class="admin-main">
+          <p class="screen-title" style="margin-bottom:14px;">Verifikasi pembayaran pendaftaran</p>
+          <table class="wf-table">
+            <tr><th>Nama anak</th><th>Bukti</th><th>Status</th><th></th></tr>
+            <tr><td>Ahmad Fauzan</td><td><a href="#">lihat file</a></td><td><span class="wf-badge b-warn">Pending</span></td>
+              <td><button class="wf-btn" style="padding:4px 10px;font-size:11px;">Verifikasi</button> <button class="wf-btn" style="padding:4px 10px;font-size:11px;">Tolak</button></td></tr>
+            <tr><td>Bilal Ramadhan</td><td><a href="#">lihat file</a></td><td><span class="wf-badge b-bad">Ditolak</span></td>
+              <td><span class="note">Catatan: nominal tidak sesuai</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.nav-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.screen).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
