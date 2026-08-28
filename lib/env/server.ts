@@ -1,6 +1,8 @@
 import "server-only";
 
 import {
+  databaseEnvironmentSchema,
+  type DatabaseEnvironment,
   serverEnvironmentSchema,
   type ServerEnvironment,
   supabaseAdminEnvironmentSchema,
@@ -9,6 +11,16 @@ import {
 
 let cachedEnvironment: ServerEnvironment | undefined;
 let cachedSupabaseAdminEnvironment: SupabaseAdminEnvironment | undefined;
+let cachedDatabaseEnvironment: DatabaseEnvironment | undefined;
+
+export function getDatabaseEnvironment(): DatabaseEnvironment {
+  cachedDatabaseEnvironment ??= databaseEnvironmentSchema.parse({
+    DATABASE_URL: process.env.DATABASE_URL,
+    DIRECT_URL: process.env.DIRECT_URL,
+  });
+
+  return cachedDatabaseEnvironment;
+}
 
 export function getSupabaseAdminEnvironment(): SupabaseAdminEnvironment {
   cachedSupabaseAdminEnvironment ??= supabaseAdminEnvironmentSchema.parse({

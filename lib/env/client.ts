@@ -1,4 +1,6 @@
 import {
+  appEnvironmentSchema,
+  type AppEnvironment,
   publicEnvironmentSchema,
   supabasePublicEnvironmentSchema,
   type PublicEnvironment,
@@ -7,6 +9,15 @@ import {
 
 let cachedEnvironment: PublicEnvironment | undefined;
 let cachedSupabaseEnvironment: SupabasePublicEnvironment | undefined;
+let cachedAppEnvironment: AppEnvironment | undefined;
+
+export function getAppEnvironment(): AppEnvironment {
+  cachedAppEnvironment ??= appEnvironmentSchema.parse({
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  });
+
+  return cachedAppEnvironment;
+}
 
 export function getSupabasePublicEnvironment(): SupabasePublicEnvironment {
   cachedSupabaseEnvironment ??= supabasePublicEnvironmentSchema.parse({

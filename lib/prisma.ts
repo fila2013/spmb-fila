@@ -3,14 +3,14 @@ import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "@/generated/prisma/client";
-import { getServerEnvironment } from "@/lib/env/server";
+import { getDatabaseEnvironment } from "@/lib/env/server";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const environment = getServerEnvironment();
+  const environment = getDatabaseEnvironment();
   const adapter = new PrismaPg({
     connectionString: environment.DATABASE_URL,
     connectionTimeoutMillis: 5_000,

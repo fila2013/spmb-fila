@@ -15,10 +15,10 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 dan Phase 1 sudah selesai. Project memiliki fondasi Next.js, kontrak
-environment, Supabase SSR, Prisma schema lengkap, migration, constraint, index,
-audit log, RLS deny-by-default, dan seed development. Migration telah diterapkan
-ke database Supabase staging.
+Phase 0, Phase 1, dan Phase 2 sudah selesai. Selain fondasi database, project
+memiliki Supabase Auth berbasis cookie, registrasi/login/logout/reset password,
+sinkronisasi profile `users`, serta guard server untuk session, role, dan
+ownership. Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
 
@@ -102,3 +102,28 @@ cookie. Paket `@supabase/server` tidak diperlukan pada tahap ini karena paket
 tersebut ditujukan untuk backend stateless yang menerima Bearer token melalui
 header. Helper tersedia di `lib/supabase`, sedangkan `proxy.ts` memverifikasi dan
 memperbarui token dengan `auth.getClaims()`.
+
+Tambahkan URL berikut ke daftar **Redirect URLs** Supabase Auth untuk local:
+
+```text
+http://localhost:3000/auth/callback
+http://localhost:3000/auth/confirm
+```
+
+Tambahkan URL ekuivalen untuk domain preview/production dan set
+`NEXT_PUBLIC_APP_URL` sesuai origin deployment. Konfirmasi email dan reset
+password memerlukan konfigurasi email/SMTP Supabase yang aktif.
+
+Trigger database membuat profile `users` dengan role `wali_murid`. Metadata Auth
+yang dikirim client tidak pernah menjadi sumber role. Setelah calon admin membuat
+dan mengonfirmasi akun, pemberian role awal dilakukan eksplisit dan tercatat:
+
+```bash
+npm run auth:set-admin -- admin@example.com
+```
+
+Uji integrasi trigger terhadap staging membuat dan membersihkan akun sementara:
+
+```bash
+npm run test:auth-integration
+```

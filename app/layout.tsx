@@ -50,9 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 </span>
               </Link>
 
-              <span className="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 sm:inline-flex">
-                Portal penerimaan murid baru
-              </span>
+              <nav aria-label="Akun" className="flex items-center gap-2">
+                <Link href="/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50">Masuk</Link>
+                <Link href="/register" className="rounded-lg bg-emerald-900 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Daftar</Link>
+              </nav>
             </div>
           </header>
 

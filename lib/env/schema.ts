@@ -17,6 +17,15 @@ export const supabasePublicEnvironmentSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
 });
 
+export const appEnvironmentSchema = z.object({
+  NEXT_PUBLIC_APP_URL: z.url(),
+});
+
+export const databaseEnvironmentSchema = z.object({
+  DATABASE_URL: postgresUrlSchema,
+  DIRECT_URL: postgresUrlSchema,
+});
+
 export const publicEnvironmentSchema = supabasePublicEnvironmentSchema.extend({
   NEXT_PUBLIC_APP_URL: z.url(),
   NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: z.string().min(1),
@@ -110,4 +119,6 @@ export type SupabasePublicEnvironment = z.infer<
 export type SupabaseAdminEnvironment = z.infer<
   typeof supabaseAdminEnvironmentSchema
 >;
+export type AppEnvironment = z.infer<typeof appEnvironmentSchema>;
+export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;

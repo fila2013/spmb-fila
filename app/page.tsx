@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const alurPendaftaran = [
   "Buat akun",
   "Tambahkan anak",
@@ -27,6 +29,10 @@ export default function Home() {
 
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-700/20 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900">
             Jadwal pembukaan portal akan diumumkan oleh panitia SPMB.
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/register" className="rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800">Buat akun wali murid</Link>
+            <Link href="/login" className="rounded-xl border border-emerald-900/20 bg-white px-5 py-3 text-sm font-bold text-emerald-900 hover:bg-emerald-50">Masuk</Link>
           </div>
         </div>
 
