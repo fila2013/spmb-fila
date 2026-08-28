@@ -12,16 +12,40 @@ const booleanStringSchema = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
 
-export const publicEnvironmentSchema = z.object({
+export const supabasePublicEnvironmentSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+});
+
+export const publicEnvironmentSchema = supabasePublicEnvironmentSchema.extend({
   NEXT_PUBLIC_APP_URL: z.url(),
   NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: z.string().min(1),
 });
 
+export const supabaseAdminEnvironmentSchema =
+  supabasePublicEnvironmentSchema
+    .extend({
+      SUPABASE_SECRET_KEY: z.string().min(1).optional(),
+      SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    })
+    .superRefine((environment, context) => {
+      if (
+        !environment.SUPABASE_SECRET_KEY &&
+        !environment.SUPABASE_SERVICE_ROLE_KEY
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["SUPABASE_SECRET_KEY"],
+          message:
+            "SUPABASE_SECRET_KEY atau SUPABASE_SERVICE_ROLE_KEY wajib diisi.",
+        });
+      }
+    });
+
 export const serverEnvironmentSchema = publicEnvironmentSchema
   .extend({
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    SUPABASE_SECRET_KEY: z.string().min(1).optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
     DATABASE_URL: postgresUrlSchema,
     DIRECT_URL: postgresUrlSchema,
     SUPABASE_STORAGE_BUCKET_PEMBAYARAN: z.string().min(1),
@@ -32,6 +56,18 @@ export const serverEnvironmentSchema = publicEnvironmentSchema
     VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
   })
   .superRefine((environment, context) => {
+    if (
+      !environment.SUPABASE_SECRET_KEY &&
+      !environment.SUPABASE_SERVICE_ROLE_KEY
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["SUPABASE_SECRET_KEY"],
+        message:
+          "SUPABASE_SECRET_KEY atau SUPABASE_SERVICE_ROLE_KEY wajib diisi.",
+      });
+    }
+
     if (
       environment.MIDTRANS_CLIENT_KEY !==
       environment.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
@@ -68,4 +104,10 @@ export const serverEnvironmentSchema = publicEnvironmentSchema
   });
 
 export type PublicEnvironment = z.infer<typeof publicEnvironmentSchema>;
+export type SupabasePublicEnvironment = z.infer<
+  typeof supabasePublicEnvironmentSchema
+>;
+export type SupabaseAdminEnvironment = z.infer<
+  typeof supabaseAdminEnvironmentSchema
+>;
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;

@@ -2,14 +2,21 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { getServerEnvironment } from "@/lib/env/server";
+import { getSupabaseAdminEnvironment } from "@/lib/env/server";
 
 export function createAdminClient() {
-  const environment = getServerEnvironment();
+  const environment = getSupabaseAdminEnvironment();
+  const adminKey =
+    environment.SUPABASE_SECRET_KEY ??
+    environment.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!adminKey) {
+    throw new Error("Supabase admin key belum dikonfigurasi.");
+  }
 
   return createClient(
     environment.NEXT_PUBLIC_SUPABASE_URL,
-    environment.SUPABASE_SERVICE_ROLE_KEY,
+    adminKey,
     {
       auth: {
         autoRefreshToken: false,

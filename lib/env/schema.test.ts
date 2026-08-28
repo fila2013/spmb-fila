@@ -7,14 +7,14 @@ import {
 
 const validPublicEnvironment = {
   NEXT_PUBLIC_SUPABASE_URL: "https://project-ref.supabase.co",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
   NEXT_PUBLIC_APP_URL: "http://localhost:3000",
   NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: "Mid-client-example",
 };
 
 const validServerEnvironment = {
   ...validPublicEnvironment,
-  SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+  SUPABASE_SECRET_KEY: "secret-key",
   DATABASE_URL:
     "postgresql://postgres:password@pooler.example.invalid:6543/postgres?pgbouncer=true",
   DIRECT_URL:
@@ -56,6 +56,25 @@ describe("serverEnvironmentSchema", () => {
       serverEnvironmentSchema.parse({
         ...validServerEnvironment,
         DATABASE_URL: "mysql://localhost/spmb",
+      }),
+    ).toThrow();
+  });
+
+  it("menerima service role key legacy sebagai fallback", () => {
+    expect(
+      serverEnvironmentSchema.parse({
+        ...validServerEnvironment,
+        SUPABASE_SECRET_KEY: undefined,
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      }).SUPABASE_SERVICE_ROLE_KEY,
+    ).toBe("service-role-key");
+  });
+
+  it("menolak environment tanpa Supabase admin key", () => {
+    expect(() =>
+      serverEnvironmentSchema.parse({
+        ...validServerEnvironment,
+        SUPABASE_SECRET_KEY: undefined,
       }),
     ).toThrow();
   });

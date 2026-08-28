@@ -2,13 +2,13 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-import { getPublicEnvironment } from "@/lib/env/client";
+import { getSupabasePublicEnvironment } from "@/lib/env/client";
 
 export function createClient() {
-  const environment = getPublicEnvironment();
+  const environment = getSupabasePublicEnvironment();
 
   return createBrowserClient(
     environment.NEXT_PUBLIC_SUPABASE_URL,
-    environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   );
 }
