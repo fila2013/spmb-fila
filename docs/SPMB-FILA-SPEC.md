@@ -37,7 +37,7 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - Nominal pembayaran pendaftaran berasal dari matrix `Jalur × Kategori`; wali murid tidak pernah mengisi nominal.
 - Auto-transfer TCP → Reguler dan fallback FIFO adalah business rule inti.
 - Auto-delete hanya menghapus data calon murid yang gagal, bukan akun wali murid atau anak lain.
-- Jejak keuangan pembayaran harus dipertimbangkan/dirancang agar tidak hilang secara tidak dapat diaudit.
+- Jejak keuangan pembayaran tetap disimpan ketika calon murid dihapus. Relasi aktif `calon_murid_id` menggunakan `ON DELETE SET NULL`, sedangkan UUID referensi non-PII, nominal, metode, status, referensi Midtrans, payload audit yang sudah disanitasi, dan timestamp dipertahankan untuk audit keuangan.
 - MVP hanya memiliki dua role: Wali Murid dan Admin.
 - Multi-tenant, role Bendahara/Asesor terpisah, notifikasi otomatis, dan WhatsApp API otomatis ditunda ke Phase 2.
 
@@ -672,6 +672,7 @@ id
 supabase_auth_user_id
 email
 role
+status_aktif
 created_at
 updated_at
 ```
@@ -801,9 +802,11 @@ UNIQUE(calon_murid_id, field_id)
 
 ```text
 id
-calon_murid_id
+calon_murid_id (nullable setelah calon murid dihapus)
+calon_murid_reference (UUID non-PII yang tetap disimpan)
 jenis
 metode_pembayaran
+nominal
 file_bukti_url
 status
 catatan_admin
@@ -817,6 +820,7 @@ midtrans_payment_type
 midtrans_raw_payload
 
 created_at
+updated_at
 ```
 
 Jenis:
@@ -852,6 +856,8 @@ isi_teks
 gambar_url
 urutan_layout
 status_aktif
+jalur_id (opsional)
+kategori_id (opsional)
 created_at
 updated_at
 ```
@@ -1498,4 +1504,3 @@ Jika muncul pertanyaan baru yang tidak tercakup dokumen:
 - Catat sebagai `Open Decision`.
 - Jelaskan dampak teknis.
 - Tunggu keputusan sebelum implementasi jika keputusan memengaruhi schema, pembayaran, kuota, atau penghapusan data.
-

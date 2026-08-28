@@ -15,11 +15,10 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 menyediakan fondasi Next.js, TypeScript strict, Tailwind CSS, Prisma ORM,
-kontrak environment, Supabase client, unit test dasar, dan layout awal SPMB.
-
-Model bisnis dan migration belum dibuat. Pekerjaan tersebut dimulai setelah
-keputusan retention data pembayaran disahkan.
+Phase 0 dan Phase 1 sudah selesai. Project memiliki fondasi Next.js, kontrak
+environment, Supabase SSR, Prisma schema lengkap, migration, constraint, index,
+audit log, RLS deny-by-default, dan seed development. Migration telah diterapkan
+ke database Supabase staging.
 
 ## Prasyarat
 
@@ -77,15 +76,24 @@ npm run check
 
 ## Prisma
 
-Schema awal berada di `prisma/schema.prisma`. Belum ada model domain pada Phase 0.
+Schema domain berada di `prisma/schema.prisma`. Riwayat migration berada di
+`prisma/migrations`.
 
 ```bash
 npm run prisma:format
 npm run prisma:validate
+npm run prisma:verify-migration
+npm run prisma:migrate:deploy
+npm run prisma:seed
 ```
 
-Migration pertama hanya boleh dibuat setelah desain retention pembayaran dan
-schema bisnis mendapat keputusan final.
+Seed bersifat idempotent dan menambahkan tiga jalur, dua kategori, sembilan field
+data pribadi, serta sepuluh field observasi. Pertanyaan observasi nomor 3–10
+masih berupa placeholder development dan harus diisi panitia melalui Form Builder.
+
+Ledger pembayaran menggunakan `ON DELETE SET NULL`: penghapusan calon murid
+melepas relasi aktif tetapi mempertahankan nominal, status, referensi transaksi,
+dan UUID referensi non-PII untuk audit keuangan.
 
 ## Supabase Auth
 

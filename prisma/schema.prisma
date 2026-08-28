@@ -7,5 +7,364 @@ datasource db {
   provider = "postgresql"
 }
 
-// Model domain sengaja belum ditambahkan pada Phase 0.
-// Schema bisnis dibuat setelah keputusan retention pembayaran disahkan.
+enum UserRole {
+  WALI_MURID @map("wali_murid")
+  ADMIN      @map("admin")
+
+  @@map("user_role")
+}
+
+enum KategoriTipe {
+  ALUMNI_TKFI @map("alumni_tkfi")
+  EKSTERNAL   @map("eksternal")
+
+  @@map("kategori_tipe")
+}
+
+enum SubKategoriAlumni {
+  TKIT_FI_1 @map("tkit_fi_1")
+  TKIT_FI_2 @map("tkit_fi_2")
+
+  @@map("sub_kategori_alumni")
+}
+
+enum StatusKeseluruhan {
+  PILIH_JALUR               @map("pilih_jalur")
+  MENUNGGU_VERIFIKASI_BAYAR @map("menunggu_verifikasi_bayar")
+  ENROLLMENT                @map("enrollment")
+  MENUNGGU_ASESMEN          @map("menunggu_asesmen")
+  MENUNGGU_PENGUMUMAN       @map("menunggu_pengumuman")
+  DITERIMA                  @map("diterima")
+  TIDAK_DITERIMA            @map("tidak_diterima")
+  MENUNGGU_KUOTA_FALLBACK   @map("menunggu_kuota_fallback")
+  MENUNGGU_DU               @map("menunggu_du")
+  MENUNGGU_JOIN_WA          @map("menunggu_join_wa")
+  SELESAI                   @map("selesai")
+
+  @@map("status_keseluruhan")
+}
+
+enum FormType {
+  DATA_PRIBADI @map("data_pribadi")
+  OBSERVASI    @map("observasi")
+
+  @@map("form_type")
+}
+
+enum TipeInput {
+  TEXT     @map("text")
+  TEXTAREA @map("textarea")
+  DATE     @map("date")
+  NUMBER   @map("number")
+  EMAIL    @map("email")
+  TEL      @map("tel")
+
+  @@map("tipe_input")
+}
+
+enum JenisPembayaran {
+  PENDAFTARAN @map("pendaftaran")
+  DU          @map("du")
+
+  @@map("jenis_pembayaran")
+}
+
+enum MetodePembayaran {
+  MANUAL_TRANSFER @map("manual_transfer")
+  MIDTRANS        @map("midtrans")
+
+  @@map("metode_pembayaran")
+}
+
+enum StatusPembayaran {
+  PENDING  @map("pending")
+  VERIFIED @map("verified")
+  REJECTED @map("rejected")
+
+  @@map("status_pembayaran")
+}
+
+enum TahapKonten {
+  ASSESSMENT    @map("assessment")
+  ANNOUNCEMENT  @map("announcement")
+  ADMISSION_FEE @map("admission_fee")
+  JOIN_WA       @map("join_wa")
+
+  @@map("tahap_konten")
+}
+
+enum StatusAssessment {
+  BELUM       @map("belum")
+  HADIR       @map("hadir")
+  TIDAK_HADIR @map("tidak_hadir")
+
+  @@map("status_assessment")
+}
+
+enum StatusPengumuman {
+  DITERIMA       @map("diterima")
+  TIDAK_DITERIMA @map("tidak_diterima")
+
+  @@map("status_pengumuman")
+}
+
+enum StatusUndanganWa {
+  MENUNGGU       @map("menunggu")
+  SUDAH_DIUNDANG @map("sudah_diundang")
+
+  @@map("status_undangan_wa")
+}
+
+model User {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supabaseAuthUserId String   @unique @map("supabase_auth_user_id") @db.Uuid
+  email              String   @unique @db.VarChar(255)
+  role               UserRole @default(WALI_MURID)
+  statusAktif        Boolean  @default(true) @map("status_aktif")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid             CalonMurid[]
+  pembayaranDiverifikasi Pembayaran[]   @relation("PembayaranVerifier")
+  pengumumanDiubah       Pengumuman[]   @relation("PengumumanUpdater")
+  statusGrupWaDiubah     StatusGrupWa[] @relation("StatusGrupWaUpdater")
+  auditLogs              AuditLog[]     @relation("AuditActor")
+
+  @@map("users")
+}
+
+model Jalur {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama               String    @unique @db.VarChar(50)
+  statusAktif        Boolean   @default(true) @map("status_aktif")
+  periodeMulai       DateTime? @map("periode_mulai") @db.Date
+  periodeSelesai     DateTime? @map("periode_selesai") @db.Date
+  kuotaMaks          Int?      @map("kuota_maks")
+  kuotaTerpakai      Int       @default(0) @map("kuota_terpakai")
+  fallbackJalurId    String?   @map("fallback_jalur_id") @db.Uuid
+  hapusDataJikaGagal Boolean   @default(false) @map("hapus_data_jika_gagal")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  fallbackJalur    Jalur?             @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
+  sumberFallback   Jalur[]            @relation("JalurFallback")
+  biayaPendaftaran BiayaPendaftaran[]
+  calonMuridAktif  CalonMurid[]       @relation("CalonMuridJalur")
+  calonMuridAsal   CalonMurid[]       @relation("CalonMuridJalurAsal")
+  antrianFallback  CalonMurid[]       @relation("CalonMuridMenungguFallback")
+  kontenTahap      KontenTahap[]
+
+  @@index([statusAktif, periodeMulai, periodeSelesai])
+  @@index([fallbackJalurId])
+  @@map("jalur")
+}
+
+model KategoriPendaftar {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama           String       @unique @db.VarChar(50)
+  tipe           KategoriTipe
+  statusAktif    Boolean      @default(true) @map("status_aktif")
+  periodeMulai   DateTime?    @map("periode_mulai") @db.Date
+  periodeSelesai DateTime?    @map("periode_selesai") @db.Date
+  kuotaMaks      Int?         @map("kuota_maks")
+  kuotaTerpakai  Int          @default(0) @map("kuota_terpakai")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  biayaPendaftaran BiayaPendaftaran[]
+  calonMurid       CalonMurid[]
+  kontenTahap      KontenTahap[]
+
+  @@index([statusAktif, periodeMulai, periodeSelesai])
+  @@map("kategori_pendaftar")
+}
+
+model BiayaPendaftaran {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jalurId     String   @map("jalur_id") @db.Uuid
+  kategoriId  String   @map("kategori_id") @db.Uuid
+  nominal     Int
+  statusAktif Boolean  @default(true) @map("status_aktif")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  jalur    Jalur             @relation(fields: [jalurId], references: [id], onDelete: Restrict)
+  kategori KategoriPendaftar @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
+
+  @@unique([jalurId, kategoriId])
+  @@index([statusAktif])
+  @@map("biaya_pendaftaran")
+}
+
+model CalonMurid {
+  id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String             @map("user_id") @db.Uuid
+  namaAnak                String             @map("nama_anak") @db.VarChar(150)
+  jalurId                 String             @map("jalur_id") @db.Uuid
+  kategoriId              String             @map("kategori_id") @db.Uuid
+  subKategoriEnum         SubKategoriAlumni? @map("sub_kategori_enum")
+  subKategoriText         String?            @map("sub_kategori_text") @db.VarChar(150)
+  jalurAsalId             String?            @map("jalur_asal_id") @db.Uuid
+  menungguFallbackJalurId String?            @map("menunggu_fallback_jalur_id") @db.Uuid
+  statusKeseluruhan       StatusKeseluruhan  @default(PILIH_JALUR) @map("status_keseluruhan")
+  createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  jalur                 Jalur             @relation("CalonMuridJalur", fields: [jalurId], references: [id], onDelete: Restrict)
+  kategori              KategoriPendaftar @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
+  jalurAsal             Jalur?            @relation("CalonMuridJalurAsal", fields: [jalurAsalId], references: [id], onDelete: SetNull)
+  menungguFallbackJalur Jalur?            @relation("CalonMuridMenungguFallback", fields: [menungguFallbackJalurId], references: [id], onDelete: SetNull)
+  formResponses         FormResponse[]
+  pembayaran            Pembayaran[]
+  hasilAssessment       HasilAssessment?
+  pengumuman            Pengumuman?
+  statusGrupWa          StatusGrupWa?
+
+  @@index([userId])
+  @@index([jalurId])
+  @@index([kategoriId])
+  @@index([statusKeseluruhan])
+  @@index([menungguFallbackJalurId, createdAt])
+  @@map("calon_murid")
+}
+
+model FormField {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formType       FormType  @map("form_type")
+  label          String    @db.VarChar(150)
+  tipeInput      TipeInput @map("tipe_input")
+  wajib          Boolean   @default(true)
+  urutan         Int       @default(0)
+  validasi       String?   @db.VarChar(50)
+  autoFillSource String?   @map("auto_fill_source") @db.VarChar(30)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  responses FormResponse[]
+
+  @@unique([formType, label])
+  @@index([formType, urutan])
+  @@map("form_field")
+}
+
+model FormResponse {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calonMuridId String   @map("calon_murid_id") @db.Uuid
+  fieldId      String   @map("field_id") @db.Uuid
+  value        String?
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
+  field      FormField  @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+
+  @@unique([calonMuridId, fieldId])
+  @@index([calonMuridId])
+  @@index([fieldId])
+  @@map("form_response")
+}
+
+model Pembayaran {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calonMuridId          String?          @map("calon_murid_id") @db.Uuid
+  calonMuridReference   String           @map("calon_murid_reference") @db.Uuid
+  jenis                 JenisPembayaran
+  metodePembayaran      MetodePembayaran @map("metode_pembayaran")
+  nominal               Int
+  fileBuktiUrl          String?          @map("file_bukti_url")
+  status                StatusPembayaran @default(PENDING)
+  catatanAdmin          String?          @map("catatan_admin")
+  verifiedById          String?          @map("verified_by") @db.Uuid
+  verifiedAt            DateTime?        @map("verified_at") @db.Timestamptz(6)
+  midtransOrderId       String?          @unique @map("midtrans_order_id") @db.VarChar(100)
+  midtransTransactionId String?          @unique @map("midtrans_transaction_id") @db.VarChar(100)
+  midtransSnapToken     String?          @map("midtrans_snap_token")
+  midtransPaymentType   String?          @map("midtrans_payment_type") @db.VarChar(30)
+  midtransRawPayload    Json?            @map("midtrans_raw_payload") @db.JsonB
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid? @relation(fields: [calonMuridId], references: [id], onDelete: SetNull)
+  verifiedBy User?       @relation("PembayaranVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@unique([calonMuridReference, jenis])
+  @@index([calonMuridId])
+  @@index([calonMuridReference])
+  @@index([status, createdAt])
+  @@map("pembayaran")
+}
+
+model KontenTahap {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tahap        TahapKonten
+  judul        String      @db.VarChar(200)
+  tanggal      DateTime?   @db.Date
+  isiTeks      String?     @map("isi_teks")
+  gambarUrl    String?     @map("gambar_url")
+  urutanLayout Int         @default(0) @map("urutan_layout")
+  statusAktif  Boolean     @default(true) @map("status_aktif")
+  jalurId      String?     @map("jalur_id") @db.Uuid
+  kategoriId   String?     @map("kategori_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  jalur    Jalur?             @relation(fields: [jalurId], references: [id], onDelete: SetNull)
+  kategori KategoriPendaftar? @relation(fields: [kategoriId], references: [id], onDelete: SetNull)
+
+  @@index([tahap, statusAktif, urutanLayout])
+  @@index([jalurId, kategoriId])
+  @@map("konten_tahap")
+}
+
+model HasilAssessment {
+  calonMuridId String           @id @map("calon_murid_id") @db.Uuid
+  status       StatusAssessment @default(BELUM)
+  catatan      String?
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
+
+  @@map("hasil_assessment")
+}
+
+model Pengumuman {
+  calonMuridId String            @id @map("calon_murid_id") @db.Uuid
+  statusAkhir  StatusPengumuman? @map("status_akhir")
+  tanggalRilis DateTime?         @map("tanggal_rilis") @db.Date
+  updatedById  String?           @map("updated_by") @db.Uuid
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
+  updatedBy  User?      @relation("PengumumanUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("pengumuman")
+}
+
+model StatusGrupWa {
+  calonMuridId String           @id @map("calon_murid_id") @db.Uuid
+  status       StatusUndanganWa @default(MENUNGGU)
+  updatedById  String?          @map("updated_by") @db.Uuid
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
+  updatedBy  User?      @relation("StatusGrupWaUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("status_grup_wa")
+}
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  String?  @map("entity_id") @db.Uuid
+  detail    Json     @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([entity, entityId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_log")
+}

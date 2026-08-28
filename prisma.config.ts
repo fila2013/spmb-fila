@@ -8,6 +8,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
   },
   // Generate/validate tidak membutuhkan koneksi. Saat DIRECT_URL tersedia,
   // perintah database dan migration selalu memakai koneksi direct Supabase.
