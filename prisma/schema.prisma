@@ -1,0 +1,11 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Model domain sengaja belum ditambahkan pada Phase 0.
+// Schema bisnis dibuat setelah keputusan retention pembayaran disahkan.
