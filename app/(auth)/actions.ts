@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { UserRole } from "@/generated/prisma/enums";
 import type { AuthActionState } from "@/lib/auth/action-state";
+import { signupErrorMessage } from "@/lib/auth/messages";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -50,9 +51,13 @@ export async function registerAction(
   });
 
   if (error) {
+    console.error("Supabase sign-up gagal.", {
+      code: error.code ?? "unknown",
+      status: error.status,
+    });
     return {
       status: "error",
-      message: "Akun belum dapat dibuat. Coba kembali beberapa saat lagi.",
+      message: signupErrorMessage(error.code),
     };
   }
 
