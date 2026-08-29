@@ -12,6 +12,58 @@ const booleanStringSchema = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
 
+const midtransEnvironmentFields = {
+  MIDTRANS_MERCHANT_ID: z.string().min(1),
+  MIDTRANS_SERVER_KEY: z.string().min(1),
+  MIDTRANS_CLIENT_KEY: z.string().min(1),
+  NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: z.string().min(1),
+  MIDTRANS_IS_PRODUCTION: booleanStringSchema,
+  MIDTRANS_NOTIFICATION_URL: z
+    .url()
+    .refine((value) => value.startsWith("https://"), "Webhook Midtrans harus menggunakan HTTPS.")
+    .optional(),
+  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+};
+
+function validateMidtransEnvironment(
+  environment: {
+    MIDTRANS_CLIENT_KEY: string;
+    NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: string;
+    MIDTRANS_IS_PRODUCTION: boolean;
+    VERCEL_ENV?: "development" | "preview" | "production";
+  },
+  context: z.core.$RefinementCtx,
+) {
+  if (
+    environment.MIDTRANS_CLIENT_KEY !==
+    environment.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["MIDTRANS_CLIENT_KEY"],
+      message: "MIDTRANS_CLIENT_KEY dan NEXT_PUBLIC_MIDTRANS_CLIENT_KEY harus sama.",
+      input: environment.MIDTRANS_CLIENT_KEY,
+    });
+  }
+
+  if (
+    environment.VERCEL_ENV &&
+    environment.VERCEL_ENV !== "production" &&
+    environment.MIDTRANS_IS_PRODUCTION
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["MIDTRANS_IS_PRODUCTION"],
+      message: "Midtrans production hanya boleh aktif pada Vercel Production.",
+      input: environment.MIDTRANS_IS_PRODUCTION,
+    });
+  }
+}
+
+export const midtransEnvironmentSchema = z
+  .object(midtransEnvironmentFields)
+  .superRefine(validateMidtransEnvironment);
+
 export const supabasePublicEnvironmentSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
@@ -59,10 +111,13 @@ export const serverEnvironmentSchema = publicEnvironmentSchema
     DIRECT_URL: postgresUrlSchema,
     SUPABASE_STORAGE_BUCKET_PEMBAYARAN: z.string().min(1),
     SUPABASE_STORAGE_BUCKET_CMS: z.string().min(1),
-    MIDTRANS_SERVER_KEY: z.string().min(1),
-    MIDTRANS_CLIENT_KEY: z.string().min(1),
-    MIDTRANS_IS_PRODUCTION: booleanStringSchema,
-    VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+    MIDTRANS_MERCHANT_ID: midtransEnvironmentFields.MIDTRANS_MERCHANT_ID,
+    MIDTRANS_SERVER_KEY: midtransEnvironmentFields.MIDTRANS_SERVER_KEY,
+    MIDTRANS_CLIENT_KEY: midtransEnvironmentFields.MIDTRANS_CLIENT_KEY,
+    MIDTRANS_IS_PRODUCTION: midtransEnvironmentFields.MIDTRANS_IS_PRODUCTION,
+    MIDTRANS_NOTIFICATION_URL:
+      midtransEnvironmentFields.MIDTRANS_NOTIFICATION_URL,
+    VERCEL_ENV: midtransEnvironmentFields.VERCEL_ENV,
   })
   .superRefine((environment, context) => {
     if (
@@ -77,39 +132,7 @@ export const serverEnvironmentSchema = publicEnvironmentSchema
       });
     }
 
-    if (
-      environment.MIDTRANS_CLIENT_KEY !==
-      environment.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["MIDTRANS_CLIENT_KEY"],
-        message: "MIDTRANS_CLIENT_KEY dan NEXT_PUBLIC_MIDTRANS_CLIENT_KEY harus sama.",
-      });
-    }
-
-    if (
-      environment.VERCEL_ENV &&
-      environment.VERCEL_ENV !== "production" &&
-      environment.MIDTRANS_IS_PRODUCTION
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["MIDTRANS_IS_PRODUCTION"],
-        message: "Midtrans production hanya boleh aktif pada Vercel Production.",
-      });
-    }
-
-    if (
-      environment.VERCEL_ENV === "production" &&
-      !environment.MIDTRANS_IS_PRODUCTION
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["MIDTRANS_IS_PRODUCTION"],
-        message: "Vercel Production wajib menggunakan konfigurasi Midtrans production.",
-      });
-    }
+    validateMidtransEnvironment(environment, context);
   });
 
 export type PublicEnvironment = z.infer<typeof publicEnvironmentSchema>;
@@ -122,3 +145,4 @@ export type SupabaseAdminEnvironment = z.infer<
 export type AppEnvironment = z.infer<typeof appEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
+export type MidtransEnvironment = z.infer<typeof midtransEnvironmentSchema>;

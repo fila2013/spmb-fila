@@ -20,6 +20,7 @@
     "test:auth-integration": "tsx scripts/verify-auth-profile.ts",
     "test:phase3-integration": "tsx scripts/verify-phase3.ts",
     "test:phase4-integration": "tsx scripts/verify-phase4.ts",
+    "test:phase5-integration": "tsx scripts/verify-phase5.ts",
     "auth:set-admin": "tsx scripts/set-admin.ts",
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",

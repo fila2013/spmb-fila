@@ -3,6 +3,8 @@ import "server-only";
 import {
   databaseEnvironmentSchema,
   type DatabaseEnvironment,
+  midtransEnvironmentSchema,
+  type MidtransEnvironment,
   serverEnvironmentSchema,
   type ServerEnvironment,
   supabaseAdminEnvironmentSchema,
@@ -12,6 +14,7 @@ import {
 let cachedEnvironment: ServerEnvironment | undefined;
 let cachedSupabaseAdminEnvironment: SupabaseAdminEnvironment | undefined;
 let cachedDatabaseEnvironment: DatabaseEnvironment | undefined;
+let cachedMidtransEnvironment: MidtransEnvironment | undefined;
 
 export function getDatabaseEnvironment(): DatabaseEnvironment {
   cachedDatabaseEnvironment ??= databaseEnvironmentSchema.parse({
@@ -34,6 +37,22 @@ export function getSupabaseAdminEnvironment(): SupabaseAdminEnvironment {
   return cachedSupabaseAdminEnvironment;
 }
 
+export function getMidtransEnvironment(): MidtransEnvironment {
+  cachedMidtransEnvironment ??= midtransEnvironmentSchema.parse({
+    MIDTRANS_MERCHANT_ID: process.env.MIDTRANS_MERCHANT_ID,
+    MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY,
+    MIDTRANS_CLIENT_KEY: process.env.MIDTRANS_CLIENT_KEY,
+    NEXT_PUBLIC_MIDTRANS_CLIENT_KEY:
+      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
+    MIDTRANS_IS_PRODUCTION: process.env.MIDTRANS_IS_PRODUCTION,
+    MIDTRANS_NOTIFICATION_URL:
+      process.env.MIDTRANS_NOTIFICATION_URL || undefined,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  });
+
+  return cachedMidtransEnvironment;
+}
+
 export function getServerEnvironment(): ServerEnvironment {
   cachedEnvironment ??= serverEnvironmentSchema.parse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -49,9 +68,12 @@ export function getServerEnvironment(): ServerEnvironment {
     SUPABASE_STORAGE_BUCKET_PEMBAYARAN:
       process.env.SUPABASE_STORAGE_BUCKET_PEMBAYARAN,
     SUPABASE_STORAGE_BUCKET_CMS: process.env.SUPABASE_STORAGE_BUCKET_CMS,
+    MIDTRANS_MERCHANT_ID: process.env.MIDTRANS_MERCHANT_ID,
     MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY,
     MIDTRANS_CLIENT_KEY: process.env.MIDTRANS_CLIENT_KEY,
     MIDTRANS_IS_PRODUCTION: process.env.MIDTRANS_IS_PRODUCTION,
+    MIDTRANS_NOTIFICATION_URL:
+      process.env.MIDTRANS_NOTIFICATION_URL || undefined,
     VERCEL_ENV: process.env.VERCEL_ENV,
   });
 

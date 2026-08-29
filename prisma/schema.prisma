@@ -287,7 +287,7 @@ model Pembayaran {
   calonMurid CalonMurid? @relation(fields: [calonMuridId], references: [id], onDelete: SetNull)
   verifiedBy User?       @relation("PembayaranVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
 
-  @@unique([calonMuridReference, jenis])
+  @@index([calonMuridReference, jenis, createdAt])
   @@index([calonMuridId])
   @@index([calonMuridReference])
   @@index([status, createdAt])

@@ -27,6 +27,13 @@ const phase4MigrationSql = await readFile(
   ),
   "utf8",
 );
+const phase5MigrationSql = await readFile(
+  new URL(
+    "./migrations/20260829210000_phase5_payment_attempts/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -48,6 +55,7 @@ try {
   await client.query(initialMigrationSql);
   await client.query(rlsMigrationSql);
   await client.query(phase4MigrationSql);
+  await client.query(phase5MigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -151,7 +159,7 @@ try {
     "Referensi audit pembayaran tidak dipertahankan.",
   );
 
-  console.log("Migration Phase 1–4 dan retention pembayaran tervalidasi.");
+  console.log("Migration Phase 1–5 dan retention pembayaran tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

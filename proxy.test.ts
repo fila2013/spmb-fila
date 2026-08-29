@@ -26,4 +26,14 @@ describe("Supabase session proxy matcher", () => {
       ).toBe(false);
     },
   );
+
+  it("melewati webhook Midtrans yang tidak memakai session", () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "/api/webhooks/midtrans",
+      }),
+    ).toBe(false);
+  });
 });

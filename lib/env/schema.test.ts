@@ -21,6 +21,7 @@ const validServerEnvironment = {
     "postgresql://postgres:password@db.example.invalid:5432/postgres",
   SUPABASE_STORAGE_BUCKET_PEMBAYARAN: "bukti-pembayaran",
   SUPABASE_STORAGE_BUCKET_CMS: "konten-cms",
+  MIDTRANS_MERCHANT_ID: "M123456789",
   MIDTRANS_SERVER_KEY: "Mid-server-example",
   MIDTRANS_CLIENT_KEY: "Mid-client-example",
   MIDTRANS_IS_PRODUCTION: "false",
@@ -97,11 +98,21 @@ describe("serverEnvironmentSchema", () => {
     ).toThrow();
   });
 
-  it("mewajibkan Midtrans production pada Vercel Production", () => {
-    expect(() =>
+  it("mengizinkan Sandbox sementara pada Vercel Production", () => {
+    expect(
       serverEnvironmentSchema.parse({
         ...validServerEnvironment,
         VERCEL_ENV: "production",
+      }).MIDTRANS_IS_PRODUCTION,
+    ).toBe(false);
+  });
+
+  it("mewajibkan HTTPS untuk override webhook Midtrans", () => {
+    expect(() =>
+      serverEnvironmentSchema.parse({
+        ...validServerEnvironment,
+        MIDTRANS_NOTIFICATION_URL:
+          "http://localhost:3000/api/webhooks/midtrans",
       }),
     ).toThrow();
   });

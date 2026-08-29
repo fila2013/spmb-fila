@@ -15,11 +15,11 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 4 sudah selesai. Selain fondasi database, Supabase Auth,
-dan master data, wali murid dapat mengelola beberapa anak dalam satu akun,
-memilih jalur/kategori, dan melihat ringkasan biaya. Pemakaian kuota dilindungi
-transaction serta row lock. Seluruh migration telah diterapkan ke database
-Supabase staging.
+Phase 0 sampai Phase 5 sudah selesai. Selain fondasi database, Supabase Auth,
+master data, dan pendaftaran multi-anak, pembayaran pendaftaran sudah
+terintegrasi dengan Midtrans Snap Sandbox. Status final berasal dari webhook
+bertanda tangan dan membuka enrollment secara server-side. Seluruh migration
+telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
 
@@ -204,5 +204,30 @@ ownership, penolakan `userId` dari client, dan kategori tanpa biaya:
 npm run test:phase4-integration
 ```
 
-Tombol Midtrans pada halaman ringkasan masih dinonaktifkan karena transaksi
-pembayaran pendaftaran merupakan scope Phase 5.
+## Midtrans Sandbox Phase 5
+
+Phase 5 sementara dikunci ke Sandbox (`MIDTRANS_IS_PRODUCTION=false`) sampai
+validasi merchant Production selesai. Detail konfigurasi dan skenario uji ada
+di `docs/MIDTRANS_SANDBOX_CHECKLIST.md`.
+
+Endpoint pembayaran:
+
+```text
+POST /api/calon-murid/:id/pembayaran/midtrans/create
+GET  /api/calon-murid/:id/pembayaran
+POST /api/webhooks/midtrans
+```
+
+Create transaction memverifikasi session, role, ownership, status tahap, dan
+mengambil nominal dari matrix biaya. Webhook tidak memakai session Supabase;
+signature SHA-512, Merchant ID, dan nominal wajib cocok sebelum perubahan
+status. Payload audit disanitasi dan tidak menyimpan signature, nomor VA, atau
+detail instrumen pembayaran.
+
+Smoke test melakukan request Snap nyata ke Sandbox, menguji idempotency,
+ownership, invalid signature, amount/merchant mismatch, pending, settlement,
+expire, retry attempt, polling status, dan enrollment transition:
+
+```bash
+npm run test:phase5-integration
+```

@@ -2,39 +2,69 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { SnapPaymentPanel } from "@/components/payment/snap-payment-panel";
+import { StatusPembayaran } from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
-import { getPaymentPreparation } from "@/lib/calon-murid/service";
+import { getMidtransEnvironment } from "@/lib/env/server";
+import { PaymentError } from "@/lib/payment/errors";
+import { midtransUrls } from "@/lib/payment/rules";
+import { getRegistrationPaymentPageData } from "@/lib/payment/service";
 
 export const metadata: Metadata = { title: "Pembayaran pendaftaran" };
 
 function rupiah(value: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
-export default async function PaymentPreparationPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PaymentPreparationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const user = await requireWaliPage();
   const { id } = await params;
   let summary;
   try {
-    summary = await getPaymentPreparation(id, user.userId);
+    summary = await getRegistrationPaymentPageData(id, user.userId);
   } catch (error) {
-    if (error instanceof AuthorizationError || error instanceof CalonMuridError) notFound();
+    if (
+      error instanceof AuthorizationError ||
+      error instanceof CalonMuridError ||
+      error instanceof PaymentError
+    ) {
+      notFound();
+    }
     throw error;
   }
 
-  const { child, fee } = summary;
+  const { child, payment, nominal } = summary;
   const subCategory = child.subKategoriEnum
-    ? child.subKategoriEnum === "TKIT_FI_1" ? "TKIT Fitrah Insani 1" : "TKIT Fitrah Insani 2"
+    ? child.subKategoriEnum === "TKIT_FI_1"
+      ? "TKIT Fitrah Insani 1"
+      : "TKIT Fitrah Insani 2"
     : child.subKategoriText;
+  const midtrans = getMidtransEnvironment();
+  const urls = midtransUrls(midtrans.MIDTRANS_IS_PRODUCTION);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-12">
-      <Link href="/dashboard" className="text-sm font-semibold text-emerald-800 hover:underline">← Kembali ke Anak Saya</Link>
+      <Link
+        href="/dashboard"
+        className="text-sm font-semibold text-emerald-800 hover:underline"
+      >
+        ← Kembali ke Anak Saya
+      </Link>
       <section className="mt-6 overflow-hidden rounded-3xl border border-emerald-950/10 bg-white shadow-sm">
         <div className="bg-emerald-950 px-6 py-7 text-white sm:px-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-300">Ringkasan pendaftaran</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-300">
+            Ringkasan pendaftaran
+          </p>
           <h1 className="mt-2 text-3xl font-bold">Pembayaran pendaftaran</h1>
         </div>
         <div className="p-6 sm:p-8">
@@ -46,10 +76,21 @@ export default async function PaymentPreparationPage({ params }: { params: Promi
           </dl>
           <div className="mt-7 rounded-2xl bg-emerald-50 p-5">
             <p className="text-sm font-semibold text-emerald-800">Total biaya pendaftaran</p>
-            <p className="mt-1 text-3xl font-bold text-emerald-950">{rupiah(fee.nominal)}</p>
-            <p className="mt-2 text-xs leading-5 text-slate-600">Nominal diambil langsung dari matriks biaya aktif.</p>
+            <p className="mt-1 text-3xl font-bold text-emerald-950">{rupiah(nominal)}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-600">Nominal diambil langsung oleh server dari matriks biaya aktif.</p>
           </div>
-          <button disabled className="mt-6 w-full cursor-not-allowed rounded-xl bg-slate-300 px-5 py-3.5 text-sm font-bold text-slate-600">Pembayaran Midtrans tersedia pada Phase 5</button>
+          <SnapPaymentPanel
+            childId={child.id}
+            clientKey={midtrans.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+            snapScriptUrl={urls.snapScriptUrl}
+            environment={urls.environment}
+            initialStatus={payment?.status ?? null}
+            initialSnapToken={
+              payment?.status === StatusPembayaran.PENDING
+                ? payment.midtransSnapToken
+                : null
+            }
+          />
         </div>
       </section>
     </div>
