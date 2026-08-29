@@ -26,6 +26,17 @@ function nextLink(child: {
   if (child.statusKeseluruhan === StatusKeseluruhan.ENROLLMENT) {
     return `/anak/${child.id}/enrollment/data-pribadi`;
   }
+  if (child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_ASESMEN) {
+    return `/anak/${child.id}/assessment`;
+  }
+  if (
+    child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PENGUMUMAN ||
+    child.statusKeseluruhan === StatusKeseluruhan.DITERIMA ||
+    child.statusKeseluruhan === StatusKeseluruhan.TIDAK_DITERIMA ||
+    child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK
+  ) {
+    return `/anak/${child.id}/pengumuman`;
+  }
   return null;
 }
 
@@ -69,7 +80,7 @@ export default async function DashboardPage() {
                   <div><dt className="text-slate-500">Kategori</dt><dd className="font-semibold text-slate-800">{child.kategori?.nama ?? "Belum dipilih"}</dd></div>
                 </dl>
                 {href ? (
-                  <Link href={href} className="mt-6 inline-flex w-full justify-center rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">Lanjutkan pendaftaran</Link>
+                  <Link href={href} className="mt-6 inline-flex w-full justify-center rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">Lihat tahap saat ini</Link>
                 ) : (
                   <p className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Tahap berikutnya akan muncul sesuai progres pendaftaran.</p>
                 )}

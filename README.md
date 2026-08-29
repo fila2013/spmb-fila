@@ -15,10 +15,12 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 6 sudah selesai. Selain fondasi database, Supabase Auth,
+Phase 0 sampai Phase 7 sudah selesai. Selain fondasi database, Supabase Auth,
 master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
 mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
 dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
+Admin dapat mengelola konten assessment/announcement dan hasil individual;
+keputusan final tidak terlihat oleh wali sebelum tanggal rilis Asia/Jakarta.
 Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
@@ -266,4 +268,30 @@ pasca-submit:
 
 ```bash
 npm run test:phase6-integration
+```
+
+## Assessment & Announcement Phase 7
+
+Halaman wali murid:
+
+```text
+/anak/:id/assessment
+/anak/:id/pengumuman
+```
+
+Admin mengelola peserta melalui `/admin/peserta` dan konten scoped per
+jalur/kategori melalui `/admin/konten/assessment` serta
+`/admin/konten/announcement`. Gambar CMS disimpan di bucket
+`SUPABASE_STORAGE_BUCKET_CMS`, dengan validasi JPG/PNG/WebP maksimal 5 MB.
+
+Hasil assessment memajukan peserta ke `MENUNGGU_PENGUMUMAN`. Keputusan
+announcement disimpan per anak dan hanya dikembalikan backend pada atau setelah
+tanggal rilis kalender Asia/Jakarta. Keputusan gagal pada jalur yang memakai
+fallback atau auto-delete sengaja ditahan sampai transaksi Phase 8 tersedia.
+
+Integration test staging memeriksa role, ownership, CMS scope, transisi status,
+release gate tanpa kebocoran hasil/konten, audit log, dan dependency Phase 8:
+
+```bash
+npm run test:phase7-integration
 ```

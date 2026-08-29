@@ -9,6 +9,9 @@ const navigation = [
   { href: "/admin/kategori", label: "Kategori & kuota" },
   { href: "/admin/biaya-pendaftaran", label: "Biaya pendaftaran" },
   { href: "/admin/form-builder", label: "Form builder" },
+  { href: "/admin/peserta", label: "Peserta" },
+  { href: "/admin/konten/assessment", label: "Konten assessment" },
+  { href: "/admin/konten/announcement", label: "Konten announcement" },
 ];
 
 export function AdminShell({
@@ -55,7 +58,7 @@ export function AdminShell({
       </aside>
 
       <main>
-        <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-700">Master data</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-700">Administrasi SPMB</p>
         <h1 className="mt-2 text-3xl font-bold text-emerald-950">{title}</h1>
         <p className="mt-2 max-w-3xl leading-7 text-slate-600">{description}</p>
         <div className="mt-8">{children}</div>
