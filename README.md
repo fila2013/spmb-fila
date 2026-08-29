@@ -15,10 +15,11 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0, Phase 1, dan Phase 2 sudah selesai. Selain fondasi database, project
-memiliki Supabase Auth berbasis cookie, registrasi/login/logout/reset password,
-sinkronisasi profile `users`, serta guard server untuk session, role, dan
-ownership. Seluruh migration telah diterapkan ke database Supabase staging.
+Phase 0 sampai Phase 3 sudah selesai. Selain fondasi database dan Supabase Auth,
+project memiliki master data Jalur, Kategori, Kuota, dan matrix Biaya
+Pendaftaran. Admin dapat mengelolanya melalui UI atau API terproteksi; setiap
+perubahan penting dicatat pada audit log. Seluruh migration telah diterapkan ke
+database Supabase staging.
 
 ## Prasyarat
 
@@ -149,3 +150,31 @@ Uji integrasi trigger terhadap staging membuat dan membersihkan akun sementara:
 ```bash
 npm run test:auth-integration
 ```
+
+## Master Data Phase 3
+
+Halaman admin tersedia di:
+
+```text
+/admin/dashboard
+/admin/jalur
+/admin/kategori
+/admin/biaya-pendaftaran
+```
+
+API `GET/POST/PATCH` tersedia di bawah `/api/admin/jalur`,
+`/api/admin/kategori`, dan `/api/admin/biaya-pendaftaran`. Semua endpoint
+memverifikasi session serta role admin pada server. Kuota terpakai tidak diterima
+sebagai input admin; perubahan batas kuota memakai row lock dan tidak boleh lebih
+kecil dari pemakaian berjalan.
+
+Smoke test staging membuat akun admin dan master data sementara melalui API,
+memeriksa authorization serta audit log, lalu membersihkannya kembali:
+
+```bash
+npm run test:phase3-integration
+```
+
+Jika production memakai Supabase project/database yang berbeda dari staging,
+akun Auth dan pemberian role admin harus dibuat ulang di production setelah
+migration diterapkan. Role tidak berpindah otomatis antar-project.

@@ -1,7 +1,5 @@
 import "server-only";
 
-import { cache } from "react";
-
 import { UserRole } from "@/generated/prisma/enums";
 import { assertOwnership, assertRole } from "@/lib/auth/authorization";
 import { AuthorizationError } from "@/lib/auth/errors";
@@ -16,7 +14,7 @@ export type AuthContext = {
   role: UserRole;
 };
 
-export const getAuthContext = cache(async (): Promise<AuthContext> => {
+export async function getAuthContext(): Promise<AuthContext> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   const authUserId = data?.claims?.sub;
@@ -59,7 +57,7 @@ export const getAuthContext = cache(async (): Promise<AuthContext> => {
     email: profile.email,
     role: profile.role,
   };
-});
+}
 
 export async function requireAuth() {
   return getAuthContext();
@@ -90,4 +88,3 @@ export async function requireCalonMuridOwnership(calonMuridId: string) {
 }
 
 export { UserRole };
-
