@@ -20,6 +20,13 @@ const rlsMigrationSql = await readFile(
   ),
   "utf8",
 );
+const phase4MigrationSql = await readFile(
+  new URL(
+    "./migrations/20260829133000_phase4_partial_enrollment/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -40,6 +47,7 @@ try {
   await client.query(`SET LOCAL search_path TO "${validationSchema}"`);
   await client.query(initialMigrationSql);
   await client.query(rlsMigrationSql);
+  await client.query(phase4MigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -62,8 +70,8 @@ try {
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 20,
-    `Expected 20 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 21,
+    `Expected 21 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -105,6 +113,22 @@ try {
     [kategoriId, "Eksternal/Umum"],
   );
   await client.query(
+    "INSERT INTO calon_murid (user_id, nama_anak) VALUES ($1, $2)",
+    [userId, "Draft Phase 4"],
+  );
+  await client.query("SAVEPOINT invalid_completed_selection");
+  try {
+    await client.query(
+      "INSERT INTO calon_murid (user_id, nama_anak, status_keseluruhan) VALUES ($1, $2, 'enrollment')",
+      [userId, "Tidak lengkap"],
+    );
+    throw new Error("Constraint tahap pilihan tidak menolak data invalid.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint tahap pilihan tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_completed_selection");
+  }
+  await client.query(
     "INSERT INTO calon_murid (id, user_id, nama_anak, jalur_id, kategori_id) VALUES ($1, $2, $3, $4, $5)",
     [calonMuridId, userId, "Data sementara", jalurId, kategoriId],
   );
@@ -127,7 +151,7 @@ try {
     "Referensi audit pembayaran tidak dipertahankan.",
   );
 
-  console.log("Migration Phase 1 dan retention pembayaran tervalidasi.");
+  console.log("Migration Phase 1–4 dan retention pembayaran tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

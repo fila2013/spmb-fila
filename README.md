@@ -15,11 +15,11 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 3 sudah selesai. Selain fondasi database dan Supabase Auth,
-project memiliki master data Jalur, Kategori, Kuota, dan matrix Biaya
-Pendaftaran. Admin dapat mengelolanya melalui UI atau API terproteksi; setiap
-perubahan penting dicatat pada audit log. Seluruh migration telah diterapkan ke
-database Supabase staging.
+Phase 0 sampai Phase 4 sudah selesai. Selain fondasi database, Supabase Auth,
+dan master data, wali murid dapat mengelola beberapa anak dalam satu akun,
+memilih jalur/kategori, dan melihat ringkasan biaya. Pemakaian kuota dilindungi
+transaction serta row lock. Seluruh migration telah diterapkan ke database
+Supabase staging.
 
 ## Prasyarat
 
@@ -178,3 +178,31 @@ npm run test:phase3-integration
 Jika production memakai Supabase project/database yang berbeda dari staging,
 akun Auth dan pemberian role admin harus dibuat ulang di production setelah
 migration diterapkan. Role tidak berpindah otomatis antar-project.
+
+## Pendaftaran Awal Phase 4
+
+Dashboard wali murid tersedia di `/dashboard`. Alur awal menggunakan halaman
+`/anak/tambah`, `/anak/:id/kategori`, lalu ringkasan persiapan pembayaran di
+`/anak/:id/pembayaran-pendaftaran`. Endpoint JSON tersedia di:
+
+```text
+GET/POST /api/calon-murid
+GET      /api/calon-murid/:id
+PATCH    /api/calon-murid/:id/jalur
+PATCH    /api/calon-murid/:id/kategori
+```
+
+Semua akses memverifikasi session, role wali murid, dan ownership. Kuota jalur
+serta kategori dialokasikan di dalam transaction dengan row lock. Pemilihan
+kategori hanya dapat diteruskan jika kombinasi biaya aktif tersedia; nominal
+selalu dibaca oleh server dari database.
+
+Smoke test staging mencakup race condition kuota, isolasi multi-child,
+ownership, penolakan `userId` dari client, dan kategori tanpa biaya:
+
+```bash
+npm run test:phase4-integration
+```
+
+Tombol Midtrans pada halaman ringkasan masih dinonaktifkan karena transaksi
+pembayaran pendaftaran merupakan scope Phase 5.

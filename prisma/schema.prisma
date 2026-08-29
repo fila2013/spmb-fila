@@ -200,8 +200,8 @@ model CalonMurid {
   id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId                  String             @map("user_id") @db.Uuid
   namaAnak                String             @map("nama_anak") @db.VarChar(150)
-  jalurId                 String             @map("jalur_id") @db.Uuid
-  kategoriId              String             @map("kategori_id") @db.Uuid
+  jalurId                 String?            @map("jalur_id") @db.Uuid
+  kategoriId              String?            @map("kategori_id") @db.Uuid
   subKategoriEnum         SubKategoriAlumni? @map("sub_kategori_enum")
   subKategoriText         String?            @map("sub_kategori_text") @db.VarChar(150)
   jalurAsalId             String?            @map("jalur_asal_id") @db.Uuid
@@ -210,11 +210,11 @@ model CalonMurid {
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user                  User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  jalur                 Jalur             @relation("CalonMuridJalur", fields: [jalurId], references: [id], onDelete: Restrict)
-  kategori              KategoriPendaftar @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
-  jalurAsal             Jalur?            @relation("CalonMuridJalurAsal", fields: [jalurAsalId], references: [id], onDelete: SetNull)
-  menungguFallbackJalur Jalur?            @relation("CalonMuridMenungguFallback", fields: [menungguFallbackJalurId], references: [id], onDelete: SetNull)
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  jalur                 Jalur?             @relation("CalonMuridJalur", fields: [jalurId], references: [id], onDelete: Restrict)
+  kategori              KategoriPendaftar? @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
+  jalurAsal             Jalur?             @relation("CalonMuridJalurAsal", fields: [jalurAsalId], references: [id], onDelete: SetNull)
+  menungguFallbackJalur Jalur?             @relation("CalonMuridMenungguFallback", fields: [menungguFallbackJalurId], references: [id], onDelete: SetNull)
   formResponses         FormResponse[]
   pembayaran            Pembayaran[]
   hasilAssessment       HasilAssessment?

@@ -2,7 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import type { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireAuth, requireRole } from "@/lib/auth/session";
 
@@ -34,3 +34,6 @@ export function requireRolePage(role: UserRole) {
   return resolvePageGuard(() => requireRole(role), "/admin/login");
 }
 
+export function requireWaliPage() {
+  return resolvePageGuard(() => requireRole(UserRole.WALI_MURID), "/login");
+}
