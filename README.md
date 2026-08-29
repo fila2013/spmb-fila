@@ -15,11 +15,11 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 5 sudah selesai. Selain fondasi database, Supabase Auth,
-master data, dan pendaftaran multi-anak, pembayaran pendaftaran sudah
-terintegrasi dengan Midtrans Snap Sandbox. Status final berasal dari webhook
-bertanda tangan dan membuka enrollment secara server-side. Seluruh migration
-telah diterapkan ke database Supabase staging.
+Phase 0 sampai Phase 6 sudah selesai. Selain fondasi database, Supabase Auth,
+master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
+mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
+dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
+Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
 
@@ -230,4 +230,40 @@ expire, retry attempt, polling status, dan enrollment transition:
 
 ```bash
 npm run test:phase5-integration
+```
+
+## Enrollment Phase 6
+
+Halaman wali murid:
+
+```text
+/anak/:id/enrollment/data-pribadi
+/anak/:id/enrollment/observasi
+```
+
+Kontrak API:
+
+```text
+GET /api/enrollment/fields?form_type=data_pribadi&calon_murid_id=:id
+GET /api/calon-murid/:id/enrollment
+PUT /api/calon-murid/:id/enrollment
+```
+
+Semua read/write memverifikasi session, role wali murid, ownership, dan
+pembayaran pendaftaran `VERIFIED`. Draft mengizinkan pengisian bertahap. Submit
+final memvalidasi seluruh field wajib pada kedua form dalam transaction,
+mengunci jawaban, lalu mengubah status calon murid menjadi `MENUNGGU_ASESMEN`.
+Nilai jawaban tidak disalin ke audit log.
+
+Admin mengelola field, tipe input, status wajib, urutan, validasi nomor WA, dan
+auto-fill melalui `/admin/form-builder`. Field yang sudah memiliki jawaban tidak
+dapat dihapus; tipe input/bagian form-nya juga tidak dapat diubah agar makna data
+lama tetap terjaga.
+
+Integration test staging mencakup payment gate, ownership, auto-fill email,
+validasi nomor WA, draft, submit tidak lengkap, final submit, dan penguncian
+pasca-submit:
+
+```bash
+npm run test:phase6-integration
 ```

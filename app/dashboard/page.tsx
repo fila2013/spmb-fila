@@ -23,6 +23,9 @@ function nextLink(child: {
   ) {
     return `/anak/${child.id}/pembayaran-pendaftaran`;
   }
+  if (child.statusKeseluruhan === StatusKeseluruhan.ENROLLMENT) {
+    return `/anak/${child.id}/enrollment/data-pribadi`;
+  }
   return null;
 }
 

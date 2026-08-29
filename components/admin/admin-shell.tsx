@@ -8,6 +8,7 @@ const navigation = [
   { href: "/admin/jalur", label: "Jalur & kuota" },
   { href: "/admin/kategori", label: "Kategori & kuota" },
   { href: "/admin/biaya-pendaftaran", label: "Biaya pendaftaran" },
+  { href: "/admin/form-builder", label: "Form builder" },
 ];
 
 export function AdminShell({
@@ -62,4 +63,3 @@ export function AdminShell({
     </div>
   );
 }
-
