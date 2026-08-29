@@ -114,6 +114,28 @@ Tambahkan URL ekuivalen untuk domain preview/production dan set
 `NEXT_PUBLIC_APP_URL` sesuai origin deployment. Konfirmasi email dan reset
 password memerlukan konfigurasi email/SMTP Supabase yang aktif.
 
+Untuk mencegah email scanner menghabiskan tautan sekali-pakai sebelum pengguna
+menekannya, gunakan halaman konfirmasi dua langkah. Atur template **Confirm
+signup** agar tombolnya menggunakan URL berikut:
+
+```html
+<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&next=/dashboard">
+  Konfirmasi email
+</a>
+```
+
+Atur template **Reset password/Recovery** dengan pola berikut:
+
+```html
+<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password">
+  Reset password
+</a>
+```
+
+Aplikasi mengarahkan `RedirectTo` ke `/auth/confirm`. Endpoint tersebut hanya
+menampilkan tombol; OTP baru diverifikasi melalui request POST setelah pengguna
+menekan tombol.
+
 Trigger database membuat profile `users` dengan role `wali_murid`. Metadata Auth
 yang dikirim client tidak pernah menjadi sumber role. Setelah calon admin membuat
 dan mengonfirmasi akun, pemberian role awal dilakukan eksplisit dan tercatat:

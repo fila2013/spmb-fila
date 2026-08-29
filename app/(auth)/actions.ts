@@ -46,7 +46,7 @@ export async function registerAction(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/confirm`,
     },
   });
 
@@ -131,7 +131,7 @@ export async function forgotPasswordAction(
   const supabase = await createClient();
   const environment = getAppEnvironment();
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+    redirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/confirm`,
   });
 
   return {
