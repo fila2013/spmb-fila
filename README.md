@@ -15,7 +15,7 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 9 sudah selesai. Selain fondasi database, Supabase Auth,
+Phase 0 sampai Phase 10 sudah selesai. Selain fondasi database, Supabase Auth,
 master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
 mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
 dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
@@ -26,6 +26,8 @@ auto-delete dengan retention pembayaran juga sudah aktif.
 Peserta diterima dapat mengunggah bukti DU ke bucket private, admin dapat
 memverifikasi/menolak bukti dan mencatat nominal aktual, lalu mengelola status
 undangan grup WhatsApp secara manual.
+Admin juga memiliki laporan peserta dengan filter lintas tahap serta ekspor
+Excel/CSV yang tercatat di audit log.
 Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
@@ -360,4 +362,28 @@ multi-child, audit, dan status WhatsApp manual:
 
 ```bash
 npm run test:phase9-integration
+```
+
+## Reporting Phase 10
+
+Halaman `/admin/laporan` menyediakan pencarian nama/email dan filter jalur,
+kategori, tahap keseluruhan, pembayaran pendaftaran, enrollment, assessment,
+hasil pengumuman, pembayaran DU, serta status grup WhatsApp. Hasil filter yang
+sama dapat diunduh melalui endpoint admin-only berikut:
+
+```text
+GET /api/admin/laporan/export?format=xlsx
+GET /api/admin/laporan/export?format=csv
+```
+
+File hanya memuat rekap operasional; token Midtrans, payload mentah, path bukti
+private, catatan internal, dan jawaban formulir tidak diekspor. Sel teks juga
+dinetralkan dari formula injection, respons tidak di-cache, dan setiap ekspor
+dicatat tanpa menyimpan kata pencarian yang mungkin memuat data pribadi.
+
+Integration test staging memeriksa role admin, filter gabungan, status transaksi
+terbaru, CSV/XLSX valid, sanitasi data, dan audit ekspor:
+
+```bash
+npm run test:phase10-integration
 ```
