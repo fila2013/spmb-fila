@@ -32,6 +32,10 @@ export function releasedOverallStatus(status: StatusPengumuman) {
     : StatusKeseluruhan.TIDAK_DITERIMA;
 }
 
+export function stageContentSlug(tahap: string) {
+  return tahap.toLowerCase().replaceAll("_", "-");
+}
+
 export function mayViewAssessment(status: StatusKeseluruhan) {
   const blocked: StatusKeseluruhan[] = [
     StatusKeseluruhan.PILIH_JALUR,

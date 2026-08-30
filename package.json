@@ -24,6 +24,7 @@
     "test:phase6-integration": "tsx scripts/verify-phase6.ts",
     "test:phase7-integration": "tsx scripts/verify-phase7.ts",
     "test:phase8-integration": "tsx scripts/verify-phase8.ts",
+    "test:phase9-integration": "tsx scripts/verify-phase9.ts",
     "auth:set-admin": "tsx scripts/set-admin.ts",
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
@@ -32,7 +33,8 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "prisma:verify-migration": "node prisma/verify-migration.mjs"
+    "prisma:verify-migration": "node prisma/verify-migration.mjs",
+    "storage:ensure-buckets": "tsx scripts/ensure-storage-buckets.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

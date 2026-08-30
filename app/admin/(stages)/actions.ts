@@ -16,6 +16,7 @@ import {
   stageIdSchema,
   updateStageContentSchema,
 } from "@/lib/stages/schemas";
+import { stageContentSlug } from "@/lib/stages/rules";
 import {
   createStageContent,
   updateAnnouncement,
@@ -64,7 +65,7 @@ export async function createStageContentAction(_state: StageActionState, formDat
     const validated = stageContentInputSchema.parse(contentValues(formData, existingImageValue(formData)));
     const input = { ...validated, gambarUrl: await uploadedImageValue(formData) ?? validated.gambarUrl };
     await createStageContent(input, admin.userId);
-    revalidatePath(`/admin/konten/${input.tahap.toLowerCase()}`);
+    revalidatePath(`/admin/konten/${stageContentSlug(input.tahap)}`);
     return { status: "success", message: "Konten berhasil ditambahkan." };
   } catch (error) { return errorState(error); }
 }
@@ -75,7 +76,7 @@ export async function updateStageContentAction(_state: StageActionState, formDat
     const validated = updateStageContentSchema.parse({ id: formData.get("id"), ...contentValues(formData, existingImageValue(formData)) });
     const input = { ...validated, gambarUrl: await uploadedImageValue(formData) ?? validated.gambarUrl };
     await updateStageContent(input, admin.userId);
-    revalidatePath(`/admin/konten/${input.tahap.toLowerCase()}`);
+    revalidatePath(`/admin/konten/${stageContentSlug(input.tahap)}`);
     return { status: "success", message: "Konten berhasil diperbarui." };
   } catch (error) { return errorState(error); }
 }

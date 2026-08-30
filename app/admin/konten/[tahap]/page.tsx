@@ -14,10 +14,24 @@ export const metadata: Metadata = { title: "Konten tahap" };
 export default async function StageContentPage({ params }: { params: Promise<{ tahap: string }> }) {
   const admin = await requireRolePage(UserRole.ADMIN);
   const slug = (await params).tahap;
-  const tahap = slug === "assessment" ? TahapKonten.ASSESSMENT : slug === "announcement" ? TahapKonten.ANNOUNCEMENT : null;
+  const tahap = slug === "assessment"
+    ? TahapKonten.ASSESSMENT
+    : slug === "announcement"
+      ? TahapKonten.ANNOUNCEMENT
+      : slug === "admission-fee"
+        ? TahapKonten.ADMISSION_FEE
+        : slug === "join-wa"
+          ? TahapKonten.JOIN_WA
+          : null;
   if (!tahap) notFound();
   const [content, jalur, kategori] = await Promise.all([listStageContent(tahap), listJalur(), listKategori()]);
-  const label = tahap === TahapKonten.ASSESSMENT ? "Assessment" : "Announcement";
+  const label = tahap === TahapKonten.ASSESSMENT
+    ? "Assessment"
+    : tahap === TahapKonten.ANNOUNCEMENT
+      ? "Announcement"
+      : tahap === TahapKonten.ADMISSION_FEE
+        ? "Daftar Ulang"
+        : "Join WhatsApp";
   const choicesJalur = jalur.map(({ id, nama }) => ({ id, nama }));
   const choicesKategori = kategori.map(({ id, nama }) => ({ id, nama }));
   return <AdminShell activePath={`/admin/konten/${slug}`} title={`Konten ${label}`} description={`Atur blok informasi ${label.toLowerCase()} berdasarkan jalur dan kategori. Konten ditampilkan sebagai teks aman, bukan HTML.`} email={admin.email}>

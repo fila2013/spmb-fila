@@ -12,6 +12,8 @@ const navigation = [
   { href: "/admin/peserta", label: "Peserta" },
   { href: "/admin/konten/assessment", label: "Konten assessment" },
   { href: "/admin/konten/announcement", label: "Konten announcement" },
+  { href: "/admin/konten/admission-fee", label: "Konten daftar ulang" },
+  { href: "/admin/konten/join-wa", label: "Konten Join WhatsApp" },
 ];
 
 export function AdminShell({

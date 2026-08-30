@@ -34,6 +34,20 @@ const phase5MigrationSql = await readFile(
   ),
   "utf8",
 );
+const phase9MigrationSql = await readFile(
+  new URL(
+    "./migrations/20260830090000_phase9_du_payment/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const phase9NominalCheckMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260830100000_phase9_du_nominal_not_null_checks/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -56,6 +70,8 @@ try {
   await client.query(rlsMigrationSql);
   await client.query(phase4MigrationSql);
   await client.query(phase5MigrationSql);
+  await client.query(phase9MigrationSql);
+  await client.query(phase9NominalCheckMigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -71,15 +87,15 @@ try {
     "SELECT indexname FROM pg_indexes WHERE schemaname = $1",
     [validationSchema],
   );
-  assert(indexes.rowCount >= 40, `Expected at least 40 indexes, found ${indexes.rowCount}.`);
+  assert(indexes.rowCount >= 42, `Expected at least 42 indexes, found ${indexes.rowCount}.`);
 
   const domainConstraints = await client.query(
     "SELECT conname FROM pg_constraint WHERE connamespace = $1::regnamespace AND conname LIKE '%_check'",
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 21,
-    `Expected 21 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 22,
+    `Expected 22 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -140,6 +156,18 @@ try {
     "INSERT INTO calon_murid (id, user_id, nama_anak, jalur_id, kategori_id) VALUES ($1, $2, $3, $4, $5)",
     [calonMuridId, userId, "Data sementara", jalurId, kategoriId],
   );
+  await client.query("SAVEPOINT invalid_registration_nominal");
+  try {
+    await client.query(
+      "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, midtrans_order_id, midtrans_snap_token) VALUES ($1, $1, 'pendaftaran', 'midtrans', NULL, 'phase1-null-order', 'phase1-null-token')",
+      [calonMuridId],
+    );
+    throw new Error("Pembayaran pendaftaran tanpa nominal tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint nominal pendaftaran tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_registration_nominal");
+  }
   await client.query(
     "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, midtrans_order_id, midtrans_snap_token) VALUES ($1, $1, 'pendaftaran', 'midtrans', 1000, 'phase1-order', 'phase1-token')",
     [calonMuridId],
@@ -159,7 +187,41 @@ try {
     "Referensi audit pembayaran tidak dipertahankan.",
   );
 
-  console.log("Migration Phase 1–5 dan retention pembayaran tervalidasi.");
+  const duChildId = "40000000-0000-4000-8000-000000000002";
+  await client.query(
+    "INSERT INTO calon_murid (id, user_id, nama_anak, jalur_id, kategori_id, status_keseluruhan) VALUES ($1, $2, $3, $4, $5, 'diterima')",
+    [duChildId, userId, "Data DU", jalurId, kategoriId],
+  );
+  await client.query(
+    "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, file_bukti_url) VALUES ($1, $1, 'du', 'manual_transfer', NULL, 'du/test-proof.png')",
+    [duChildId],
+  );
+  await client.query("SAVEPOINT invalid_verified_du");
+  try {
+    await client.query(
+      "UPDATE pembayaran SET status = 'verified', verified_at = now() WHERE calon_murid_reference = $1 AND jenis = 'du'",
+      [duChildId],
+    );
+    throw new Error("DU verified tanpa nominal tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint nominal DU verified tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_verified_du");
+  }
+  await client.query("SAVEPOINT duplicate_active_du");
+  try {
+    await client.query(
+      "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, file_bukti_url) VALUES ($1, $1, 'du', 'manual_transfer', NULL, 'du/duplicate.png')",
+      [duChildId],
+    );
+    throw new Error("Transaksi DU aktif ganda tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23505", "Unique active DU tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT duplicate_active_du");
+  }
+
+  console.log("Migration Phase 1–9, retention pembayaran, dan constraint DU tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

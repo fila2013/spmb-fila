@@ -7,6 +7,7 @@ import {
   mayViewAnnouncement,
   mayViewAssessment,
   releasedOverallStatus,
+  stageContentSlug,
 } from "@/lib/stages/rules";
 
 describe("Phase 7 stage rules", () => {
@@ -33,5 +34,10 @@ describe("Phase 7 stage rules", () => {
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_ASESMEN)).toBe(false);
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_PENGUMUMAN)).toBe(true);
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK)).toBe(true);
+  });
+
+  it("membentuk slug CMS untuk tahap bertanda underscore", () => {
+    expect(stageContentSlug("ADMISSION_FEE")).toBe("admission-fee");
+    expect(stageContentSlug("JOIN_WA")).toBe("join-wa");
   });
 });

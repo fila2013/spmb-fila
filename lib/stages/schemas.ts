@@ -21,10 +21,12 @@ export const stageIdSchema = uuid;
 export const stageTypeSchema = z.enum([
   TahapKonten.ASSESSMENT,
   TahapKonten.ANNOUNCEMENT,
+  TahapKonten.ADMISSION_FEE,
+  TahapKonten.JOIN_WA,
 ]);
 export const stageTypeParamSchema = z
   .string()
-  .transform((value) => value.toUpperCase())
+  .transform((value) => value.toUpperCase().replaceAll("-", "_"))
   .pipe(stageTypeSchema);
 
 export const stageContentInputSchema = z.object({

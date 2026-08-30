@@ -6,6 +6,8 @@ import { announcementInputSchema, stageContentInputSchema, stageTypeParamSchema 
 describe("Phase 7 schemas", () => {
   it("menerima slug tahap lowercase", () => {
     expect(stageTypeParamSchema.parse("assessment")).toBe(TahapKonten.ASSESSMENT);
+    expect(stageTypeParamSchema.parse("admission-fee")).toBe(TahapKonten.ADMISSION_FEE);
+    expect(stageTypeParamSchema.parse("join-wa")).toBe(TahapKonten.JOIN_WA);
   });
 
   it("menormalisasi scope dan tanggal konten kosong", () => {

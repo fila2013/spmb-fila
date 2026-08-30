@@ -270,7 +270,7 @@ model Pembayaran {
   calonMuridReference   String           @map("calon_murid_reference") @db.Uuid
   jenis                 JenisPembayaran
   metodePembayaran      MetodePembayaran @map("metode_pembayaran")
-  nominal               Int
+  nominal               Int?
   fileBuktiUrl          String?          @map("file_bukti_url")
   status                StatusPembayaran @default(PENDING)
   catatanAdmin          String?          @map("catatan_admin")
@@ -349,6 +349,7 @@ model StatusGrupWa {
   calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
   updatedBy  User?      @relation("StatusGrupWaUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
+  @@index([status, updatedAt])
   @@map("status_grup_wa")
 }
 

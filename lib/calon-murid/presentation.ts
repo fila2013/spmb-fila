@@ -37,11 +37,11 @@ export const statusPresentation: Record<
     className: "bg-amber-100 text-amber-900",
   },
   [StatusKeseluruhan.MENUNGGU_DU]: {
-    label: "Menunggu Daftar Ulang",
+    label: "Daftar Ulang",
     className: "bg-sky-100 text-sky-900",
   },
   [StatusKeseluruhan.MENUNGGU_JOIN_WA]: {
-    label: "Menunggu Grup WhatsApp",
+    label: "Menunggu Diundang",
     className: "bg-sky-100 text-sky-900",
   },
   [StatusKeseluruhan.SELESAI]: {

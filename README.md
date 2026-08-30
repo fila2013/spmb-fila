@@ -15,7 +15,7 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 8 sudah selesai. Selain fondasi database, Supabase Auth,
+Phase 0 sampai Phase 9 sudah selesai. Selain fondasi database, Supabase Auth,
 master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
 mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
 dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
@@ -23,6 +23,9 @@ Admin dapat mengelola konten assessment/announcement dan hasil individual;
 keputusan final tidak terlihat oleh wali sebelum tanggal rilis Asia/Jakarta.
 Fallback TCP ke Reguler, antrian FIFO, reprocess otomatis/manual, dan
 auto-delete dengan retention pembayaran juga sudah aktif.
+Peserta diterima dapat mengunggah bukti DU ke bucket private, admin dapat
+memverifikasi/menolak bukti dan mencatat nominal aktual, lalu mengelola status
+undangan grup WhatsApp secara manual.
 Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
@@ -325,4 +328,36 @@ retention pembayaran, dan audit snapshot:
 
 ```bash
 npm run test:phase8-integration
+```
+
+## Daftar Ulang & Join WhatsApp Phase 9
+
+Tahap DU hanya dapat dibuka oleh wali pemilik calon murid yang sudah diterima.
+Bukti JPG/PNG/PDF maksimal 5 MB disimpan sebagai object private di bucket
+`bukti-pembayaran`; aksesnya selalu melalui signed URL berumur pendek. Upload
+tidak meminta nominal dari wali. Admin mencatat nominal aktual saat verifikasi,
+atau mengisi alasan penolakan agar wali dapat mengunggah ulang.
+
+Pembayaran DU terverifikasi memajukan status ke `MENUNGGU_JOIN_WA`. Admin lalu
+mencatat status `MENUNGGU` atau `SUDAH_DIUNDANG`; tidak ada pengiriman pesan atau
+integrasi WhatsApp API otomatis pada MVP. Konten kedua tahap tetap dikelola dari
+CMS berdasarkan jalur/kategori:
+
+```text
+/admin/konten/admission-fee
+/admin/konten/join-wa
+```
+
+Siapkan atau harden bucket Supabase sesuai kontrak proyek dengan:
+
+```bash
+npm run storage:ensure-buckets
+```
+
+Integration test staging mencakup gate tahap, ownership, signature file,
+Storage private/signed URL, reject–reupload, verifikasi nominal, role admin,
+multi-child, audit, dan status WhatsApp manual:
+
+```bash
+npm run test:phase9-integration
 ```

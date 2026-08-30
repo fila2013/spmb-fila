@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { config } from "dotenv";
 
 import { PrismaClient } from "../generated/prisma/client";
 import {
@@ -11,6 +12,8 @@ import {
   StatusPembayaran,
 } from "../generated/prisma/enums";
 
+config({ path: ".env.local", quiet: true });
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,7 +21,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const serverKey = process.env.MIDTRANS_SERVER_KEY;
 const merchantId = process.env.MIDTRANS_MERCHANT_ID;
 const isProduction = process.env.MIDTRANS_IS_PRODUCTION;
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const appUrl = process.argv[2] ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 if (!supabaseUrl || !publishableKey || !secretKey || !databaseUrl || !serverKey || !merchantId) {
   throw new Error("Environment integration test Phase 5 belum lengkap.");

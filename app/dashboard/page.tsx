@@ -31,11 +31,22 @@ function nextLink(child: {
   }
   if (
     child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PENGUMUMAN ||
-    child.statusKeseluruhan === StatusKeseluruhan.DITERIMA ||
     child.statusKeseluruhan === StatusKeseluruhan.TIDAK_DITERIMA ||
     child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK
   ) {
     return `/anak/${child.id}/pengumuman`;
+  }
+  if (
+    child.statusKeseluruhan === StatusKeseluruhan.DITERIMA ||
+    child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_DU
+  ) {
+    return `/anak/${child.id}/daftar-ulang`;
+  }
+  if (
+    child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_JOIN_WA ||
+    child.statusKeseluruhan === StatusKeseluruhan.SELESAI
+  ) {
+    return `/anak/${child.id}/join-wa`;
   }
   return null;
 }

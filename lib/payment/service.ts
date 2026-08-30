@@ -225,7 +225,16 @@ export async function getRegistrationPaymentPageData(
     );
   }
   const payment = await preferredRegistrationPayment(child.id);
-  if (payment) return { child, payment, nominal: payment.nominal };
+  if (payment) {
+    if (payment.nominal === null) {
+      throw new PaymentError(
+        "INVALID_STAGE",
+        "Nominal pembayaran pendaftaran tidak valid.",
+        409,
+      );
+    }
+    return { child, payment, nominal: payment.nominal };
+  }
 
   const fee = await prisma.biayaPendaftaran.findFirst({
     where: {
