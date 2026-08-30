@@ -105,7 +105,7 @@ try {
 
   await api(`/api/admin/peserta/${deleteChild.id}/hasil-assessment`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "TIDAK_HADIR", catatan: null }) });
   const blocked = await api(`/api/admin/peserta/${deleteChild.id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "TIDAK_DITERIMA", tanggalRilis: "2020-01-01" }) });
-  if (blocked.response.status !== 409 || blocked.body.error?.code !== "PHASE8_REQUIRED") throw new Error("Kasus auto-delete tidak ditahan untuk Phase 8.");
+  if (blocked.response.status !== 409 || blocked.body.error?.code !== "AUTO_DELETE_CONFIRMATION_REQUIRED") throw new Error("Kasus auto-delete tidak meminta konfirmasi eksplisit.");
 
   const audits = await prisma.auditLog.count({ where: { actorId: admin.profile.id, action: { in: ["CREATE_STAGE_CONTENT", "UPDATE_ASSESSMENT_RESULT", "UPDATE_ANNOUNCEMENT_RESULT"] } } });
   if (audits < 4) throw new Error("Audit Phase 7 tidak lengkap.");

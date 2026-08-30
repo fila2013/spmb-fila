@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
 import { UserRole } from "@/generated/prisma/enums";
 import { requireRole } from "@/lib/auth/session";
+import { FallbackError } from "@/lib/fallback/errors";
 import type { StageActionState } from "@/lib/stages/action-state";
 import { StageError } from "@/lib/stages/errors";
 import {
@@ -27,6 +29,7 @@ function errorState(error: unknown): StageActionState {
     return { status: "error", message: "Periksa kembali data yang diisi.", fieldErrors: Object.fromEntries(Object.entries(error.flatten().fieldErrors).filter((entry): entry is [string, string[]] => Boolean(entry[1]))) };
   }
   if (error instanceof StageError) return { status: "error", message: error.message };
+  if (error instanceof FallbackError) return { status: "error", message: error.message };
   return { status: "error", message: "Perubahan belum dapat disimpan." };
 }
 
@@ -90,14 +93,24 @@ export async function updateAssessmentAction(_state: StageActionState, formData:
 }
 
 export async function updateAnnouncementAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
+  let result: Awaited<ReturnType<typeof updateAnnouncement>>;
+  let id: string;
   try {
     const admin = await requireRole(UserRole.ADMIN);
-    const id = stageIdSchema.parse(formData.get("id"));
-    const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis") });
-    const result = await updateAnnouncement(id, input, admin.userId);
-    revalidatePath(`/admin/peserta/${id}`);
-    revalidatePath("/admin/peserta");
-    revalidatePath(`/anak/${id}/pengumuman`);
-    return { status: "success", message: result.released ? "Pengumuman disimpan dan sudah dirilis." : "Pengumuman disimpan untuk tanggal rilis tersebut." };
+    id = stageIdSchema.parse(formData.get("id"));
+    const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis"), deletionConfirmation: formData.get("deletionConfirmation") });
+    result = await updateAnnouncement(id, input, admin.userId);
   } catch (error) { return errorState(error); }
+  revalidatePath("/admin/peserta");
+  revalidatePath(`/anak/${id}/pengumuman`);
+  if (result.deleted) redirect("/admin/peserta?deleted=1");
+  revalidatePath(`/admin/peserta/${id}`);
+  const message = result.effect.type === "TRANSFERRED"
+    ? "Peserta otomatis dipindahkan ke jalur fallback dan diterima."
+    : result.effect.type === "QUEUED"
+      ? "Jalur fallback penuh; peserta masuk antrian FIFO."
+      : result.released
+        ? "Pengumuman disimpan dan sudah dirilis."
+        : "Pengumuman disimpan untuk tanggal rilis tersebut.";
+  return { status: "success", message };
 }

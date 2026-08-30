@@ -2,7 +2,6 @@ import {
   StatusKeseluruhan,
   StatusPengumuman,
 } from "@/generated/prisma/enums";
-import { StageError } from "@/lib/stages/errors";
 
 const jakartaDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Jakarta",
@@ -25,22 +24,6 @@ export function isAnnouncementReleased(
 ) {
   const value = dateOnly(releaseDate);
   return Boolean(value && value <= today);
-}
-
-export function assertAnnouncementDecisionSupported(
-  status: StatusPengumuman,
-  jalur: { fallbackJalurId: string | null; hapusDataJikaGagal: boolean },
-) {
-  if (
-    status === StatusPengumuman.TIDAK_DITERIMA &&
-    (jalur.fallbackJalurId || jalur.hapusDataJikaGagal)
-  ) {
-    throw new StageError(
-      "PHASE8_REQUIRED",
-      "Keputusan gagal untuk jalur ini harus diproses bersama fallback atau konfirmasi penghapusan pada Phase 8.",
-      409,
-    );
-  }
 }
 
 export function releasedOverallStatus(status: StatusPengumuman) {

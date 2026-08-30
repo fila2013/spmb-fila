@@ -56,6 +56,10 @@ export const announcementInputSchema = z.object({
     StatusPengumuman.TIDAK_DITERIMA,
   ]),
   tanggalRilis: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal rilis wajib diisi."),
+  deletionConfirmation: z.preprocess(
+    (value) => typeof value === "string" && value === "" ? null : value,
+    z.string().max(200).nullable().optional(),
+  ),
 });
 
 export type StageContentInput = z.infer<typeof stageContentInputSchema>;

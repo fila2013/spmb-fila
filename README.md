@@ -15,12 +15,14 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 7 sudah selesai. Selain fondasi database, Supabase Auth,
+Phase 0 sampai Phase 8 sudah selesai. Selain fondasi database, Supabase Auth,
 master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
 mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
 dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
 Admin dapat mengelola konten assessment/announcement dan hasil individual;
 keputusan final tidak terlihat oleh wali sebelum tanggal rilis Asia/Jakarta.
+Fallback TCP ke Reguler, antrian FIFO, reprocess otomatis/manual, dan
+auto-delete dengan retention pembayaran juga sudah aktif.
 Seluruh migration telah diterapkan ke database Supabase staging.
 
 ## Prasyarat
@@ -286,12 +288,41 @@ jalur/kategori melalui `/admin/konten/assessment` serta
 
 Hasil assessment memajukan peserta ke `MENUNGGU_PENGUMUMAN`. Keputusan
 announcement disimpan per anak dan hanya dikembalikan backend pada atau setelah
-tanggal rilis kalender Asia/Jakarta. Keputusan gagal pada jalur yang memakai
-fallback atau auto-delete sengaja ditahan sampai transaksi Phase 8 tersedia.
+tanggal rilis kalender Asia/Jakarta. Keputusan gagal selanjutnya diproses oleh
+aturan fallback atau auto-delete Phase 8.
 
 Integration test staging memeriksa role, ownership, CMS scope, transisi status,
 release gate tanpa kebocoran hasil/konten, audit log, dan dependency Phase 8:
 
 ```bash
 npm run test:phase7-integration
+```
+
+## Fallback, FIFO & Auto-delete Phase 8
+
+Jalur dengan `fallback_jalur_id` memindahkan peserta yang tidak diterima ke
+jalur tujuan secara atomik. Jika kuota tersedia, peserta langsung diterima
+tanpa assessment atau pembayaran ulang. Jika penuh, peserta masuk status
+`MENUNGGU_KUOTA_FALLBACK` dan diproses FIFO berdasarkan `created_at`.
+
+Admin dapat melihat dan memproses ulang antrian dari `/admin/jalur`. Penambahan
+`kuota_maks` juga memicu reprocess otomatis. Kontrak API operasional:
+
+```text
+GET  /api/admin/jalur/:id/antrian-fallback
+POST /api/admin/jalur/:id/proses-ulang-antrian
+```
+
+Auto-delete memerlukan frasa konfirmasi `HAPUS <nama anak>`. Snapshot minimum
+disimpan ke audit log sebelum delete. Akun wali dan anak lain tidak disentuh;
+baris pembayaran tetap disimpan dengan `calon_murid_id = NULL`, sementara UUID
+referensi, nominal, metode, status, referensi Midtrans, dan timestamp tetap
+tersedia untuk audit keuangan.
+
+Integration test staging mencakup transfer langsung, FIFO, reprocess otomatis
+dan manual, race condition paralel, role guard, konfirmasi delete, multi-child,
+retention pembayaran, dan audit snapshot:
+
+```bash
+npm run test:phase8-integration
 ```

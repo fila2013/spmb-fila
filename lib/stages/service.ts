@@ -4,14 +4,16 @@ import type { KontenTahap, Prisma } from "@/generated/prisma/client";
 import {
   StatusAssessment,
   StatusKeseluruhan,
+  StatusPengumuman,
   TahapKonten,
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
+import { FallbackError } from "@/lib/fallback/errors";
+import { handleRejectedDecisionInTransaction } from "@/lib/fallback/service";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { StageError } from "@/lib/stages/errors";
 import {
-  assertAnnouncementDecisionSupported,
   dateOnly,
   isAnnouncementReleased,
   mayViewAnnouncement,
@@ -113,6 +115,7 @@ async function getOwnedStageChild(childId: string, userId: string) {
       kategori: { select: { id: true, nama: true } },
       hasilAssessment: true,
       pengumuman: true,
+      menungguFallbackJalur: { select: { id: true, nama: true } },
     },
   });
   if (!child) throw new StageError("NOT_FOUND", "Data calon murid tidak ditemukan.", 404);
@@ -147,26 +150,41 @@ export async function getAssessmentForWali(childId: string, userId: string) {
 }
 
 async function synchronizeReleasedAnnouncement(transaction: Transaction, childId: string) {
-  const announcement = await transaction.pengumuman.findUnique({ where: { calonMuridId: childId } });
-  if (!announcement?.statusAkhir || !isAnnouncementReleased(announcement.tanggalRilis)) return announcement;
-  const nextStatus = releasedOverallStatus(announcement.statusAkhir);
-  const child = await transaction.calonMurid.findUnique({ where: { id: childId }, select: { statusKeseluruhan: true } });
-  if (child?.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PENGUMUMAN) {
-    await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
-    await transaction.auditLog.create({ data: { action: "RELEASE_ANNOUNCEMENT", entity: "calon_murid", entityId: childId, detail: { statusAkhir: announcement.statusAkhir, tanggalRilis: dateOnly(announcement.tanggalRilis), nextStatus } } });
+  await transaction.$queryRaw`SELECT id FROM "calon_murid" WHERE id = ${childId}::uuid FOR UPDATE`;
+  const child = await transaction.calonMurid.findUnique({
+    where: { id: childId },
+    include: { pengumuman: true, jalur: true },
+  });
+  const announcement = child?.pengumuman;
+  if (!child || !announcement?.statusAkhir || !isAnnouncementReleased(announcement.tanggalRilis)) return;
+  if (child.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_PENGUMUMAN) return;
+
+  if (announcement.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
+    const effect = await handleRejectedDecisionInTransaction(transaction, childId, null);
+    if (effect.type !== "NONE") return;
   }
-  return announcement;
+  const nextStatus = releasedOverallStatus(announcement.statusAkhir);
+  await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
+  await transaction.auditLog.create({ data: { action: "RELEASE_ANNOUNCEMENT", entity: "calon_murid", entityId: childId, detail: { statusAkhir: announcement.statusAkhir, tanggalRilis: dateOnly(announcement.tanggalRilis), nextStatus } } });
 }
 
 export async function getAnnouncementForWali(childId: string, userId: string) {
   const owned = await getOwnedStageChild(childId, userId);
   if (!mayViewAnnouncement(owned.statusKeseluruhan)) throw new StageError("STAGE_FORBIDDEN", "Tahap pengumuman belum dapat diakses.", 403);
-  const announcement = await prisma.$transaction((transaction) => synchronizeReleasedAnnouncement(transaction, childId));
+  await prisma.$transaction(
+    (transaction) => synchronizeReleasedAnnouncement(transaction, childId),
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+  const current = await getOwnedStageChild(childId, userId);
+  const announcement = current.pengumuman;
+  const waitingQuota = current.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
   const released = Boolean(announcement?.statusAkhir && isAnnouncementReleased(announcement.tanggalRilis));
-  const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, owned), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
+  const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
   return {
-    child: { id: owned.id, namaAnak: owned.namaAnak, jalur: owned.jalur?.nama ?? null, kategori: owned.kategori?.nama ?? null },
+    child: { id: current.id, namaAnak: current.namaAnak, jalur: current.jalur?.nama ?? null, kategori: current.kategori?.nama ?? null },
     released,
+    waitingQuota,
+    fallbackJalur: current.menungguFallbackJalur?.nama ?? null,
     tanggalRilis: dateOnly(announcement?.tanggalRilis ?? null),
     statusAkhir: released ? announcement?.statusAkhir ?? null : null,
     content: content.map(publicContent),
@@ -219,14 +237,48 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
     await transaction.$queryRaw`SELECT id FROM "calon_murid" WHERE id = ${childId}::uuid FOR UPDATE`;
     const child = await transaction.calonMurid.findUnique({ where: { id: childId }, include: { jalur: true, hasilAssessment: true, pengumuman: true } });
     if (!child?.jalur) throw new StageError("NOT_FOUND", "Peserta atau jalur tidak ditemukan.", 404);
+    if (child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK) {
+      throw new FallbackError(
+        "QUEUE_MANAGED_BY_SYSTEM",
+        "Peserta yang sedang menunggu kuota dikelola melalui antrian fallback.",
+        409,
+      );
+    }
     if (!child.hasilAssessment || child.hasilAssessment.status === StatusAssessment.BELUM) throw new StageError("ASSESSMENT_REQUIRED", "Hasil assessment harus diisi terlebih dahulu.", 409);
-    assertAnnouncementDecisionSupported(input.statusAkhir, child.jalur);
     const tanggalRilis = new Date(`${input.tanggalRilis}T00:00:00.000Z`);
     const released = isAnnouncementReleased(tanggalRilis);
-    const nextStatus = released ? releasedOverallStatus(input.statusAkhir) : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
-    const result = await transaction.pengumuman.upsert({ where: { calonMuridId: childId }, update: { ...input, tanggalRilis, updatedById: actorId }, create: { calonMuridId: childId, ...input, tanggalRilis, updatedById: actorId } });
-    await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
-    await transaction.auditLog.create({ data: { actorId, action: "UPDATE_ANNOUNCEMENT_RESULT", entity: "pengumuman", entityId: childId, detail: { before: child.pengumuman ? { statusAkhir: child.pengumuman.statusAkhir, tanggalRilis: dateOnly(child.pengumuman.tanggalRilis) } : null, after: { statusAkhir: result.statusAkhir, tanggalRilis: dateOnly(result.tanggalRilis) }, released, nextStatus } } });
-    return { ...result, released, nextStatus };
-  });
+    if (
+      input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA &&
+      child.jalur.hapusDataJikaGagal &&
+      !released
+    ) {
+      throw new FallbackError(
+        "AUTO_DELETE_FUTURE_UNSUPPORTED",
+        "Keputusan yang menghapus data hanya dapat disimpan pada atau setelah tanggal rilis agar konfirmasi tidak menimbulkan kebocoran hasil.",
+        422,
+      );
+    }
+    const { deletionConfirmation, ...announcementData } = input;
+    const result = await transaction.pengumuman.upsert({ where: { calonMuridId: childId }, update: { ...announcementData, tanggalRilis, updatedById: actorId }, create: { calonMuridId: childId, ...announcementData, tanggalRilis, updatedById: actorId } });
+
+    let effect: Awaited<ReturnType<typeof handleRejectedDecisionInTransaction>> = { type: "NONE" };
+    let nextStatus: StatusKeseluruhan = released ? releasedOverallStatus(input.statusAkhir) : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
+    if (released && input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
+      effect = await handleRejectedDecisionInTransaction(transaction, childId, actorId, deletionConfirmation);
+      if (effect.type === "TRANSFERRED") nextStatus = StatusKeseluruhan.DITERIMA;
+      if (effect.type === "QUEUED") nextStatus = StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
+    }
+    if (effect.type === "NONE") {
+      await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
+    }
+    await transaction.auditLog.create({ data: { actorId, action: "UPDATE_ANNOUNCEMENT_RESULT", entity: "pengumuman", entityId: childId, detail: { before: child.pengumuman ? { statusAkhir: child.pengumuman.statusAkhir, tanggalRilis: dateOnly(child.pengumuman.tanggalRilis) } : null, after: { statusAkhir: result.statusAkhir, tanggalRilis: dateOnly(result.tanggalRilis) }, released, nextStatus, effect: effect.type } } });
+    return {
+      statusAkhir: effect.type === "TRANSFERRED" ? StatusPengumuman.DITERIMA : effect.type === "QUEUED" ? null : result.statusAkhir,
+      tanggalRilis: result.tanggalRilis,
+      released,
+      nextStatus,
+      effect,
+      deleted: effect.type === "DELETED",
+    };
+  }, { maxWait: 20_000, timeout: 60_000 });
 }

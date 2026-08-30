@@ -2,6 +2,8 @@ import "server-only";
 
 import type { Jalur, KategoriPendaftar } from "@/generated/prisma/client";
 import { MasterDataError } from "@/lib/master-data/errors";
+import { isQuotaCapacityIncreased } from "@/lib/fallback/rules";
+import { reprocessFallbackQueueInTransaction } from "@/lib/fallback/service";
 import type {
   CreateBiayaInput,
   CreateJalurInput,
@@ -153,8 +155,19 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
           },
         },
       });
-      return jalur;
-    });
+      const fallbackReprocess = isQuotaCapacityIncreased(
+        previous.kuotaMaks,
+        jalur.kuotaMaks,
+      )
+        ? await reprocessFallbackQueueInTransaction(
+            transaction,
+            jalur.id,
+            actorId,
+            "AUTO_REPROCESS",
+          )
+        : null;
+      return { ...jalur, fallbackReprocess };
+    }, { maxWait: 20_000, timeout: 60_000 });
   } catch (error) {
     if (error instanceof MasterDataError) throw error;
     rethrowKnownDatabaseError(error);
