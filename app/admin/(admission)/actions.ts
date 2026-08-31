@@ -10,7 +10,7 @@ import {
   whatsappInvitationSchema,
 } from "@/lib/admission/schemas";
 import {
-  updateWhatsappInvitation,
+  setWhatsappInvitationLink,
   verifyAdmissionPayment,
 } from "@/lib/admission/service";
 import { UserRole } from "@/generated/prisma/enums";
@@ -45,6 +45,7 @@ export async function verifyAdmissionPaymentAction(
       status: formData.get("status"),
       nominal: formData.get("nominal"),
       catatanAdmin: formData.get("catatanAdmin"),
+      proofReviewed: formData.get("proofReviewed"),
     });
     const result = await verifyAdmissionPayment(paymentId, input, admin.userId);
     revalidatePath(`/admin/peserta/${childId}`);
@@ -69,16 +70,14 @@ export async function updateWhatsappInvitationAction(
   try {
     const admin = await requireRole(UserRole.ADMIN);
     const childId = admissionIdSchema.parse(formData.get("childId"));
-    const input = whatsappInvitationSchema.parse({ status: formData.get("status") });
-    const result = await updateWhatsappInvitation(childId, input, admin.userId);
+    const input = whatsappInvitationSchema.parse({ inviteUrl: formData.get("inviteUrl") });
+    await setWhatsappInvitationLink(childId, input, admin.userId);
     revalidatePath(`/admin/peserta/${childId}`);
     revalidatePath("/admin/peserta");
     revalidatePath(`/anak/${childId}/join-wa`);
     return {
       status: "success",
-      message: result.status.status === "SUDAH_DIUNDANG"
-        ? "Peserta ditandai sudah diundang ke grup WhatsApp."
-        : "Status dikembalikan menjadi menunggu undangan.",
+      message: "Link grup WhatsApp tersimpan. Wali sekarang dapat membuka link dan mengonfirmasi sudah bergabung.",
     };
   } catch (error) {
     return errorState(error);

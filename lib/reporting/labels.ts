@@ -26,8 +26,8 @@ export const announcementLabels: Record<StatusPengumuman, string> = {
 };
 
 export const whatsappLabels: Record<StatusUndanganWa, string> = {
-  [StatusUndanganWa.MENUNGGU]: "Menunggu diundang",
-  [StatusUndanganWa.SUDAH_DIUNDANG]: "Sudah diundang",
+  [StatusUndanganWa.MENUNGGU]: "Menunggu bergabung",
+  [StatusUndanganWa.SUDAH_DIUNDANG]: "Sudah bergabung",
 };
 
 export const subCategoryLabels: Record<SubKategoriAlumni, string> = {

@@ -125,7 +125,8 @@ try {
   const ownership = await api(`/api/calon-murid/${otherChild.id}/du`, waliA.cookie);
   if (ownership.response.status !== 403) throw new Error("Ownership DU bocor antar wali.");
   const admissionContent = await api(`/api/konten-tahap/admission-fee?calon_murid_id=${child.id}`, waliA.cookie);
-  if (admissionContent.response.status !== 200 || !Array.isArray(admissionContent.body.data?.content) || admissionContent.body.data.content.length !== 1) throw new Error("Konten DU scoped tidak tersedia melalui kontrak info.");
+  const admissionBlocks = admissionContent.body.data?.content as Array<{ id?: string }> | undefined;
+  if (admissionContent.response.status !== 200 || !Array.isArray(admissionBlocks) || !admissionBlocks.some((item) => item.id === contentIds[0])) throw new Error(`Konten DU scoped tidak tersedia melalui kontrak info (${admissionContent.response.status}: ${admissionContent.body.error?.code ?? "unknown"}).`);
 
   const fake = await api(`/api/calon-murid/${child.id}/du`, waliA.cookie, { method: "POST", body: proofBody(new File(["fake"], "fake.png", { type: "image/png" })) });
   if (fake.response.status !== 422 || fake.body.error?.code !== "INVALID_FILE") throw new Error("Signature file palsu diterima.");
@@ -143,9 +144,9 @@ try {
   const duplicate = await api(`/api/calon-murid/${child.id}/du`, waliA.cookie, { method: "POST", body: proofBody(pngProof(`phase9-${marker}-duplicate`)) });
   if (duplicate.response.status !== 409 || duplicate.body.error?.code !== "PAYMENT_PENDING") throw new Error("Transaksi DU aktif dapat diduplikasi.");
 
-  const roleGuard = await api(`/api/admin/pembayaran/${firstPaymentId}/verifikasi`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: null }) });
+  const roleGuard = await api(`/api/admin/pembayaran/${firstPaymentId}/verifikasi`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: null, proofReviewed: true }) });
   if (roleGuard.response.status !== 403) throw new Error("Verifikasi DU tidak dilindungi role admin.");
-  const missingNominal = await api(`/api/admin/pembayaran/${firstPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: null, catatanAdmin: null }) });
+  const missingNominal = await api(`/api/admin/pembayaran/${firstPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: null, catatanAdmin: null, proofReviewed: true }) });
   if (missingNominal.response.status !== 422) throw new Error("DU dapat diverifikasi tanpa nominal aktual.");
 
   const rejected = await api(`/api/admin/pembayaran/${firstPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "REJECTED", nominal: null, catatanAdmin: "Bukti belum terbaca jelas." }) });
@@ -161,7 +162,10 @@ try {
   if (!secondPayment.fileBuktiUrl) throw new Error("Path bukti kedua tidak tersimpan.");
   storagePaths.push(secondPayment.fileBuktiUrl);
 
-  const verified = await api(`/api/admin/pembayaran/${secondPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: "Sesuai mutasi rekening." }) });
+  const missingReview = await api(`/api/admin/pembayaran/${secondPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: "Sesuai mutasi rekening.", proofReviewed: false }) });
+  if (missingReview.response.status !== 422) throw new Error("DU dapat diverifikasi tanpa konfirmasi preview bukti.");
+
+  const verified = await api(`/api/admin/pembayaran/${secondPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: "Sesuai mutasi rekening.", proofReviewed: true }) });
   if (verified.response.status !== 200) throw new Error(`Verifikasi DU gagal: ${verified.response.status}`);
   const [verifiedPayment, afterVerified] = await Promise.all([
     prisma.pembayaran.findUniqueOrThrow({ where: { id: secondPaymentId } }),
@@ -170,7 +174,7 @@ try {
   if (verifiedPayment.status !== StatusPembayaran.VERIFIED || verifiedPayment.nominal !== 2_500_000 || !verifiedPayment.verifiedAt || verifiedPayment.verifiedById !== admin.profile.id) throw new Error("Ledger verifikasi DU tidak lengkap.");
   if (afterVerified.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA || afterVerified.statusGrupWa?.status !== StatusUndanganWa.MENUNGGU) throw new Error("Verifikasi DU tidak membuka Join WhatsApp.");
 
-  const finalAgain = await api(`/api/admin/pembayaran/${secondPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: null }) });
+  const finalAgain = await api(`/api/admin/pembayaran/${secondPaymentId}/verifikasi`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "VERIFIED", nominal: 2_500_000, catatanAdmin: null, proofReviewed: true }) });
   if (finalAgain.response.status !== 409 || finalAgain.body.error?.code !== "PAYMENT_FINAL") throw new Error("Keputusan DU final tidak idempotent-safe.");
 
   const duView = await api(`/api/calon-murid/${child.id}/du`, waliA.cookie);
@@ -184,25 +188,41 @@ try {
   const waWaiting = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie);
   if (waWaiting.response.status !== 200 || waWaiting.body.data?.status !== "MENUNGGU" || !Array.isArray(waWaiting.body.data?.content)) throw new Error("Status Join WhatsApp awal tidak tersedia.");
   const joinContent = await api(`/api/konten-tahap/join-wa?calon_murid_id=${child.id}`, waliA.cookie);
-  if (joinContent.response.status !== 200 || !Array.isArray(joinContent.body.data?.content) || joinContent.body.data.content.length !== 1) throw new Error("Konten Join WhatsApp scoped tidak tersedia melalui kontrak info.");
-  const waRoleGuard = await api(`/api/admin/peserta/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ status: "SUDAH_DIUNDANG" }) });
-  if (waRoleGuard.response.status !== 403) throw new Error("Status WhatsApp tidak dilindungi role admin.");
+  const joinBlocks = joinContent.body.data?.content as Array<{ id?: string }> | undefined;
+  if (joinContent.response.status !== 200 || !Array.isArray(joinBlocks) || !joinBlocks.some((item) => item.id === contentIds[1])) throw new Error("Konten Join WhatsApp scoped tidak tersedia melalui kontrak info.");
+  const inviteUrl = `https://chat.whatsapp.com/Phase9_${marker}`;
+  const waRoleGuard = await api(`/api/admin/peserta/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl }) });
+  if (waRoleGuard.response.status !== 403) throw new Error("Pengelolaan link WhatsApp tidak dilindungi role admin.");
 
-  const invited = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "SUDAH_DIUNDANG" }) });
-  if (invited.response.status !== 200) throw new Error("Update status undangan WhatsApp gagal.");
+  const invited = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl: `${inviteUrl}?mode=invite` }) });
+  if (invited.response.status !== 200) throw new Error("Penyimpanan link undangan WhatsApp gagal.");
+  const afterLink = await prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id }, include: { statusGrupWa: true } });
+  if (afterLink.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA || afterLink.statusGrupWa?.linkUndangan !== inviteUrl || !afterLink.statusGrupWa.linkDitetapkanAt) throw new Error("Link undangan tidak tersimpan tanpa menyelesaikan pendaftaran.");
+
+  const waWithLink = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie);
+  if (waWithLink.response.status !== 200 || waWithLink.body.data?.hasInviteLink !== true || JSON.stringify(waWithLink.body).includes(inviteUrl)) throw new Error("Link mentah WhatsApp terekspos pada payload halaman wali.");
+
+  const prematureConfirmation = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ confirmed: true }) });
+  if (prematureConfirmation.response.status !== 409 || prematureConfirmation.body.error?.code !== "INVITE_LINK_NOT_OPENED") throw new Error("Wali dapat mengonfirmasi sebelum membuka link grup.");
+
+  const foreignOpen = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliB.cookie }, redirect: "manual" });
+  if (foreignOpen.status !== 403) throw new Error("Redirect link WhatsApp bocor antar wali.");
+  const opened = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliA.cookie }, redirect: "manual" });
+  if (opened.status !== 307 || opened.headers.get("location") !== inviteUrl) throw new Error("Redirect terotorisasi ke grup WhatsApp gagal.");
+
+  const confirmed = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ confirmed: true }) });
+  if (confirmed.response.status !== 200) throw new Error("Konfirmasi bergabung oleh wali gagal.");
   const finished = await prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id }, include: { statusGrupWa: true } });
-  if (finished.statusKeseluruhan !== StatusKeseluruhan.SELESAI || finished.statusGrupWa?.status !== StatusUndanganWa.SUDAH_DIUNDANG) throw new Error("Status selesai tidak sinkron dengan undangan WhatsApp.");
+  if (finished.statusKeseluruhan !== StatusKeseluruhan.SELESAI || finished.statusGrupWa?.status !== StatusUndanganWa.SUDAH_DIUNDANG || !finished.statusGrupWa.linkDibukaAt || !finished.statusGrupWa.dikonfirmasiWaliAt) throw new Error("Status selesai tidak sinkron dengan konfirmasi wali.");
 
-  const reverted = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "MENUNGGU" }) });
-  if (reverted.response.status !== 200) throw new Error("Status undangan tidak dapat dikoreksi admin.");
-  const afterRevert = await prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id } });
-  if (afterRevert.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA) throw new Error("Koreksi status WA tidak mengembalikan gate tahap.");
+  const changeAfterConfirmation = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl: "https://chat.whatsapp.com/New_Group" }) });
+  if (changeAfterConfirmation.response.status !== 409 || changeAfterConfirmation.body.error?.code !== "INVALID_STAGE") throw new Error("Link masih dapat diubah setelah pendaftaran selesai.");
 
   const siblingAfter = await prisma.calonMurid.findUniqueOrThrow({ where: { id: sibling.id } });
   const siblingPayments = await prisma.pembayaran.count({ where: { calonMuridReference: sibling.id, jenis: JenisPembayaran.DU } });
   if (siblingAfter.statusKeseluruhan !== StatusKeseluruhan.DITERIMA || siblingPayments !== 0) throw new Error("Alur DU satu anak memengaruhi saudara dalam akun yang sama.");
-  const audits = await prisma.auditLog.count({ where: { actorId: { in: [admin.profile.id, waliA.profile.id] }, action: { in: ["UPLOAD_DU_PROOF", "VERIFY_DU_PAYMENT", "UPDATE_WHATSAPP_INVITATION"] } } });
-  if (audits < 6) throw new Error("Audit Phase 9 tidak lengkap.");
+  const audits = await prisma.auditLog.count({ where: { actorId: { in: [admin.profile.id, waliA.profile.id] }, action: { in: ["UPLOAD_DU_PROOF", "VERIFY_DU_PAYMENT", "SET_WHATSAPP_INVITATION_LINK", "OPEN_WHATSAPP_INVITATION", "CONFIRM_WHATSAPP_MEMBERSHIP"] } } });
+  if (audits < 7) throw new Error("Audit Phase 9 tidak lengkap.");
 
   console.log("Phase 9 DU manual & Join WhatsApp integration: OK");
 } finally {

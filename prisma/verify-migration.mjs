@@ -48,6 +48,13 @@ const phase9NominalCheckMigrationSql = await readFile(
   ),
   "utf8",
 );
+const phase9WhatsappConfirmationMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260831160000_phase9_whatsapp_confirmation/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -72,6 +79,7 @@ try {
   await client.query(phase5MigrationSql);
   await client.query(phase9MigrationSql);
   await client.query(phase9NominalCheckMigrationSql);
+  await client.query(phase9WhatsappConfirmationMigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -94,8 +102,8 @@ try {
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 22,
-    `Expected 22 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 24,
+    `Expected 24 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(

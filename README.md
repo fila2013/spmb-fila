@@ -341,7 +341,9 @@ tidak meminta nominal dari wali. Admin mencatat nominal aktual saat verifikasi,
 atau mengisi alasan penolakan agar wali dapat mengunggah ulang.
 
 Pembayaran DU terverifikasi memajukan status ke `MENUNGGU_JOIN_WA`. Admin lalu
-mencatat status `MENUNGGU` atau `SUDAH_DIUNDANG`; tidak ada pengiriman pesan atau
+menyediakan link grup WhatsApp per peserta. Wali membuka link melalui redirect
+terotorisasi dan wajib mengonfirmasi sudah bergabung; konfirmasi ini mengubah status
+menjadi `SELESAI`. Tidak ada pengiriman pesan atau
 integrasi WhatsApp API otomatis pada MVP. Konten kedua tahap tetap dikelola dari
 CMS berdasarkan jalur/kategori:
 

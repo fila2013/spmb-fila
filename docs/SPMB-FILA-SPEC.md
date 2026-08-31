@@ -29,6 +29,7 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 
 - **Midtrans pembayaran pendaftaran = MVP**, bukan Phase 2. Roadmap terbaru secara eksplisit memajukannya ke MVP karena API key production sudah tersedia.
 - **Pembayaran DU = manual**, upload bukti + verifikasi admin.
+- **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
 - **Prisma** adalah ORM utama untuk akses PostgreSQL.
 - **Supabase** digunakan untuk PostgreSQL, Auth, dan Storage.
@@ -529,9 +530,14 @@ DU:
 
 ## 5.13 Join WA
 
-Admin mengubah:
-- `menunggu`
-- `sudah_diundang`
+Admin menyediakan link grup setelah pembayaran DU terverifikasi.
+
+Wali murid:
+- membuka link melalui tombol aplikasi; URL mentah tidak ditampilkan pada UI wali;
+- kembali ke halaman Join WA;
+- mengonfirmasi **Iya, saya sudah masuk**.
+
+Status `selesai` hanya ditetapkan setelah konfirmasi wali. Sistem mencatat waktu link ditetapkan, pertama dibuka, dan dikonfirmasi.
 
 Sistem tidak membuat grup WhatsApp otomatis pada MVP.
 
@@ -895,6 +901,10 @@ updated_at
 ```text
 calon_murid_id
 status
+link_undangan
+link_ditetapkan_at
+link_dibuka_at
+dikonfirmasi_wali_at
 updated_by
 updated_at
 ```
@@ -1397,8 +1407,10 @@ Codex wajib mengerjakan secara bertahap:
 
 ### Phase 9 — DU & Join WA
 - DU upload.
-- Manual verification.
-- Join WA status.
+- Preview bukti dan verifikasi manual admin.
+- Admin menyediakan link grup setelah DU terverifikasi.
+- Wali membuka link dan wajib mengonfirmasi sudah bergabung.
+- Konfirmasi wali mengubah status pendaftaran menjadi selesai.
 
 ### Phase 10 — Reporting
 - Filter.

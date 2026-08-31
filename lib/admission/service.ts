@@ -21,6 +21,7 @@ import type {
   AdmissionVerificationInput,
   WhatsappInvitationInput,
 } from "@/lib/admission/schemas";
+import { whatsappInvitationSchema } from "@/lib/admission/schemas";
 import { assertOwnership } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -102,6 +103,23 @@ async function signedProofUrl(path: string | null) {
   return data.signedUrl;
 }
 
+function proofKind(path: string | null) {
+  if (!path) return null;
+  return path.toLowerCase().endsWith(".pdf") ? "pdf" as const : "image" as const;
+}
+
+function validatedWhatsappInviteUrl(value: string) {
+  const parsed = whatsappInvitationSchema.safeParse({ inviteUrl: value });
+  if (!parsed.success) {
+    throw new AdmissionError(
+      "INVALID_INVITE_LINK",
+      "Link grup WhatsApp yang tersimpan tidak valid. Hubungi panitia.",
+      409,
+    );
+  }
+  return parsed.data.inviteUrl;
+}
+
 export async function getAdmissionFeePageData(childId: string, userId: string) {
   const child = await ownedChild(childId, userId);
   if (!admissionFeeVisibleStatuses.includes(child.statusKeseluruhan)) {
@@ -125,6 +143,7 @@ export async function getAdmissionFeePageData(childId: string, userId: string) {
       createdAt: payment.createdAt,
       verifiedAt: payment.verifiedAt,
       proofUrl: await signedProofUrl(payment.fileBuktiUrl),
+      proofKind: proofKind(payment.fileBuktiUrl),
     } : null,
     content: content.map(publicContent),
   };
@@ -222,8 +241,18 @@ export async function getAdminAdmissionData(childId: string) {
   if (!child) throw new AdmissionError("NOT_FOUND", "Peserta tidak ditemukan.", 404);
   const payment = await preferredDuPayment(childId);
   return {
-    payment: payment ? { ...payment, proofUrl: await signedProofUrl(payment.fileBuktiUrl) } : null,
-    whatsappStatus: child.statusGrupWa?.status ?? null,
+    payment: payment ? {
+      ...payment,
+      proofUrl: await signedProofUrl(payment.fileBuktiUrl),
+      proofKind: proofKind(payment.fileBuktiUrl),
+    } : null,
+    whatsapp: child.statusGrupWa ? {
+      status: child.statusGrupWa.status,
+      inviteUrl: child.statusGrupWa.linkUndangan,
+      linkDitetapkanAt: child.statusGrupWa.linkDitetapkanAt,
+      linkDibukaAt: child.statusGrupWa.linkDibukaAt,
+      confirmedAt: child.statusGrupWa.dikonfirmasiWaliAt,
+    } : null,
   };
 }
 
@@ -246,6 +275,9 @@ export async function verifyAdmissionPayment(
     }
     if (input.status === StatusPembayaran.VERIFIED && !input.nominal) {
       throw new AdmissionError("NOMINAL_REQUIRED", "Nominal aktual wajib dicatat saat verifikasi.", 422);
+    }
+    if (input.status === StatusPembayaran.VERIFIED && !input.proofReviewed) {
+      throw new AdmissionError("PROOF_REVIEW_REQUIRED", "Preview bukti wajib diperiksa sebelum pembayaran disetujui.", 422);
     }
 
     const payment = await transaction.pembayaran.update({
@@ -273,7 +305,14 @@ export async function verifyAdmissionPayment(
       nextStatus = StatusKeseluruhan.MENUNGGU_JOIN_WA;
       await transaction.statusGrupWa.upsert({
         where: { calonMuridId: previous.calonMurid.id },
-        update: { status: StatusUndanganWa.MENUNGGU, updatedById: actorId },
+        update: {
+          status: StatusUndanganWa.MENUNGGU,
+          linkUndangan: null,
+          linkDitetapkanAt: null,
+          linkDibukaAt: null,
+          dikonfirmasiWaliAt: null,
+          updatedById: actorId,
+        },
         create: { calonMuridId: previous.calonMurid.id, status: StatusUndanganWa.MENUNGGU, updatedById: actorId },
       });
     } else {
@@ -293,6 +332,7 @@ export async function verifyAdmissionPayment(
           before: { status: previous.status, nominal: previous.nominal },
           after: { status: payment.status, nominal: payment.nominal },
           catatanAdmin: payment.catatanAdmin,
+          proofReviewed: input.status === StatusPembayaran.VERIFIED,
           nextStatus,
         },
       },
@@ -319,11 +359,14 @@ export async function getJoinWaPageData(childId: string, userId: string) {
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null },
     status: child.statusGrupWa?.status ?? StatusUndanganWa.MENUNGGU,
+    hasInviteLink: Boolean(child.statusGrupWa?.linkUndangan),
+    linkOpenedAt: child.statusGrupWa?.linkDibukaAt ?? null,
+    confirmedAt: child.statusGrupWa?.dikonfirmasiWaliAt ?? null,
     content: content.map(publicContent),
   };
 }
 
-export async function updateWhatsappInvitation(
+export async function setWhatsappInvitationLink(
   childId: string,
   input: WhatsappInvitationInput,
   actorId: string,
@@ -335,7 +378,7 @@ export async function updateWhatsappInvitation(
       include: { statusGrupWa: true },
     });
     if (!child) throw new AdmissionError("NOT_FOUND", "Peserta tidak ditemukan.", 404);
-    if (!joinWaVisibleStatuses.includes(child.statusKeseluruhan)) {
+    if (child.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA) {
       throw new AdmissionError("INVALID_STAGE", "Peserta belum berada pada tahap grup WhatsApp.", 409);
     }
     const verified = await transaction.pembayaran.findFirst({
@@ -343,32 +386,172 @@ export async function updateWhatsappInvitation(
       select: { id: true },
     });
     if (!verified) throw new AdmissionError("PAYMENT_REQUIRED", "Pembayaran DU belum terverifikasi.", 409);
+    if (child.statusGrupWa?.status === StatusUndanganWa.SUDAH_DIUNDANG) {
+      throw new AdmissionError("ALREADY_CONFIRMED", "Wali sudah mengonfirmasi bergabung ke grup WhatsApp.", 409);
+    }
+    const now = new Date();
     const status = await transaction.statusGrupWa.upsert({
       where: { calonMuridId: childId },
-      update: { status: input.status, updatedById: actorId },
-      create: { calonMuridId: childId, status: input.status, updatedById: actorId },
-    });
-    const nextStatus = input.status === StatusUndanganWa.SUDAH_DIUNDANG
-      ? StatusKeseluruhan.SELESAI
-      : StatusKeseluruhan.MENUNGGU_JOIN_WA;
-    await transaction.calonMurid.update({
-      where: { id: childId },
-      data: { statusKeseluruhan: nextStatus },
+      update: {
+        status: StatusUndanganWa.MENUNGGU,
+        linkUndangan: input.inviteUrl,
+        linkDitetapkanAt: now,
+        linkDibukaAt: null,
+        dikonfirmasiWaliAt: null,
+        updatedById: actorId,
+      },
+      create: {
+        calonMuridId: childId,
+        status: StatusUndanganWa.MENUNGGU,
+        linkUndangan: input.inviteUrl,
+        linkDitetapkanAt: now,
+        updatedById: actorId,
+      },
     });
     await transaction.auditLog.create({
       data: {
         actorId,
-        action: "UPDATE_WHATSAPP_INVITATION",
+        action: "SET_WHATSAPP_INVITATION_LINK",
         entity: "status_grup_wa",
         entityId: childId,
         detail: {
-          before: child.statusGrupWa?.status ?? null,
-          after: status.status,
-          nextStatus,
+          previousLinkConfigured: Boolean(child.statusGrupWa?.linkUndangan),
+          linkConfigured: true,
+          nextStatus: StatusKeseluruhan.MENUNGGU_JOIN_WA,
           automaticInvite: false,
         },
       },
     });
-    return { status, nextStatus };
+    return {
+      status: status.status,
+      linkDitetapkanAt: status.linkDitetapkanAt,
+      nextStatus: StatusKeseluruhan.MENUNGGU_JOIN_WA,
+    };
+  }, { maxWait: 10_000, timeout: 30_000 });
+}
+
+export async function openWhatsappInvitation(childId: string, userId: string) {
+  return prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT id FROM "calon_murid" WHERE id = ${childId}::uuid FOR UPDATE`;
+    const child = await transaction.calonMurid.findUnique({
+      where: { id: childId },
+      include: { statusGrupWa: true },
+    });
+    if (!child) throw new AdmissionError("NOT_FOUND", "Peserta tidak ditemukan.", 404);
+    assertOwnership({ userId, role: "WALI_MURID" }, child.userId);
+    if (!joinWaVisibleStatuses.includes(child.statusKeseluruhan)) {
+      throw new AdmissionError("INVALID_STAGE", "Tahap grup WhatsApp belum tersedia.", 409);
+    }
+    const verified = await transaction.pembayaran.findFirst({
+      where: {
+        calonMuridReference: childId,
+        jenis: JenisPembayaran.DU,
+        status: StatusPembayaran.VERIFIED,
+      },
+      select: { id: true },
+    });
+    if (!verified) throw new AdmissionError("PAYMENT_REQUIRED", "Pembayaran DU belum terverifikasi.", 409);
+    if (!child.statusGrupWa?.linkUndangan || !child.statusGrupWa.linkDitetapkanAt) {
+      throw new AdmissionError("INVITE_LINK_PENDING", "Link grup WhatsApp belum disediakan panitia.", 409);
+    }
+
+    const inviteUrl = validatedWhatsappInviteUrl(child.statusGrupWa.linkUndangan);
+    if (!child.statusGrupWa.linkDibukaAt) {
+      const openedAt = new Date();
+      await transaction.statusGrupWa.update({
+        where: { calonMuridId: childId },
+        data: { linkDibukaAt: openedAt },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorId: userId,
+          action: "OPEN_WHATSAPP_INVITATION",
+          entity: "status_grup_wa",
+          entityId: childId,
+          detail: { openedAt, inviteUrlExposedInPage: false },
+        },
+      });
+    }
+    return inviteUrl;
+  }, { maxWait: 10_000, timeout: 30_000 });
+}
+
+export async function confirmWhatsappMembership(childId: string, userId: string) {
+  return prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT id FROM "calon_murid" WHERE id = ${childId}::uuid FOR UPDATE`;
+    const child = await transaction.calonMurid.findUnique({
+      where: { id: childId },
+      include: { statusGrupWa: true },
+    });
+    if (!child) throw new AdmissionError("NOT_FOUND", "Peserta tidak ditemukan.", 404);
+    assertOwnership({ userId, role: "WALI_MURID" }, child.userId);
+    if (
+      child.statusKeseluruhan === StatusKeseluruhan.SELESAI &&
+      child.statusGrupWa?.status === StatusUndanganWa.SUDAH_DIUNDANG
+    ) {
+      return {
+        status: child.statusGrupWa.status,
+        confirmedAt: child.statusGrupWa.dikonfirmasiWaliAt,
+        nextStatus: StatusKeseluruhan.SELESAI,
+      };
+    }
+    if (child.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA) {
+      throw new AdmissionError("INVALID_STAGE", "Peserta belum berada pada tahap grup WhatsApp.", 409);
+    }
+    const verified = await transaction.pembayaran.findFirst({
+      where: {
+        calonMuridReference: childId,
+        jenis: JenisPembayaran.DU,
+        status: StatusPembayaran.VERIFIED,
+      },
+      select: { id: true },
+    });
+    if (!verified) throw new AdmissionError("PAYMENT_REQUIRED", "Pembayaran DU belum terverifikasi.", 409);
+    if (!child.statusGrupWa?.linkUndangan) {
+      throw new AdmissionError("INVITE_LINK_PENDING", "Link grup WhatsApp belum disediakan panitia.", 409);
+    }
+    if (!child.statusGrupWa.linkDibukaAt) {
+      throw new AdmissionError("INVITE_LINK_NOT_OPENED", "Buka link grup WhatsApp terlebih dahulu sebelum mengonfirmasi.", 409);
+    }
+
+    const confirmedAt = new Date();
+    const status = await transaction.statusGrupWa.update({
+      where: { calonMuridId: childId },
+      data: {
+        status: StatusUndanganWa.SUDAH_DIUNDANG,
+        dikonfirmasiWaliAt: confirmedAt,
+        updatedById: userId,
+      },
+    });
+    const advanced = await transaction.calonMurid.updateMany({
+      where: {
+        id: childId,
+        userId,
+        statusKeseluruhan: StatusKeseluruhan.MENUNGGU_JOIN_WA,
+      },
+      data: { statusKeseluruhan: StatusKeseluruhan.SELESAI },
+    });
+    if (advanced.count !== 1) {
+      throw new AdmissionError("INVALID_STAGE", "Status peserta berubah; konfirmasi dibatalkan.", 409);
+    }
+    await transaction.auditLog.create({
+      data: {
+        actorId: userId,
+        action: "CONFIRM_WHATSAPP_MEMBERSHIP",
+        entity: "status_grup_wa",
+        entityId: childId,
+        detail: {
+          linkOpenedAt: child.statusGrupWa.linkDibukaAt,
+          confirmedAt,
+          nextStatus: StatusKeseluruhan.SELESAI,
+          selfAttestation: true,
+        },
+      },
+    });
+    return {
+      status: status.status,
+      confirmedAt: status.dikonfirmasiWaliAt,
+      nextStatus: StatusKeseluruhan.SELESAI,
+    };
   }, { maxWait: 10_000, timeout: 30_000 });
 }

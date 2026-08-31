@@ -341,10 +341,14 @@ model Pengumuman {
 }
 
 model StatusGrupWa {
-  calonMuridId String           @id @map("calon_murid_id") @db.Uuid
-  status       StatusUndanganWa @default(MENUNGGU)
-  updatedById  String?          @map("updated_by") @db.Uuid
-  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  calonMuridId          String           @id @map("calon_murid_id") @db.Uuid
+  status                StatusUndanganWa @default(MENUNGGU)
+  linkUndangan          String?          @map("link_undangan") @db.VarChar(2048)
+  linkDitetapkanAt      DateTime?        @map("link_ditetapkan_at") @db.Timestamptz(6)
+  linkDibukaAt          DateTime?        @map("link_dibuka_at") @db.Timestamptz(6)
+  dikonfirmasiWaliAt    DateTime?        @map("dikonfirmasi_wali_at") @db.Timestamptz(6)
+  updatedById           String?          @map("updated_by") @db.Uuid
+  updatedAt             DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
   updatedBy  User?      @relation("StatusGrupWaUpdater", fields: [updatedById], references: [id], onDelete: SetNull)

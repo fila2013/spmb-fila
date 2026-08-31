@@ -6,7 +6,7 @@ import {
   admissionIdSchema,
   whatsappInvitationSchema,
 } from "@/lib/admission/schemas";
-import { updateWhatsappInvitation } from "@/lib/admission/service";
+import { setWhatsappInvitationLink } from "@/lib/admission/service";
 import { requireRole } from "@/lib/auth/session";
 
 export async function PATCH(
@@ -17,7 +17,7 @@ export async function PATCH(
     const admin = await requireRole(UserRole.ADMIN);
     const id = admissionIdSchema.parse((await params).id);
     const input = whatsappInvitationSchema.parse(await request.json());
-    return NextResponse.json({ data: await updateWhatsappInvitation(id, input, admin.userId) });
+    return NextResponse.json({ data: await setWhatsappInvitationLink(id, input, admin.userId) });
   } catch (error) {
     return admissionErrorResponse(error);
   }

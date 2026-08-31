@@ -41,7 +41,7 @@ export const statusPresentation: Record<
     className: "bg-sky-100 text-sky-900",
   },
   [StatusKeseluruhan.MENUNGGU_JOIN_WA]: {
-    label: "Menunggu Diundang",
+    label: "Join WhatsApp",
     className: "bg-sky-100 text-sky-900",
   },
   [StatusKeseluruhan.SELESAI]: {
