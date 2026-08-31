@@ -2,9 +2,13 @@
 
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StatusPembayaran } from "@/generated/prisma/enums";
+import {
+  paymentReturnUrl,
+  type PaymentReturnState,
+} from "@/lib/payment/navigation";
 
 declare global {
   interface Window {
@@ -51,6 +55,7 @@ export function SnapPaymentPanel({
   initialStatus,
   initialSnapToken,
   environment,
+  localWebhookWarning,
 }: {
   childId: string;
   clientKey: string;
@@ -58,6 +63,7 @@ export function SnapPaymentPanel({
   initialStatus: StatusPembayaran | null;
   initialSnapToken: string | null;
   environment: "sandbox" | "production";
+  localWebhookWarning: boolean;
 }) {
   const router = useRouter();
   const environmentLabel = environment === "sandbox" ? "Sandbox" : "Production";
@@ -66,8 +72,16 @@ export function SnapPaymentPanel({
   const [snapToken, setSnapToken] = useState(initialSnapToken);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const navigationStarted = useRef(false);
 
-  async function pollStatus() {
+  const goToDashboard = useCallback((returnState: PaymentReturnState) => {
+    if (navigationStarted.current) return;
+    navigationStarted.current = true;
+    setBusy(true);
+    router.replace(paymentReturnUrl(childId, returnState));
+  }, [childId, router]);
+
+  const pollStatus = useCallback(async () => {
     for (let attempt = 0; attempt < 15; attempt += 1) {
       await delay(attempt === 0 ? 700 : 2_000);
       const response = await fetch(
@@ -79,19 +93,24 @@ export function SnapPaymentPanel({
       if (!body.data) continue;
       setStatus(body.data.status);
       if (body.data.status === StatusPembayaran.VERIFIED) {
-        setMessage("Pembayaran terverifikasi. Tahap enrollment sudah terbuka.");
-        router.refresh();
+        goToDashboard("verified");
         return;
       }
       if (body.data.status === StatusPembayaran.REJECTED) {
-        setMessage("Transaksi ditolak atau kedaluwarsa. Buat transaksi baru untuk mencoba kembali.");
         setSnapToken(null);
-        router.refresh();
+        goToDashboard("rejected");
         return;
       }
     }
     setMessage("Status masih diproses. Halaman ini dapat diperiksa kembali beberapa saat lagi.");
-  }
+  }, [childId, goToDashboard]);
+
+  useEffect(() => {
+    if (initialStatus === StatusPembayaran.PENDING && initialSnapToken) {
+      const timeout = window.setTimeout(() => void pollStatus(), 0);
+      return () => window.clearTimeout(timeout);
+    }
+  }, [initialSnapToken, initialStatus, pollStatus]);
 
   async function openSnap() {
     setBusy(true);
@@ -123,20 +142,19 @@ export function SnapPaymentPanel({
       window.snap.pay(token, {
         onSuccess: () => {
           setMessage("Pembayaran selesai di Snap. Menunggu konfirmasi webhook…");
-          void pollStatus();
+          goToDashboard("success");
         },
         onPending: () => {
           setStatus(StatusPembayaran.PENDING);
           setMessage("Transaksi menunggu pembayaran atau konfirmasi Midtrans.");
-          void pollStatus();
+          goToDashboard("checking");
         },
         onError: () => {
           setMessage("Snap melaporkan transaksi gagal. Status server sedang diperiksa.");
           void pollStatus();
         },
         onClose: () => {
-          setMessage("Jendela pembayaran ditutup. Transaksi pending tetap dapat dilanjutkan.");
-          setBusy(false);
+          goToDashboard("checking");
         },
       });
     } catch (error) {
@@ -176,6 +194,15 @@ export function SnapPaymentPanel({
             : "Transaksi ini menggunakan lingkungan pembayaran production."}
         </p>
       </div>
+      {localWebhookWarning ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-950">
+          <p className="font-bold">Webhook nyata tidak dapat masuk ke localhost</p>
+          <p>
+            Gunakan deployment Preview HTTPS dan isi MIDTRANS_NOTIFICATION_URL
+            agar status Settlement dari Sandbox dapat diterima otomatis.
+          </p>
+        </div>
+      ) : null}
 
       {verified ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">

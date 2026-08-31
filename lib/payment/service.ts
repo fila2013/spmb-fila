@@ -15,6 +15,7 @@ import { getAppEnvironment } from "@/lib/env/client";
 import { getMidtransEnvironment } from "@/lib/env/server";
 import { PaymentError } from "@/lib/payment/errors";
 import { createMidtransSnapTransaction } from "@/lib/payment/midtrans";
+import { paymentReturnUrl } from "@/lib/payment/navigation";
 import {
   grossAmountToInteger,
   mapMidtransStatus,
@@ -158,7 +159,7 @@ export async function createRegistrationSnapPayment(
         routeName: child.jalur.nama,
         categoryName: child.kategori.nama,
         finishUrl: new URL(
-          `/anak/${child.id}/pembayaran-pendaftaran`,
+          paymentReturnUrl(child.id, "success"),
           appEnvironment.NEXT_PUBLIC_APP_URL,
         ).toString(),
       });
@@ -336,7 +337,42 @@ export async function processMidtransNotification(
       previous.midtransPaymentType ===
         (notification.payment_type ?? previous.midtransPaymentType);
     if (duplicate) {
-      return { payment: previous, duplicate: true, ignored: !incomingStatus };
+      let enrollmentAdvanced = false;
+      if (
+        nextStatus === StatusPembayaran.VERIFIED &&
+        previous.calonMuridId
+      ) {
+        const updated = await transaction.calonMurid.updateMany({
+          where: {
+            id: previous.calonMuridId,
+            statusKeseluruhan:
+              StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR,
+          },
+          data: { statusKeseluruhan: StatusKeseluruhan.ENROLLMENT },
+        });
+        enrollmentAdvanced = updated.count === 1;
+      }
+      if (enrollmentAdvanced) {
+        await transaction.auditLog.create({
+          data: {
+            actorId: null,
+            action: "REPAIR_MIDTRANS_ENROLLMENT_TRANSITION",
+            entity: "pembayaran",
+            entityId: previous.id,
+            detail: {
+              orderId: notification.order_id,
+              paymentStatus: previous.status,
+              enrollmentAdvanced,
+            },
+          },
+        });
+      }
+      return {
+        payment: previous,
+        duplicate: true,
+        ignored: !incomingStatus,
+        enrollmentAdvanced,
+      };
     }
 
     const payment = await transaction.pembayaran.update({
@@ -363,7 +399,6 @@ export async function processMidtransNotification(
     let enrollmentAdvanced = false;
     if (
       nextStatus === StatusPembayaran.VERIFIED &&
-      previous.status !== StatusPembayaran.VERIFIED &&
       payment.calonMuridId
     ) {
       const updated = await transaction.calonMurid.updateMany({

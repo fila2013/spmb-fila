@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { SnapPaymentPanel } from "@/components/payment/snap-payment-panel";
 import { StatusPembayaran } from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
+import { getAppEnvironment } from "@/lib/env/client";
 import { getMidtransEnvironment } from "@/lib/env/server";
 import { PaymentError } from "@/lib/payment/errors";
+import { paymentReturnUrl } from "@/lib/payment/navigation";
 import { midtransUrls } from "@/lib/payment/rules";
 import { getRegistrationPaymentPageData } from "@/lib/payment/service";
 
@@ -44,6 +46,9 @@ export default async function PaymentPreparationPage({
   }
 
   const { child, payment, nominal } = summary;
+  if (payment?.status === StatusPembayaran.VERIFIED) {
+    redirect(paymentReturnUrl(child.id, "verified"));
+  }
   const subCategory = child.subKategoriEnum
     ? child.subKategoriEnum === "TKIT_FI_1"
       ? "TKIT Fitrah Insani 1"
@@ -51,6 +56,13 @@ export default async function PaymentPreparationPage({
     : child.subKategoriText;
   const midtrans = getMidtransEnvironment();
   const urls = midtransUrls(midtrans.MIDTRANS_IS_PRODUCTION);
+  const appHostname = new URL(
+    getAppEnvironment().NEXT_PUBLIC_APP_URL,
+  ).hostname;
+  const localWebhookWarning =
+    urls.environment === "sandbox" &&
+    !midtrans.MIDTRANS_NOTIFICATION_URL &&
+    ["localhost", "127.0.0.1", "::1"].includes(appHostname);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-12">
@@ -90,6 +102,7 @@ export default async function PaymentPreparationPage({
                 ? payment.midtransSnapToken
                 : null
             }
+            localWebhookWarning={localWebhookWarning}
           />
         </div>
       </section>

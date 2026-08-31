@@ -188,6 +188,12 @@ try {
   if (verifiedPayment.status !== StatusPembayaran.VERIFIED || !verifiedPayment.verifiedAt || enrolledChild.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT) {
     throw new Error("Payment state transition atau enrollment gate gagal.");
   }
+  const settlementAuditBeforeDuplicate = await prisma.auditLog.count({ where: { entityId: payment.id } });
+  const settlementDuplicate = await api("/api/webhooks/midtrans", { method: "POST", body: JSON.stringify(settlement) });
+  const settlementAuditAfterDuplicate = await prisma.auditLog.count({ where: { entityId: payment.id } });
+  if (settlementDuplicate.response.status !== 200 || settlementDuplicate.body.duplicate !== true || settlementAuditAfterDuplicate !== settlementAuditBeforeDuplicate) {
+    throw new Error("Webhook settlement duplicate belum idempotent.");
+  }
   const statusResult = await api(`/api/calon-murid/${primary.id}/pembayaran`, undefined, wali.cookie);
   if (statusResult.response.status !== 200 || (statusResult.body.data as { status?: string })?.status !== StatusPembayaran.VERIFIED) {
     throw new Error("Polling status tidak mengembalikan verified.");

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { logoutAction } from "@/app/(auth)/actions";
+import { PaymentReturnNotice } from "@/components/payment/payment-return-notice";
 import { StatusKeseluruhan } from "@/generated/prisma/enums";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { statusPresentation } from "@/lib/calon-murid/presentation";
 import { listOwnedCalonMurid } from "@/lib/calon-murid/service";
+import { parsePaymentReturnState } from "@/lib/payment/navigation";
 
 export const metadata: Metadata = { title: "Dashboard wali murid" };
 
@@ -51,9 +53,18 @@ function nextLink(child: {
   return null;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string; child?: string }>;
+}) {
   const user = await requireWaliPage();
+  const query = await searchParams;
   const children = await listOwnedCalonMurid(user.userId);
+  const paymentReturnState = parsePaymentReturnState(query.payment);
+  const paymentChild = query.child
+    ? children.find((child) => child.id === query.child)
+    : undefined;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
@@ -68,6 +79,15 @@ export default async function DashboardPage() {
           <form action={logoutAction}><button className="rounded-xl border border-emerald-900/20 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-50">Keluar</button></form>
         </div>
       </div>
+
+      {paymentReturnState && paymentChild ? (
+        <PaymentReturnNotice
+          key={`${paymentChild.id}-${paymentReturnState}`}
+          childId={paymentChild.id}
+          childName={paymentChild.namaAnak}
+          returnState={paymentReturnState}
+        />
+      ) : null}
 
       {children.length === 0 ? (
         <section className="mt-8 rounded-3xl border border-dashed border-emerald-900/25 bg-emerald-50/50 px-6 py-12 text-center">
