@@ -29,6 +29,7 @@
     "test:phase8-integration": "tsx scripts/verify-phase8.ts",
     "test:phase9-integration": "tsx scripts/verify-phase9.ts",
     "test:phase10-integration": "tsx scripts/verify-phase10.ts",
+    "test:admin-deletion-integration": "tsx scripts/verify-admin-deletion.ts",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "test:integration": "node scripts/run-phase11.mjs --integration-only",

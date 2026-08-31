@@ -10,6 +10,7 @@ const navigation = [
   { href: "/admin/biaya-pendaftaran", label: "Biaya pendaftaran" },
   { href: "/admin/form-builder", label: "Form builder" },
   { href: "/admin/peserta", label: "Peserta" },
+  { href: "/admin/wali-murid", label: "Wali murid" },
   { href: "/admin/konten/assessment", label: "Konten assessment" },
   { href: "/admin/konten/announcement", label: "Konten announcement" },
   { href: "/admin/konten/admission-fee", label: "Konten daftar ulang" },

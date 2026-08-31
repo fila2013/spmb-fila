@@ -21,6 +21,7 @@ const scripts = [
   "verify-phase8.ts",
   "verify-phase9.ts",
   "verify-phase10.ts",
+  "verify-admin-deletion.ts",
 ];
 
 if (process.env.MIDTRANS_IS_PRODUCTION !== "false") {

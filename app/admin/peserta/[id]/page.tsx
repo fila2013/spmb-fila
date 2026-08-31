@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/admin-shell";
 import { AdmissionVerificationForm, WhatsappInvitationForm } from "@/components/admin/admission-forms";
+import { DeleteParticipantForm } from "@/components/admin/deletion-forms";
 import { AnnouncementResultForm, AssessmentResultForm } from "@/components/admin/stage-forms";
 import { StatusAssessment, StatusPembayaran, StatusUndanganWa, UserRole } from "@/generated/prisma/enums";
 import { AdmissionError } from "@/lib/admission/errors";
@@ -36,6 +37,7 @@ export default async function ParticipantDetailPage({ params }: { params: Promis
       <section className="rounded-2xl border border-emerald-950/10 bg-white p-5"><h2 className="mb-4 text-lg font-bold text-emerald-950">Pembayaran DU</h2>{du ? <div className="grid gap-4"><div className="grid gap-2 text-sm text-slate-700"><p><span className="font-semibold">Status:</span> {du.status === StatusPembayaran.PENDING ? "Menunggu verifikasi" : du.status === StatusPembayaran.VERIFIED ? "Terverifikasi" : "Ditolak"}</p>{du.nominal ? <p><span className="font-semibold">Nominal:</span> {rupiah(du.nominal)}</p> : null}{du.catatanAdmin ? <p><span className="font-semibold">Catatan:</span> {du.catatanAdmin}</p> : null}{du.proofUrl ? <a href={du.proofUrl} target="_blank" rel="noreferrer" className="font-bold text-emerald-800 hover:underline">Buka bukti pembayaran</a> : null}</div>{du.status === StatusPembayaran.PENDING ? <AdmissionVerificationForm childId={participant.id} paymentId={du.id} /> : null}</div> : <p className="text-sm text-slate-600">Wali belum mengunggah bukti pembayaran DU.</p>}</section>
       <section className="rounded-2xl border border-emerald-950/10 bg-white p-5"><h2 className="mb-4 text-lg font-bold text-emerald-950">Undangan grup WhatsApp</h2>{du?.status === StatusPembayaran.VERIFIED ? <WhatsappInvitationForm childId={participant.id} status={admission.whatsappStatus ?? StatusUndanganWa.MENUNGGU} /> : <p className="text-sm text-slate-600">Status undangan tersedia setelah pembayaran DU terverifikasi.</p>}</section>
       <section className="rounded-2xl border border-emerald-950/10 bg-white p-5 lg:col-span-2"><h2 className="text-lg font-bold text-emerald-950">Data enrollment</h2><dl className="mt-4 grid gap-3 sm:grid-cols-2">{participant.formResponses.map((response) => <div key={response.id} className="rounded-xl bg-slate-50 p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{response.field.label}</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-slate-900">{response.value || "—"}</dd></div>)}</dl>{participant.formResponses.length === 0 ? <p className="mt-3 text-sm text-slate-500">Belum ada jawaban enrollment.</p> : null}</section>
+      <section className="rounded-2xl border border-red-200 bg-red-50 p-5 lg:col-span-2"><h2 className="mb-2 text-lg font-bold text-red-950">Zona berbahaya</h2><DeleteParticipantForm id={participant.id} name={participant.namaAnak} /></section>
     </div>
   </AdminShell>;
 }
