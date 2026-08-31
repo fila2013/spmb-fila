@@ -15,7 +15,7 @@ Jika terdapat konflik, gunakan bagian **Final Decisions** pada
 
 ## Status implementasi
 
-Phase 0 sampai Phase 10 sudah selesai. Selain fondasi database, Supabase Auth,
+Phase 0 sampai Phase 11 sudah selesai. Selain fondasi database, Supabase Auth,
 master data, pendaftaran multi-anak, dan Midtrans Snap Sandbox, wali murid dapat
 mengisi enrollment Data Pribadi serta Observasi secara bertahap. Submit final
 dikunci oleh pembayaran terverifikasi dan memajukan status ke tahap asesmen.
@@ -387,3 +387,19 @@ terbaru, CSV/XLSX valid, sanitasi data, dan audit ekspor:
 ```bash
 npm run test:phase10-integration
 ```
+
+## Quality Gate Phase 11
+
+Phase 11 menambahkan E2E Chromium untuk routing publik, anonymous guard, login
+wali/admin, multi-child dashboard, role guard, dan filter laporan. Seluruh unit,
+integration Phase Auth serta Phase 3–10, verifikasi migration staging, dan E2E
+dapat dijalankan berurutan melalui:
+
+```bash
+npm run test:e2e:install
+npm run test:phase11
+```
+
+Quality gate hanya boleh memakai Supabase staging dan Midtrans Sandbox. Matriks
+coverage, perintah parsial, dan batas keamanannya tersedia di
+`docs/PHASE11_TEST_MATRIX.md`.

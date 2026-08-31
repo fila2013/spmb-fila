@@ -58,18 +58,16 @@ async function api(path: string, cookie: string, init?: RequestInit) {
 }
 
 try {
-  const [admin, waliA, waliB] = await Promise.all([createAccount("admin", UserRole.ADMIN), createAccount("wali-a", UserRole.WALI_MURID), createAccount("wali-b", UserRole.WALI_MURID)]);
-  const [normalRoute, deleteRoute, category] = await Promise.all([
-    prisma.jalur.create({ data: { nama: `Phase 7 Normal ${marker}` } }),
-    prisma.jalur.create({ data: { nama: `Phase 7 Delete ${marker}`, hapusDataJikaGagal: true } }),
-    prisma.kategoriPendaftar.create({ data: { nama: `Phase 7 Kategori ${marker}`, tipe: KategoriTipe.EKSTERNAL } }),
-  ]);
+  const admin = await createAccount("admin", UserRole.ADMIN);
+  const waliA = await createAccount("wali-a", UserRole.WALI_MURID);
+  const waliB = await createAccount("wali-b", UserRole.WALI_MURID);
+  const normalRoute = await prisma.jalur.create({ data: { nama: `Phase 7 Normal ${marker}` } });
+  const deleteRoute = await prisma.jalur.create({ data: { nama: `Phase 7 Delete ${marker}`, hapusDataJikaGagal: true } });
+  const category = await prisma.kategoriPendaftar.create({ data: { nama: `Phase 7 Kategori ${marker}`, tipe: KategoriTipe.EKSTERNAL } });
   routeIds.push(normalRoute.id, deleteRoute.id); categoryIds.push(category.id);
-  const [child, otherChild, deleteChild] = await Promise.all([
-    prisma.calonMurid.create({ data: { userId: waliA.profile.id, namaAnak: `Anak A ${marker}`, jalurId: normalRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } }),
-    prisma.calonMurid.create({ data: { userId: waliB.profile.id, namaAnak: `Anak B ${marker}`, jalurId: normalRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } }),
-    prisma.calonMurid.create({ data: { userId: waliA.profile.id, namaAnak: `Anak Delete ${marker}`, jalurId: deleteRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } }),
-  ]);
+  const child = await prisma.calonMurid.create({ data: { userId: waliA.profile.id, namaAnak: `Anak A ${marker}`, jalurId: normalRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } });
+  const otherChild = await prisma.calonMurid.create({ data: { userId: waliB.profile.id, namaAnak: `Anak B ${marker}`, jalurId: normalRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } });
+  const deleteChild = await prisma.calonMurid.create({ data: { userId: waliA.profile.id, namaAnak: `Anak Delete ${marker}`, jalurId: deleteRoute.id, kategoriId: category.id, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN } });
   childIds.push(child.id, otherChild.id, deleteChild.id);
 
   const forbiddenAdmin = await api("/api/admin/peserta", waliA.cookie);

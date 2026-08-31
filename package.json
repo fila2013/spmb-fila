@@ -29,6 +29,10 @@
     "test:phase8-integration": "tsx scripts/verify-phase8.ts",
     "test:phase9-integration": "tsx scripts/verify-phase9.ts",
     "test:phase10-integration": "tsx scripts/verify-phase10.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "test:integration": "node scripts/run-phase11.mjs --integration-only",
+    "test:phase11": "npm run lint && npm run typecheck && npm test && npm run build && node scripts/run-phase11.mjs",
     "auth:set-admin": "tsx scripts/set-admin.ts",
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
@@ -56,6 +60,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "8.23.1",

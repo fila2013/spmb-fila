@@ -193,11 +193,26 @@ try {
   if (!jalurId || !kategoriId || !biayaId) {
     throw new Error("ID master data hasil smoke test tidak lengkap.");
   }
-  const auditCount = await prisma.auditLog.count({
-    where: { entityId: { in: [jalurId, kategoriId, biayaId] } },
+  const expectedAuditActions = [
+    "CREATE_JALUR",
+    "CREATE_KATEGORI",
+    "CREATE_BIAYA_PENDAFTARAN",
+    "UPDATE_JALUR",
+    "UPDATE_KATEGORI",
+    "UPDATE_BIAYA_PENDAFTARAN",
+  ];
+  const auditRows = await prisma.auditLog.findMany({
+    where: {
+      entityId: { in: [jalurId, kategoriId, biayaId] },
+      action: { in: expectedAuditActions },
+    },
+    select: { action: true },
   });
-  if (auditCount !== 6) {
-    throw new Error(`Audit log Phase 3 tidak lengkap: ${auditCount}/6.`);
+  const actionCounts = new Map<string, number>();
+  for (const row of auditRows) actionCounts.set(row.action, (actionCounts.get(row.action) ?? 0) + 1);
+  const missingActions = expectedAuditActions.filter((action) => actionCounts.get(action) !== 1);
+  if (missingActions.length) {
+    throw new Error(`Audit log Phase 3 tidak lengkap: ${missingActions.join(", ")}.`);
   }
 
   console.log("Phase 3 integration: OK");
