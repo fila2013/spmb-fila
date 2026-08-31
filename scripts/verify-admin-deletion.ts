@@ -271,7 +271,44 @@ try {
     throw new Error("Profil, Auth, atau audit penghapusan wali tidak lengkap.");
   }
 
-  console.log("Admin participant & guardian deletion integration: OK");
+  const recreated = await auth.auth.admin.createUser({
+    email: guardian.email,
+    password,
+    email_confirm: true,
+  });
+  if (recreated.error || !recreated.data.user) {
+    throw recreated.error ?? new Error("Email wali yang dihapus tidak dapat dipakai ulang.");
+  }
+  authIds.push(recreated.data.user.id);
+  if (recreated.data.user.id === guardian.authId) {
+    throw new Error("Pembuatan ulang tidak menghasilkan identitas Auth baru.");
+  }
+
+  const recreatedProfile = await prisma.user.findUniqueOrThrow({
+    where: { supabaseAuthUserId: recreated.data.user.id },
+  });
+  profileIds.push(recreatedProfile.id);
+  if (
+    recreatedProfile.email !== guardian.email ||
+    recreatedProfile.role !== UserRole.WALI_MURID
+  ) {
+    throw new Error("Profil wali hasil pendaftaran ulang tidak sinkron.");
+  }
+
+  const manuallyDeleted = await auth.auth.admin.deleteUser(
+    recreated.data.user.id,
+    false,
+  );
+  if (manuallyDeleted.error) throw manuallyDeleted.error;
+
+  const profileAfterManualAuthDelete = await prisma.user.findUnique({
+    where: { id: recreatedProfile.id },
+  });
+  if (profileAfterManualAuthDelete) {
+    throw new Error("Penghapusan manual Auth masih meninggalkan profil wali yatim.");
+  }
+
+  console.log("Admin deletion, Auth sync, and email reuse integration: OK");
 } finally {
   await retry(() =>
     prisma.auditLog.deleteMany({

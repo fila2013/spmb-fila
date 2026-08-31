@@ -321,11 +321,26 @@ export async function deleteGuardian(
   if (lookup.data.user) {
     const deletion = await supabase.auth.admin.deleteUser(
       guardian.supabaseAuthUserId,
+      false,
     );
     if (deletion.error && !isMissingAuthUser(deletion.error)) {
       throw new AdminDeletionError(
         "AUTH_DELETE_FAILED",
         "Identitas autentikasi belum dapat dihapus. Akun telah dinonaktifkan dan penghapusan dapat dicoba kembali.",
+        502,
+      );
+    }
+
+    const verification = await supabase.auth.admin.getUserById(
+      guardian.supabaseAuthUserId,
+    );
+    if (
+      (!verification.error && verification.data.user) ||
+      (verification.error && !isMissingAuthUser(verification.error))
+    ) {
+      throw new AdminDeletionError(
+        "AUTH_DELETE_FAILED",
+        "Identitas autentikasi belum dapat dipastikan terhapus. Akun telah dinonaktifkan dan penghapusan dapat dicoba kembali.",
         502,
       );
     }
@@ -341,15 +356,14 @@ export async function deleteGuardian(
         _count: { select: { calonMurid: true } },
       },
     });
-    if (!target) return;
-    if (target.role !== UserRole.WALI_MURID) {
+    if (target && target.role !== UserRole.WALI_MURID) {
       throw new AdminDeletionError(
         "ADMIN_DELETE_FORBIDDEN",
         "Role akun berubah; penghapusan profil dibatalkan.",
         409,
       );
     }
-    assertGuardianHasNoChildren(target._count.calonMurid);
+    if (target) assertGuardianHasNoChildren(target._count.calonMurid);
     await transaction.auditLog.create({
       data: {
         actorId,
@@ -367,10 +381,13 @@ export async function deleteGuardian(
           },
           authIdentityDeleted: true,
           applicationProfileDeleted: true,
+          applicationProfileDeletedByAuthTrigger: !target,
         },
       },
     });
-    await transaction.user.delete({ where: { id: guardian.id } });
+    if (target) {
+      await transaction.user.delete({ where: { id: guardian.id } });
+    }
   });
 
   return { id: guardian.id, email: guardian.email };
