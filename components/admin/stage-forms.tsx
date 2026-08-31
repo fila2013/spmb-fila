@@ -21,7 +21,7 @@ type ContentValue = { id: string; judul: string; tanggal: string; isiTeks: strin
 export function StageContentForm({ tahap, value, jalur, kategori }: { tahap: TahapKonten; value?: ContentValue; jalur: Array<{ id: string; nama: string }>; kategori: Array<{ id: string; nama: string }> }) {
   const [state, action, pending] = useActionState(value ? updateStageContentAction : createStageContentAction, initialStageActionState);
   return (
-    <form action={action} className="grid gap-4" encType="multipart/form-data">
+    <form action={action} className="grid gap-4">
       <input type="hidden" name="tahap" value={tahap} />
       {value ? <><input type="hidden" name="id" value={value.id} /><input type="hidden" name="gambarUrl" value={value.gambarUrl} /></> : null}
       <label className="text-sm font-semibold text-slate-800">Judul<input name="judul" required maxLength={200} defaultValue={value?.judul} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" />{state.fieldErrors?.judul ? <span className="text-xs text-red-700">{state.fieldErrors.judul[0]}</span> : null}</label>
