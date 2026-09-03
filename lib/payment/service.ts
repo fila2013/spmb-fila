@@ -519,6 +519,92 @@ export async function downloadPaymentProof(paymentId: string) {
   return { blob: data, filename };
 }
 
+export async function deletePaymentProofFile(
+  paymentId: string,
+  actorId: string,
+) {
+  const current = await prisma.pembayaran.findUnique({
+    where: { id: paymentId },
+  });
+  if (
+    !current?.fileBuktiUrl ||
+    current.metodePembayaran !== MetodePembayaran.MANUAL_TRANSFER
+  ) {
+    throw new PaymentError(
+      "NOT_FOUND",
+      "File bukti pembayaran tidak ditemukan.",
+      404,
+    );
+  }
+  if (current.status === StatusPembayaran.PENDING) {
+    throw new PaymentError(
+      "INVALID_STAGE",
+      "Selesaikan pemeriksaan pembayaran sebelum menghapus file bukti.",
+      409,
+    );
+  }
+
+  const storagePath = current.fileBuktiUrl;
+  const { error: deleteError } = await createAdminClient().storage
+    .from(paymentProofBucket())
+    .remove([storagePath]);
+  if (deleteError) {
+    throw new PaymentError(
+      "PROOF_DELETE_FAILED",
+      "File bukti pembayaran belum dapat dihapus.",
+      502,
+    );
+  }
+
+  return prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`
+      SELECT id FROM "pembayaran" WHERE id = ${paymentId}::uuid FOR UPDATE
+    `;
+    const locked = await transaction.pembayaran.findUnique({
+      where: { id: paymentId },
+    });
+    if (!locked) {
+      throw new PaymentError("NOT_FOUND", "Transaksi tidak ditemukan.", 404);
+    }
+    if (locked.status === StatusPembayaran.PENDING) {
+      throw new PaymentError(
+        "INVALID_STAGE",
+        "Selesaikan pemeriksaan pembayaran sebelum menghapus file bukti.",
+        409,
+      );
+    }
+    if (locked.fileBuktiUrl !== storagePath) {
+      throw new PaymentError(
+        "INVALID_STAGE",
+        "File bukti berubah saat proses penghapusan. Muat ulang halaman.",
+        409,
+      );
+    }
+    const payment = await transaction.pembayaran.update({
+      where: { id: paymentId },
+      data: { fileBuktiUrl: null },
+    });
+    await transaction.auditLog.create({
+      data: {
+        actorId,
+        action: "DELETE_PAYMENT_PROOF_FILE",
+        entity: "pembayaran",
+        entityId: payment.id,
+        detail: {
+          calonMuridReference: payment.calonMuridReference,
+          jenis: payment.jenis,
+          metodePembayaran: payment.metodePembayaran,
+          status: payment.status,
+          nominal: payment.nominal,
+          deletedStoragePath: storagePath,
+          transactionRetained: true,
+        },
+      },
+    });
+    return payment;
+  });
+}
+
 export async function requireVerifiedRegistrationPayment(
   childId: string,
   userId: string,

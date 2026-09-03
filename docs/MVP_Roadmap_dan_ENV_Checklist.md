@@ -62,6 +62,7 @@ Sistem dianggap siap dipakai untuk satu siklus SPMB penuh jika:
 
 - [ ] Buat project Supabase baru (disarankan 2 project: `spmb-staging` dan `spmb-production`).
 - [ ] Aktifkan **Auth → Email provider** (email+password).
+- [ ] Aktifkan **Confirm Email** pada konfigurasi provider Email agar akun tidak dapat login sebelum verifikasi.
 - [ ] Buat 2 bucket di **Storage**:
   - `bukti-pembayaran` → **private**
   - `konten-cms` → **public**

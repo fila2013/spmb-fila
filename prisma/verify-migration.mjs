@@ -62,6 +62,13 @@ const dynamicRegistrationPaymentMigrationSql = await readFile(
   ),
   "utf8",
 );
+const paymentProofDeletionMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260903113000_allow_payment_proof_file_deletion/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -88,6 +95,7 @@ try {
   await client.query(phase9NominalCheckMigrationSql);
   await client.query(phase9WhatsappConfirmationMigrationSql);
   await client.query(dynamicRegistrationPaymentMigrationSql);
+  await client.query(paymentProofDeletionMigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -192,6 +200,10 @@ try {
     "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, file_bukti_url, status, verified_at) VALUES ($1, $1, 'pendaftaran', 'manual_transfer', 1000, 'pendaftaran/test-proof.png', 'verified', now())",
     [calonMuridId],
   );
+  await client.query(
+    "UPDATE pembayaran SET file_bukti_url = NULL WHERE calon_murid_reference = $1 AND metode_pembayaran = 'manual_transfer'",
+    [calonMuridId],
+  );
   await client.query("DELETE FROM calon_murid WHERE id = $1", [calonMuridId]);
 
   const retainedPayment = await client.query(
@@ -216,6 +228,18 @@ try {
     "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, file_bukti_url) VALUES ($1, $1, 'du', 'manual_transfer', NULL, 'du/test-proof.png')",
     [duChildId],
   );
+  await client.query("SAVEPOINT pending_du_without_proof");
+  try {
+    await client.query(
+      "UPDATE pembayaran SET file_bukti_url = NULL WHERE calon_murid_reference = $1 AND jenis = 'du'",
+      [duChildId],
+    );
+    throw new Error("DU pending dapat kehilangan bukti sebelum diperiksa.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint bukti DU pending tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT pending_du_without_proof");
+  }
   await client.query("SAVEPOINT invalid_verified_du");
   try {
     await client.query(

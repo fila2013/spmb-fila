@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { signupErrorMessage } from "@/lib/auth/messages";
+import {
+  loginErrorMessage,
+  signupErrorMessage,
+} from "@/lib/auth/messages";
 
 describe("signupErrorMessage", () => {
   it("memberi arahan untuk kegagalan SMTP", () => {
@@ -14,3 +17,16 @@ describe("signupErrorMessage", () => {
   });
 });
 
+describe("loginErrorMessage", () => {
+  it("menjelaskan bahwa email belum dikonfirmasi", () => {
+    expect(loginErrorMessage("email_not_confirmed")).toContain(
+      "belum dikonfirmasi",
+    );
+  });
+
+  it("tetap menyamarkan kegagalan login lain", () => {
+    expect(loginErrorMessage("invalid_credentials")).toBe(
+      "Email atau password tidak sesuai.",
+    );
+  });
+});

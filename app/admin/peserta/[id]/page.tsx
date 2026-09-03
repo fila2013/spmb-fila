@@ -8,6 +8,7 @@ import {
   WhatsappInvitationForm,
 } from "@/components/admin/admission-forms";
 import { DeleteParticipantForm } from "@/components/admin/deletion-forms";
+import { PaymentProofDeletion } from "@/components/admin/payment-proof-deletion";
 import {
   AnnouncementResultForm,
   AssessmentResultForm,
@@ -132,8 +133,11 @@ export default async function ParticipantDetailPage({
                     title="Preview bukti pembayaran pendaftaran"
                     downloadUrl={`/api/admin/pembayaran/${registrationPayment.id}/bukti`}
                   />
-                ) : <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">File bukti tidak tersedia.</p>
+                ) : <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">File bukti sudah dihapus atau tidak tersedia.</p>
               ) : <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Pembayaran diproses melalui webhook Midtrans dan tidak memiliki file bukti manual.</p>}
+              {registrationPayment.fileBuktiUrl && registrationPayment.status !== StatusPembayaran.PENDING ? (
+                <PaymentProofDeletion paymentId={registrationPayment.id} />
+              ) : null}
             </div>
           ) : <p className="text-sm text-slate-600">Belum ada pembayaran pendaftaran.</p>}
         </section>
@@ -147,7 +151,8 @@ export default async function ParticipantDetailPage({
                   {du.nominal ? <p><span className="font-semibold">Nominal:</span> {rupiah(du.nominal)}</p> : null}
                   {du.catatanAdmin ? <p><span className="font-semibold">Catatan:</span> {du.catatanAdmin}</p> : null}
                 </div>
-                {du.proofUrl ? <PaymentProofPreview url={du.proofUrl} kind={du.proofKind} title="Preview bukti pembayaran DU" downloadUrl={`/api/admin/pembayaran/${du.id}/bukti`} /> : <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">File bukti tidak tersedia.</p>}
+                {du.proofUrl ? <PaymentProofPreview url={du.proofUrl} kind={du.proofKind} title="Preview bukti pembayaran DU" downloadUrl={`/api/admin/pembayaran/${du.id}/bukti`} /> : <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">File bukti sudah dihapus atau tidak tersedia.</p>}
+                {du.fileBuktiUrl && du.status !== StatusPembayaran.PENDING ? <PaymentProofDeletion paymentId={du.id} /> : null}
               </div>
               <div>
                 {du.status === StatusPembayaran.PENDING ? (

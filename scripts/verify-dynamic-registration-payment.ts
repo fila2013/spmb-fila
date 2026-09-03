@@ -8,6 +8,7 @@ import { config } from "dotenv";
 import { PrismaClient } from "../generated/prisma/client";
 import {
   KategoriTipe,
+  JenisPembayaran,
   MetodePembayaran,
   ModePembayaranPendaftaran,
   StatusKeseluruhan,
@@ -43,7 +44,7 @@ let routeId: string | undefined;
 let categoryId: string | undefined;
 let feeId: string | undefined;
 let bankId: string | undefined;
-let proofPath: string | undefined;
+const proofPaths: string[] = [];
 
 async function loginCookie(email: string) {
   const cookies = new Map<string, string>();
@@ -164,13 +165,62 @@ try {
     prisma.pembayaran.findFirstOrThrow({ where: { calonMuridReference: child.id, jenis: "PENDAFTARAN" } }),
     prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id } }),
   ]);
-  proofPath = payment.fileBuktiUrl ?? undefined;
+  if (payment.fileBuktiUrl) proofPaths.push(payment.fileBuktiUrl);
   if (payment.status !== StatusPembayaran.VERIFIED || payment.metodePembayaran !== MetodePembayaran.MANUAL_TRANSFER || payment.nominal !== fee.nominal || !payment.verifiedAt || enrolled.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT) {
     throw new Error("Transisi atomik manual ke VERIFIED/ENROLLMENT tidak sesuai.");
   }
   const downloaded = await api(`/api/admin/pembayaran/${payment.id}/bukti`, {}, admin.cookie);
   if (!downloaded.response.ok || !downloaded.response.headers.get("content-disposition")?.includes("attachment")) {
     throw new Error("Admin tidak dapat mengunduh bukti manual.");
+  }
+  const guardianDelete = await api(`/api/admin/pembayaran/${payment.id}/bukti`, { method: "DELETE" }, wali.cookie);
+  if (guardianDelete.response.status !== 403) throw new Error("Wali dapat menghapus bukti pembayaran.");
+  const deletedRegistrationProof = await api(`/api/admin/pembayaran/${payment.id}/bukti`, { method: "DELETE" }, admin.cookie);
+  if (!deletedRegistrationProof.response.ok) throw new Error("Admin tidak dapat menghapus bukti pendaftaran.");
+  const retainedRegistration = await prisma.pembayaran.findUniqueOrThrow({ where: { id: payment.id } });
+  if (retainedRegistration.fileBuktiUrl !== null || retainedRegistration.status !== StatusPembayaran.VERIFIED || retainedRegistration.nominal !== fee.nominal) {
+    throw new Error("Penghapusan bukti mengubah atau menghapus transaksi pendaftaran.");
+  }
+
+  const duChild = await prisma.calonMurid.create({ data: {
+    userId: wali.profile.id,
+    namaAnak: `Anak DU ${marker}`,
+    jalurId: route.id,
+    kategoriId: category.id,
+    subKategoriText: "TK Uji",
+    statusKeseluruhan: StatusKeseluruhan.MENUNGGU_DU,
+  } });
+  childIds.push(duChild.id);
+  const duPath = `du/${wali.profile.id}/${duChild.id}/${randomUUID()}.png`;
+  const duUpload = await adminClient.storage.from(paymentBucket).upload(
+    duPath,
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    { contentType: "image/png", upsert: false },
+  );
+  if (duUpload.error) throw duUpload.error;
+  proofPaths.push(duPath);
+  const duPayment = await prisma.pembayaran.create({ data: {
+    calonMuridId: duChild.id,
+    calonMuridReference: duChild.id,
+    jenis: JenisPembayaran.DU,
+    metodePembayaran: MetodePembayaran.MANUAL_TRANSFER,
+    nominal: null,
+    fileBuktiUrl: duPath,
+    status: StatusPembayaran.PENDING,
+  } });
+  const pendingDelete = await api(`/api/admin/pembayaran/${duPayment.id}/bukti`, { method: "DELETE" }, admin.cookie);
+  if (pendingDelete.response.status !== 409) throw new Error("Bukti DU dapat dihapus sebelum diperiksa.");
+  await prisma.pembayaran.update({ where: { id: duPayment.id }, data: {
+    nominal: 1_500_000,
+    status: StatusPembayaran.VERIFIED,
+    verifiedAt: new Date(),
+    catatanAdmin: "Sudah diperiksa",
+  } });
+  const deletedDuProof = await api(`/api/admin/pembayaran/${duPayment.id}/bukti`, { method: "DELETE" }, admin.cookie);
+  if (!deletedDuProof.response.ok) throw new Error("Admin tidak dapat menghapus bukti DU.");
+  const retainedDu = await prisma.pembayaran.findUniqueOrThrow({ where: { id: duPayment.id } });
+  if (retainedDu.fileBuktiUrl !== null || retainedDu.nominal !== 1_500_000 || retainedDu.catatanAdmin !== "Sudah diperiksa") {
+    throw new Error("Penghapusan bukti mengubah atau menghapus transaksi DU.");
   }
 
   if (initialAccountCount === 0) {
@@ -184,7 +234,7 @@ try {
     where: { id: "pendaftaran" },
     data: { mode: initialSetting.mode, updatedById: initialSetting.updatedById },
   });
-  if (proofPath) await adminClient.storage.from(paymentBucket).remove([proofPath]);
+  if (proofPaths.length) await adminClient.storage.from(paymentBucket).remove(proofPaths);
   const payments = childIds.length ? await prisma.pembayaran.findMany({ where: { calonMuridReference: { in: childIds } }, select: { id: true } }) : [];
   if (profileIds.length) await prisma.auditLog.deleteMany({ where: { actorId: { in: profileIds } } });
   if (payments.length) await prisma.auditLog.deleteMany({ where: { entityId: { in: payments.map(({ id }) => id) } } });

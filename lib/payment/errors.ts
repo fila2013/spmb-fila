@@ -16,6 +16,7 @@ export type PaymentErrorCode =
   | "STORAGE_NOT_CONFIGURED"
   | "UPLOAD_FAILED"
   | "SIGNED_URL_FAILED"
+  | "PROOF_DELETE_FAILED"
   | "GATEWAY_ERROR";
 
 export class PaymentError extends Error {

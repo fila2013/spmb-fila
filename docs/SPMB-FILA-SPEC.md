@@ -30,6 +30,8 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - **Pembayaran pendaftaran memiliki mode dinamis `MIDTRANS` atau `MANUAL`** yang dipilih Admin dari dashboard dan disimpan di database. Integrasi Midtrans tetap dipertahankan. Pada mode manual, nominal tetap berasal dari matrix Jalur × Kategori; setelah bukti JPG/PNG/PDF maksimal 500 KB berhasil disimpan, pembayaran langsung `verified` dan peserta masuk `enrollment` tanpa verifikasi Admin.
 - **Rekening sekolah dikelola Admin** dan minimal satu rekening wajib tersedia sebelum mode manual dapat diaktifkan.
 - **Pembayaran DU = manual**, upload bukti + verifikasi admin.
+- **File bukti pembayaran pendaftaran manual dan DU dapat dihapus Admin setelah pemeriksaan selesai.** Penghapusan hanya menghapus object Storage dan mengosongkan `file_bukti_url`; record transaksi, jenis, metode, nominal, status, timestamp, dan audit tetap dipertahankan.
+- **Konfirmasi email wajib aktif di Supabase Auth.** Jika signup menghasilkan session langsung, aplikasi memperlakukannya sebagai salah konfigurasi dan tidak mengaktifkan akun tersebut.
 - **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
 - **Prisma** adalah ORM utama untuk akses PostgreSQL.
@@ -126,6 +128,7 @@ Sistem harus memungkinkan admin mengelola jalur, kategori, kuota, biaya, form en
 - Mode manual menampilkan rekening sekolah dan upload bukti maksimal 500 KB.
 - Upload manual yang berhasil langsung menghasilkan status pembayaran `verified` dan membuka enrollment.
 - Admin dapat melihat dan mengunduh bukti transfer manual pada detail peserta.
+- Setelah pemeriksaan selesai, Admin dapat menghapus file bukti tanpa menghapus record transaksi.
 - VA / QRIS / e-wallet sesuai metode yang diaktifkan merchant.
 - Snap token dibuat server-side.
 - Status final ditentukan webhook.

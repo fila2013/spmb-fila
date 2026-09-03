@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { UserRole } from "@/generated/prisma/enums";
 import type { AuthActionState } from "@/lib/auth/action-state";
-import { signupErrorMessage } from "@/lib/auth/messages";
+import { loginErrorMessage, signupErrorMessage } from "@/lib/auth/messages";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -14,6 +14,8 @@ import {
 import { ensureUserProfile } from "@/lib/auth/profile";
 import { getAppEnvironment } from "@/lib/env/client";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from "@/lib/prisma";
 
 function values(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -61,15 +63,40 @@ export async function registerAction(
     };
   }
 
-  if (data.session && data.user?.email) {
-    await ensureUserProfile({ id: data.user.id, email: data.user.email });
-    redirect("/dashboard");
+  if (data.session && data.user) {
+    await supabase.auth.signOut();
+    let rolledBack = false;
+    try {
+      const rollback = await createAdminClient().auth.admin.deleteUser(
+        data.user.id,
+      );
+      rolledBack = !rollback.error;
+      if (rollback.error) {
+        console.error("Rollback akun auto-confirm gagal.", {
+          code: rollback.error.code ?? "unknown",
+          status: rollback.error.status,
+        });
+      }
+    } catch {
+      console.error("Rollback akun auto-confirm tidak tersedia.");
+    }
+    if (!rolledBack) {
+      await prisma.user.updateMany({
+        where: { supabaseAuthUserId: data.user.id },
+        data: { statusAktif: false },
+      });
+    }
+    return {
+      status: "error",
+      message:
+        "Konfirmasi email belum diwajibkan oleh Supabase. Akun tidak diaktifkan; hubungi admin untuk memeriksa pengaturan Confirm Email.",
+    };
   }
 
   return {
     status: "success",
     message:
-      "Jika alamat email dapat didaftarkan, tautan konfirmasi telah dikirim. Periksa juga folder spam.",
+      "Jika alamat email baru dapat didaftarkan, tautan konfirmasi telah dikirim. Jika akun lama sudah pernah dikonfirmasi, silakan masuk. Periksa juga folder spam.",
   };
 }
 
@@ -91,7 +118,7 @@ export async function loginAction(
   if (error || !data.user.email) {
     return {
       status: "error",
-      message: "Email atau password tidak sesuai.",
+      message: loginErrorMessage(error?.code),
     };
   }
 

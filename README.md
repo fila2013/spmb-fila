@@ -124,6 +124,12 @@ Tambahkan URL ekuivalen untuk domain preview/production dan set
 `NEXT_PUBLIC_APP_URL` sesuai origin deployment. Konfirmasi email dan reset
 password memerlukan konfigurasi email/SMTP Supabase yang aktif.
 
+Pada **Authentication → Providers → Email**, opsi **Confirm Email** wajib aktif.
+Jika Supabase mengembalikan session langsung saat signup, aplikasi membatalkan
+aktivasi akun sebagai fail-safe. Untuk email yang tidak diterima, periksa Auth
+Logs Supabase, log delivery/suppression penyedia SMTP, folder spam, dan pastikan
+link tracking penyedia SMTP dinonaktifkan.
+
 Untuk mencegah email scanner menghabiskan tautan sekali-pakai sebelum pengguna
 menekannya, gunakan halaman konfirmasi dua langkah. Atur template **Confirm
 signup** agar tombolnya menggunakan URL berikut:
@@ -235,7 +241,7 @@ POST /api/webhooks/midtrans
 GET/PATCH /api/admin/settings/payment
 GET/POST  /api/admin/settings/bank-accounts
 PATCH/DELETE /api/admin/settings/bank-accounts/:id
-GET /api/admin/pembayaran/:id/bukti
+GET/DELETE /api/admin/pembayaran/:id/bukti
 ```
 
 Create transaction memverifikasi session, role, ownership, status tahap, dan
@@ -243,6 +249,10 @@ mengambil nominal dari matrix biaya. Webhook tidak memakai session Supabase;
 signature SHA-512, Merchant ID, dan nominal wajib cocok sebelum perubahan
 status. Payload audit disanitasi dan tidak menyimpan signature, nomor VA, atau
 detail instrumen pembayaran.
+
+Setelah pembayaran manual selesai diperiksa, Admin dapat menghapus file bukti
+pendaftaran maupun DU. Object Storage dan `file_bukti_url` dihapus, tetapi
+record transaksi, nominal, status, serta audit keuangan tetap dipertahankan.
 
 Smoke test melakukan request Snap nyata ke Sandbox, menguji idempotency,
 ownership, invalid signature, amount/merchant mismatch, pending, settlement,
