@@ -8,6 +8,7 @@ import { config } from "dotenv";
 import { PrismaClient } from "../generated/prisma/client";
 import {
   KategoriTipe,
+  ModePembayaranPendaftaran,
   StatusKeseluruhan,
   StatusPembayaran,
 } from "../generated/prisma/enums";
@@ -45,6 +46,10 @@ const childIds: string[] = [];
 let routeId: string | undefined;
 let categoryId: string | undefined;
 let feeId: string | undefined;
+const initialPaymentSetting = await prisma.pengaturanPembayaran.findUniqueOrThrow({
+  where: { id: "pendaftaran" },
+});
+const paymentModeChanged = initialPaymentSetting.mode !== ModePembayaranPendaftaran.MIDTRANS;
 
 async function sessionCookie(accessToken: string, refreshToken: string) {
   const cookies = new Map<string, string>();
@@ -114,6 +119,12 @@ async function createPayment(childId: string, cookie: string) {
 }
 
 try {
+  if (paymentModeChanged) {
+    await prisma.pengaturanPembayaran.update({
+      where: { id: "pendaftaran" },
+      data: { mode: ModePembayaranPendaftaran.MIDTRANS },
+    });
+  }
   const [wali, otherWali] = await Promise.all([createWali("owner"), createWali("other")]);
   const route = await prisma.jalur.create({ data: { nama: `Bayar ${marker}`, kuotaMaks: 5, kuotaTerpakai: 2 } });
   routeId = route.id;
@@ -215,6 +226,16 @@ try {
 
   console.log("Phase 5 Midtrans Sandbox integration: OK");
 } finally {
+  if (paymentModeChanged) {
+    await prisma.pengaturanPembayaran.update({
+      where: { id: "pendaftaran" },
+      data: {
+        mode: initialPaymentSetting.mode,
+        updatedById: initialPaymentSetting.updatedById,
+        updatedAt: initialPaymentSetting.updatedAt,
+      },
+    });
+  }
   const payments = childIds.length
     ? await prisma.pembayaran.findMany({ where: { calonMuridReference: { in: childIds } }, select: { id: true } })
     : [];

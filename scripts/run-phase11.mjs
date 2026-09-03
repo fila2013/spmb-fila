@@ -16,6 +16,7 @@ const scripts = [
   "verify-phase3.ts",
   "verify-phase4.ts",
   "verify-phase5.ts",
+  "verify-dynamic-registration-payment.ts",
   "verify-phase6.ts",
   "verify-phase7.ts",
   "verify-phase8.ts",

@@ -11,7 +11,7 @@ menggunakan Midtrans Sandbox (`MIDTRANS_IS_PRODUCTION=false`).
 | Session, role, ownership, inactive/error contract | `lib/auth/*.test.ts`, `proxy.test.ts` | Phase 3, 4, 6, 7, 9, 10 | Anonim ditolak; wali ditolak dari admin |
 | Satu akun banyak anak dan isolasi antar-wali | Authorization rules | Phase 4, 8 | Dashboard wali menampilkan dua anak |
 | Kuota jalur/kategori tidak bocor | Calon murid/master-data rules | Phase 4 (request paralel) | — |
-| Matrix biaya dan nominal server-side | Master-data/payment rules | Phase 4 dan 5 | — |
+| Matrix biaya, mode dinamis, upload dan retention bukti | Master-data/payment rules | Phase 4, 5, dan dynamic payment | — |
 | Signature, status, sanitasi, idempotency webhook | Payment rules | Phase 5 | — |
 | Gate enrollment setelah payment verified | Enrollment rules/schema | Phase 5 dan 6 | — |
 | Assessment dan release announcement | Stage rules/schema | Phase 7 | — |
