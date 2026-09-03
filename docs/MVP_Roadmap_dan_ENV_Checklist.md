@@ -19,7 +19,7 @@ Prinsip pembagian: **MVP = wajib ada agar satu siklus SPMB (dari buka pendaftara
 | **Kategori Pendaftar** | CRUD kategori, toggle aktif, periode, kuota + auto-close; radio Alumni TKIT (2 pilihan tetap) & free-text Eksternal | — |
 | **Auto-Transfer & Antrian Fallback** | TCP gagal → auto-pindah ke Reguler (cek kuota); jika kuota penuh → status antrian `menunggu_kuota_fallback` (FIFO, tanpa batas waktu), diproses ulang otomatis saat admin menambah kuota atau manual via tombol "proses ulang antrian" | Notifikasi otomatis ke wali murid saat berhasil pindah dari antrian |
 | **Auto-Delete Data Calon Murid** | Reguler & Pindahan: gagal → hapus data calon murid ybs saja (cascade FK), akun & anak lain tidak tersentuh; wajib konfirmasi UI + snapshot audit log sebelum hapus | Soft-delete + anonymisasi khusus baris `pembayaran` (rekomendasi, opsional) |
-| **Pembayaran Pendaftaran** | **Integrasi Midtrans Snap (live/production)** — nominal otomatis dari matrix Biaya Pendaftaran, bayar via VA/QRIS/e-wallet, status real-time via webhook | Multi payment gateway lain (jika suatu saat perlu), retry/reminder otomatis untuk transaksi pending |
+| **Pembayaran Pendaftaran** | **Mode dinamis Midtrans/transfer manual** — Admin memilih mode aktif; nominal otomatis dari matrix Biaya Pendaftaran. Midtrans final via webhook, sedangkan upload manual valid maksimal 500 KB langsung verified/enrollment. | Multi payment gateway lain (jika suatu saat perlu), retry/reminder otomatis untuk transaksi pending |
 | **Pembayaran DU** | Upload bukti manual + verifikasi admin | Integrasi Midtrans untuk DU (menyusul, belum diprioritaskan) |
 | **Enrollment — Form** | Form Data Pribadi & Observasi dengan field **default sudah jadi** (admin bisa tambah/edit/hapus field lewat form builder sederhana: tambah, ubah label, wajib/opsional) | Drag-and-drop reorder field, tipe field lanjutan (dropdown, file upload di dalam form, conditional field) |
 | **Enrollment — Validasi & Auto-fill** | Validasi No. WA format Indonesia, auto-fill Email (akun) & Asal TK (kategori) | Validasi custom lain per field (mis. regex bebas diatur admin) |
@@ -39,7 +39,7 @@ Prinsip pembagian: **MVP = wajib ada agar satu siklus SPMB (dari buka pendaftara
 Sistem dianggap siap dipakai untuk satu siklus SPMB penuh jika:
 - [ ] Wali murid bisa daftar akun, tambah >1 anak, dan menuntaskan seluruh 10 tahap sampai status "sudah diundang" tanpa bantuan manual admin di luar sistem (kecuali proses invite WA itu sendiri yang memang tetap manual by design).
 - [ ] Admin bisa mengatur seluruh jalur/kategori/kuota/periode, **matrix biaya pendaftaran**, dan konten 4 tahap terakhir tanpa perlu bantuan developer.
-- [ ] Pembayaran pendaftaran via Midtrans dengan **nominal otomatis** sesuai kombinasi jalur+kategori (bukan diisi wali murid), status verified otomatis lewat webhook.
+- [ ] Pembayaran pendaftaran mode dinamis berjalan dengan **nominal otomatis** sesuai kombinasi jalur+kategori: Midtrans verified lewat webhook atau transfer manual verified setelah upload valid maksimal 500 KB.
 - [ ] Verifikasi pembayaran DU (manual) berjalan dan tercatat rapi di dashboard admin.
 - [ ] **Auto-transfer TCP→Reguler teruji**: kuota Reguler tersedia → langsung diterima; kuota penuh → status "Menunggu Kuota" (bukan "Tidak Diterima"), masuk antrian FIFO, dan berhasil diproses otomatis saat admin menambah kuota.
 - [ ] **Auto-delete data calon murid teruji** (jalur Reguler & Pindahan): hanya data calon murid yang gagal yang terhapus, akun wali murid & anak lain tetap utuh, ada konfirmasi UI sebelum eksekusi.

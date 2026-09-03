@@ -2,7 +2,50 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 import { StatusPembayaran } from "@/generated/prisma/enums";
 import { PaymentError } from "@/lib/payment/errors";
+import { MAX_REGISTRATION_PROOF_BYTES } from "@/lib/payment/constants";
 import type { MidtransNotification } from "@/lib/payment/schemas";
+
+export { MAX_REGISTRATION_PROOF_BYTES } from "@/lib/payment/constants";
+
+function startsWith(bytes: Uint8Array, signature: number[]) {
+  return signature.every((value, index) => bytes[index] === value);
+}
+
+export function assertRegistrationProofSize(file: { size: number }) {
+  if (file.size === 0) {
+    throw new PaymentError("EMPTY_FILE", "Pilih bukti transfer.", 422);
+  }
+  if (file.size > MAX_REGISTRATION_PROOF_BYTES) {
+    throw new PaymentError(
+      "FILE_TOO_LARGE",
+      "Bukti transfer maksimal 500 KB.",
+      413,
+    );
+  }
+}
+
+export function validateRegistrationProof(
+  file: { size: number; type: string },
+  bytes: Uint8Array,
+) {
+  assertRegistrationProofSize(file);
+  const jpeg =
+    file.type === "image/jpeg" && startsWith(bytes, [0xff, 0xd8, 0xff]);
+  const png =
+    file.type === "image/png" &&
+    startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const pdf =
+    file.type === "application/pdf" &&
+    startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+  if (!jpeg && !png && !pdf) {
+    throw new PaymentError(
+      "INVALID_FILE",
+      "Bukti transfer harus berupa JPG, PNG, atau PDF yang valid.",
+      422,
+    );
+  }
+  return jpeg ? "jpg" : png ? "png" : "pdf";
+}
 
 export function midtransUrls(isProduction: boolean) {
   return isProduction

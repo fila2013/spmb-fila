@@ -76,6 +76,13 @@ enum MetodePembayaran {
   @@map("metode_pembayaran")
 }
 
+enum ModePembayaranPendaftaran {
+  MIDTRANS @map("midtrans")
+  MANUAL   @map("manual")
+
+  @@map("mode_pembayaran_pendaftaran")
+}
+
 enum StatusPembayaran {
   PENDING  @map("pending")
   VERIFIED @map("verified")
@@ -124,13 +131,38 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  calonMurid             CalonMurid[]
-  pembayaranDiverifikasi Pembayaran[]   @relation("PembayaranVerifier")
-  pengumumanDiubah       Pengumuman[]   @relation("PengumumanUpdater")
-  statusGrupWaDiubah     StatusGrupWa[] @relation("StatusGrupWaUpdater")
-  auditLogs              AuditLog[]     @relation("AuditActor")
+  calonMurid                 CalonMurid[]
+  pembayaranDiverifikasi     Pembayaran[]           @relation("PembayaranVerifier")
+  pengumumanDiubah           Pengumuman[]           @relation("PengumumanUpdater")
+  statusGrupWaDiubah         StatusGrupWa[]         @relation("StatusGrupWaUpdater")
+  pengaturanPembayaranDiubah PengaturanPembayaran[] @relation("PengaturanPembayaranUpdater")
+  auditLogs                  AuditLog[]             @relation("AuditActor")
 
   @@map("users")
+}
+
+model PengaturanPembayaran {
+  id          String                    @id @default("pendaftaran") @db.VarChar(30)
+  mode        ModePembayaranPendaftaran @default(MIDTRANS)
+  updatedById String?                   @map("updated_by") @db.Uuid
+  updatedAt   DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("PengaturanPembayaranUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("pengaturan_pembayaran")
+}
+
+model RekeningBank {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  namaBank      String   @map("nama_bank") @db.VarChar(100)
+  nomorRekening String   @map("nomor_rekening") @db.VarChar(30)
+  atasNama      String   @map("atas_nama") @db.VarChar(150)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([namaBank, nomorRekening])
+  @@index([createdAt])
+  @@map("rekening_bank")
 }
 
 model Jalur {
@@ -341,14 +373,14 @@ model Pengumuman {
 }
 
 model StatusGrupWa {
-  calonMuridId          String           @id @map("calon_murid_id") @db.Uuid
-  status                StatusUndanganWa @default(MENUNGGU)
-  linkUndangan          String?          @map("link_undangan") @db.VarChar(2048)
-  linkDitetapkanAt      DateTime?        @map("link_ditetapkan_at") @db.Timestamptz(6)
-  linkDibukaAt          DateTime?        @map("link_dibuka_at") @db.Timestamptz(6)
-  dikonfirmasiWaliAt    DateTime?        @map("dikonfirmasi_wali_at") @db.Timestamptz(6)
-  updatedById           String?          @map("updated_by") @db.Uuid
-  updatedAt             DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  calonMuridId       String           @id @map("calon_murid_id") @db.Uuid
+  status             StatusUndanganWa @default(MENUNGGU)
+  linkUndangan       String?          @map("link_undangan") @db.VarChar(2048)
+  linkDitetapkanAt   DateTime?        @map("link_ditetapkan_at") @db.Timestamptz(6)
+  linkDibukaAt       DateTime?        @map("link_dibuka_at") @db.Timestamptz(6)
+  dikonfirmasiWaliAt DateTime?        @map("dikonfirmasi_wali_at") @db.Timestamptz(6)
+  updatedById        String?          @map("updated_by") @db.Uuid
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   calonMurid CalonMurid @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
   updatedBy  User?      @relation("StatusGrupWaUpdater", fields: [updatedById], references: [id], onDelete: SetNull)

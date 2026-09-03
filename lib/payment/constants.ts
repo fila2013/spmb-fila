@@ -1,0 +1,1 @@
+export const MAX_REGISTRATION_PROOF_BYTES = 500 * 1024;

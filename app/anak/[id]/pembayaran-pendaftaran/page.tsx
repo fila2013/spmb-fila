@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { SnapPaymentPanel } from "@/components/payment/snap-payment-panel";
-import { StatusPembayaran } from "@/generated/prisma/enums";
+import { ManualRegistrationPaymentPanel } from "@/components/payment/manual-registration-payment-panel";
+import {
+  ModePembayaranPendaftaran,
+  MetodePembayaran,
+  StatusPembayaran,
+} from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
@@ -45,7 +50,7 @@ export default async function PaymentPreparationPage({
     throw error;
   }
 
-  const { child, payment, nominal } = summary;
+  const { child, payment, nominal, mode, bankAccounts } = summary;
   if (payment?.status === StatusPembayaran.VERIFIED) {
     redirect(paymentReturnUrl(child.id, "verified"));
   }
@@ -54,15 +59,20 @@ export default async function PaymentPreparationPage({
       ? "TKIT Fitrah Insani 1"
       : "TKIT Fitrah Insani 2"
     : child.subKategoriText;
-  const midtrans = getMidtransEnvironment();
-  const urls = midtransUrls(midtrans.MIDTRANS_IS_PRODUCTION);
-  const appHostname = new URL(
-    getAppEnvironment().NEXT_PUBLIC_APP_URL,
-  ).hostname;
-  const localWebhookWarning =
-    urls.environment === "sandbox" &&
-    !midtrans.MIDTRANS_NOTIFICATION_URL &&
-    ["localhost", "127.0.0.1", "::1"].includes(appHostname);
+  const midtrans =
+    mode === ModePembayaranPendaftaran.MIDTRANS
+      ? getMidtransEnvironment()
+      : null;
+  const urls = midtrans
+    ? midtransUrls(midtrans.MIDTRANS_IS_PRODUCTION)
+    : null;
+  const localWebhookWarning = midtrans && urls
+    ? urls.environment === "sandbox" &&
+      !midtrans.MIDTRANS_NOTIFICATION_URL &&
+      ["localhost", "127.0.0.1", "::1"].includes(
+        new URL(getAppEnvironment().NEXT_PUBLIC_APP_URL).hostname,
+      )
+    : false;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-12">
@@ -91,19 +101,27 @@ export default async function PaymentPreparationPage({
             <p className="mt-1 text-3xl font-bold text-emerald-950">{rupiah(nominal)}</p>
             <p className="mt-2 text-xs leading-5 text-slate-600">Nominal diambil langsung oleh server dari matriks biaya aktif.</p>
           </div>
-          <SnapPaymentPanel
-            childId={child.id}
-            clientKey={midtrans.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-            snapScriptUrl={urls.snapScriptUrl}
-            environment={urls.environment}
-            initialStatus={payment?.status ?? null}
-            initialSnapToken={
-              payment?.status === StatusPembayaran.PENDING
-                ? payment.midtransSnapToken
-                : null
-            }
-            localWebhookWarning={localWebhookWarning}
-          />
+          {midtrans && urls ? (
+            <SnapPaymentPanel
+              childId={child.id}
+              clientKey={midtrans.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+              snapScriptUrl={urls.snapScriptUrl}
+              environment={urls.environment}
+              initialStatus={payment?.status ?? null}
+              initialSnapToken={
+                payment?.status === StatusPembayaran.PENDING &&
+                payment.metodePembayaran === MetodePembayaran.MIDTRANS
+                  ? payment.midtransSnapToken
+                  : null
+              }
+              localWebhookWarning={localWebhookWarning}
+            />
+          ) : (
+            <ManualRegistrationPaymentPanel
+              childId={child.id}
+              bankAccounts={bankAccounts}
+            />
+          )}
         </div>
       </section>
     </div>

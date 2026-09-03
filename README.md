@@ -213,18 +213,29 @@ ownership, penolakan `userId` dari client, dan kategori tanpa biaya:
 npm run test:phase4-integration
 ```
 
-## Midtrans Sandbox Phase 5
+## Pembayaran Dinamis Phase 5
 
 Phase 5 sementara dikunci ke Sandbox (`MIDTRANS_IS_PRODUCTION=false`) sampai
 validasi merchant Production selesai. Detail konfigurasi dan skenario uji ada
 di `docs/MIDTRANS_SANDBOX_CHECKLIST.md`.
 
+Admin memilih mode pembayaran pendaftaran di `/admin/settings`: `MIDTRANS`
+atau `MANUAL`. Mode manual membutuhkan minimal satu rekening sekolah. Bukti
+JPG/PNG/PDF maksimal 500 KB disimpan di bucket privat `bukti-pembayaran` dan,
+sesuai keputusan bisnis terbaru, langsung memverifikasi pembayaran serta
+membuka enrollment tanpa verifikasi admin.
+
 Endpoint pembayaran:
 
 ```text
 POST /api/calon-murid/:id/pembayaran/midtrans/create
+POST /api/calon-murid/:id/pembayaran/manual
 GET  /api/calon-murid/:id/pembayaran
 POST /api/webhooks/midtrans
+GET/PATCH /api/admin/settings/payment
+GET/POST  /api/admin/settings/bank-accounts
+PATCH/DELETE /api/admin/settings/bank-accounts/:id
+GET /api/admin/pembayaran/:id/bukti
 ```
 
 Create transaction memverifikasi session, role, ownership, status tahap, dan
@@ -239,6 +250,7 @@ expire, retry attempt, polling status, dan enrollment transition:
 
 ```bash
 npm run test:phase5-integration
+npm run test:dynamic-payment-integration
 ```
 
 ## Enrollment Phase 6

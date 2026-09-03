@@ -55,6 +55,13 @@ const phase9WhatsappConfirmationMigrationSql = await readFile(
   ),
   "utf8",
 );
+const dynamicRegistrationPaymentMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260903090000_dynamic_registration_payment/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -80,12 +87,13 @@ try {
   await client.query(phase9MigrationSql);
   await client.query(phase9NominalCheckMigrationSql);
   await client.query(phase9WhatsappConfirmationMigrationSql);
+  await client.query(dynamicRegistrationPaymentMigrationSql);
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
     [validationSchema],
   );
-  assert(tables.rowCount === 13, `Expected 13 tables, found ${tables.rowCount}.`);
+  assert(tables.rowCount === 15, `Expected 15 tables, found ${tables.rowCount}.`);
   assert(
     tables.rows.some(({ table_name }) => table_name === "audit_log"),
     "Tabel audit_log tidak ditemukan.",
@@ -95,15 +103,15 @@ try {
     "SELECT indexname FROM pg_indexes WHERE schemaname = $1",
     [validationSchema],
   );
-  assert(indexes.rowCount >= 42, `Expected at least 42 indexes, found ${indexes.rowCount}.`);
+  assert(indexes.rowCount >= 46, `Expected at least 46 indexes, found ${indexes.rowCount}.`);
 
   const domainConstraints = await client.query(
     "SELECT conname FROM pg_constraint WHERE connamespace = $1::regnamespace AND conname LIKE '%_check'",
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 24,
-    `Expected 24 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 28,
+    `Expected 28 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -111,8 +119,8 @@ try {
     [validationSchema],
   );
   assert(
-    rlsTables.rows[0].count === 13,
-    `Expected RLS on 13 tables, found ${rlsTables.rows[0].count}.`,
+    rlsTables.rows[0].count === 15,
+    `Expected RLS on 15 tables, found ${rlsTables.rows[0].count}.`,
   );
 
   await client.query("SAVEPOINT invalid_quota");
@@ -180,6 +188,10 @@ try {
     "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, midtrans_order_id, midtrans_snap_token) VALUES ($1, $1, 'pendaftaran', 'midtrans', 1000, 'phase1-order', 'phase1-token')",
     [calonMuridId],
   );
+  await client.query(
+    "INSERT INTO pembayaran (calon_murid_id, calon_murid_reference, jenis, metode_pembayaran, nominal, file_bukti_url, status, verified_at) VALUES ($1, $1, 'pendaftaran', 'manual_transfer', 1000, 'pendaftaran/test-proof.png', 'verified', now())",
+    [calonMuridId],
+  );
   await client.query("DELETE FROM calon_murid WHERE id = $1", [calonMuridId]);
 
   const retainedPayment = await client.query(
@@ -229,7 +241,7 @@ try {
     await client.query("ROLLBACK TO SAVEPOINT duplicate_active_du");
   }
 
-  console.log("Migration Phase 1–9, retention pembayaran, dan constraint DU tervalidasi.");
+  console.log("Migration Phase 1–9, pembayaran dinamis, retention, dan constraint tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

@@ -24,6 +24,7 @@
     "test:phase3-integration": "tsx scripts/verify-phase3.ts",
     "test:phase4-integration": "tsx scripts/verify-phase4.ts",
     "test:phase5-integration": "tsx scripts/verify-phase5.ts",
+    "test:dynamic-payment-integration": "tsx scripts/verify-dynamic-registration-payment.ts",
     "test:phase6-integration": "tsx scripts/verify-phase6.ts",
     "test:phase7-integration": "tsx scripts/verify-phase7.ts",
     "test:phase8-integration": "tsx scripts/verify-phase8.ts",

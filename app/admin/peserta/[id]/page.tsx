@@ -13,6 +13,7 @@ import {
   AssessmentResultForm,
 } from "@/components/admin/stage-forms";
 import {
+  MetodePembayaran,
   StatusAssessment,
   StatusPembayaran,
   StatusUndanganWa,
@@ -22,6 +23,8 @@ import { AdmissionError } from "@/lib/admission/errors";
 import { getAdminAdmissionData } from "@/lib/admission/service";
 import { requireRolePage } from "@/lib/auth/navigation";
 import { StageError } from "@/lib/stages/errors";
+import { PaymentError } from "@/lib/payment/errors";
+import { getAdminRegistrationPaymentData } from "@/lib/payment/service";
 import { dateOnly } from "@/lib/stages/rules";
 import { getParticipant } from "@/lib/stages/service";
 
@@ -35,16 +38,29 @@ function rupiah(value: number) {
   }).format(value);
 }
 
-function DuProofPreview({ url, kind }: { url: string; kind: "image" | "pdf" | null }) {
+function PaymentProofPreview({
+  url,
+  kind,
+  title,
+  downloadUrl,
+}: {
+  url: string;
+  kind: "image" | "pdf" | null;
+  title: string;
+  downloadUrl: string;
+}) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <p className="text-sm font-bold text-slate-800">Preview bukti {kind === "pdf" ? "PDF" : "gambar"}</p>
-        <a href={url} target="_blank" rel="noreferrer" className="text-sm font-bold text-emerald-800 hover:underline">Buka ukuran penuh</a>
+        <div className="flex gap-3">
+          <a href={url} target="_blank" rel="noreferrer" className="text-sm font-bold text-emerald-800 hover:underline">Buka</a>
+          <a href={downloadUrl} className="text-sm font-bold text-emerald-800 hover:underline">Unduh</a>
+        </div>
       </div>
       <iframe
         src={url}
-        title="Preview bukti pembayaran DU"
+        title={title}
         referrerPolicy="no-referrer"
         className="h-[28rem] w-full bg-white"
       />
@@ -60,15 +76,19 @@ export default async function ParticipantDetailPage({
   const admin = await requireRolePage(UserRole.ADMIN);
   let participant;
   let admission;
+  let registrationPayment;
   try {
     const id = (await params).id;
-    [participant, admission] = await Promise.all([
+    [participant, admission, registrationPayment] = await Promise.all([
       getParticipant(id),
       getAdminAdmissionData(id),
+      getAdminRegistrationPaymentData(id),
     ]);
   } catch (error) {
     if (
-      (error instanceof StageError || error instanceof AdmissionError) &&
+      (error instanceof StageError ||
+        error instanceof AdmissionError ||
+        error instanceof PaymentError) &&
       error.code === "NOT_FOUND"
     ) {
       notFound();
@@ -96,6 +116,28 @@ export default async function ParticipantDetailPage({
           <AnnouncementResultForm id={participant.id} statusAkhir={participant.pengumuman?.statusAkhir ?? null} tanggalRilis={dateOnly(participant.pengumuman?.tanggalRilis ?? null) ?? ""} childName={participant.namaAnak} requiresDeleteConfirmation={Boolean(participant.jalur?.hapusDataJikaGagal && !participant.jalur.fallbackJalurId)} />
         </section>
         <section className="rounded-2xl border border-emerald-950/10 bg-white p-5 lg:col-span-2">
+          <h2 className="mb-4 text-lg font-bold text-emerald-950">Pembayaran pendaftaran</h2>
+          {registrationPayment ? (
+            <div className="grid gap-4">
+              <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
+                <p><span className="font-semibold">Status:</span> {registrationPayment.status === StatusPembayaran.VERIFIED ? "Terverifikasi" : registrationPayment.status === StatusPembayaran.PENDING ? "Menunggu" : "Ditolak"}</p>
+                <p><span className="font-semibold">Metode:</span> {registrationPayment.metodePembayaran === MetodePembayaran.MIDTRANS ? "Midtrans" : "Transfer manual"}</p>
+                {registrationPayment.nominal ? <p><span className="font-semibold">Nominal:</span> {rupiah(registrationPayment.nominal)}</p> : null}
+              </div>
+              {registrationPayment.metodePembayaran === MetodePembayaran.MANUAL_TRANSFER ? (
+                registrationPayment.proofUrl ? (
+                  <PaymentProofPreview
+                    url={registrationPayment.proofUrl}
+                    kind={registrationPayment.proofKind}
+                    title="Preview bukti pembayaran pendaftaran"
+                    downloadUrl={`/api/admin/pembayaran/${registrationPayment.id}/bukti`}
+                  />
+                ) : <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">File bukti tidak tersedia.</p>
+              ) : <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Pembayaran diproses melalui webhook Midtrans dan tidak memiliki file bukti manual.</p>}
+            </div>
+          ) : <p className="text-sm text-slate-600">Belum ada pembayaran pendaftaran.</p>}
+        </section>
+        <section className="rounded-2xl border border-emerald-950/10 bg-white p-5 lg:col-span-2">
           <h2 className="mb-4 text-lg font-bold text-emerald-950">Pembayaran DU</h2>
           {du ? (
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
@@ -105,7 +147,7 @@ export default async function ParticipantDetailPage({
                   {du.nominal ? <p><span className="font-semibold">Nominal:</span> {rupiah(du.nominal)}</p> : null}
                   {du.catatanAdmin ? <p><span className="font-semibold">Catatan:</span> {du.catatanAdmin}</p> : null}
                 </div>
-                {du.proofUrl ? <DuProofPreview url={du.proofUrl} kind={du.proofKind} /> : <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">File bukti tidak tersedia.</p>}
+                {du.proofUrl ? <PaymentProofPreview url={du.proofUrl} kind={du.proofKind} title="Preview bukti pembayaran DU" downloadUrl={`/api/admin/pembayaran/${du.id}/bukti`} /> : <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">File bukti tidak tersedia.</p>}
               </div>
               <div>
                 {du.status === StatusPembayaran.PENDING ? (

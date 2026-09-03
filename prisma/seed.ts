@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import {
   FormType,
   KategoriTipe,
+  ModePembayaranPendaftaran,
   PrismaClient,
   TipeInput,
 } from "../generated/prisma/client";
@@ -64,6 +65,14 @@ const observasiFields = [
 
 async function main() {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pengaturanPembayaran.upsert({
+      where: { id: "pendaftaran" },
+      update: {},
+      create: {
+        id: "pendaftaran",
+        mode: ModePembayaranPendaftaran.MIDTRANS,
+      },
+    });
     const reguler = await transaction.jalur.upsert({
       where: { nama: "Reguler" },
       update: { hapusDataJikaGagal: true },

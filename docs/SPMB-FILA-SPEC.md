@@ -27,7 +27,8 @@ Jika ada konflik antar dokumen lama dan keputusan terbaru, gunakan keputusan yan
 
 Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementasi saat ini:
 
-- **Midtrans pembayaran pendaftaran = MVP**, bukan Phase 2. Roadmap terbaru secara eksplisit memajukannya ke MVP karena API key production sudah tersedia.
+- **Pembayaran pendaftaran memiliki mode dinamis `MIDTRANS` atau `MANUAL`** yang dipilih Admin dari dashboard dan disimpan di database. Integrasi Midtrans tetap dipertahankan. Pada mode manual, nominal tetap berasal dari matrix Jalur × Kategori; setelah bukti JPG/PNG/PDF maksimal 500 KB berhasil disimpan, pembayaran langsung `verified` dan peserta masuk `enrollment` tanpa verifikasi Admin.
+- **Rekening sekolah dikelola Admin** dan minimal satu rekening wajib tersedia sebelum mode manual dapat diaktifkan.
 - **Pembayaran DU = manual**, upload bukti + verifikasi admin.
 - **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
@@ -120,7 +121,11 @@ Sistem harus memungkinkan admin mengelola jalur, kategori, kuota, biaya, form en
 - Kombinasi tanpa biaya aktif harus diblokir.
 
 ### Pembayaran Pendaftaran
-- Midtrans Snap production.
+- Mode aktif dipilih Admin: Midtrans Snap atau transfer bank manual.
+- Mode Midtrans menggunakan alur Snap dan webhook yang sudah ada.
+- Mode manual menampilkan rekening sekolah dan upload bukti maksimal 500 KB.
+- Upload manual yang berhasil langsung menghasilkan status pembayaran `verified` dan membuka enrollment.
+- Admin dapat melihat dan mengunduh bukti transfer manual pada detail peserta.
 - VA / QRIS / e-wallet sesuai metode yang diaktifkan merchant.
 - Snap token dibuat server-side.
 - Status final ditentukan webhook.

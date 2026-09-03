@@ -7,6 +7,15 @@ export type PaymentErrorCode =
   | "MERCHANT_MISMATCH"
   | "INVALID_SIGNATURE"
   | "INVALID_PAYLOAD"
+  | "PAYMENT_MODE_DISABLED"
+  | "PAYMENT_UNAVAILABLE"
+  | "FILE_REQUIRED"
+  | "EMPTY_FILE"
+  | "FILE_TOO_LARGE"
+  | "INVALID_FILE"
+  | "STORAGE_NOT_CONFIGURED"
+  | "UPLOAD_FAILED"
+  | "SIGNED_URL_FAILED"
   | "GATEWAY_ERROR";
 
 export class PaymentError extends Error {

@@ -5,13 +5,51 @@ import { describe, expect, it } from "vitest";
 import { StatusPembayaran } from "@/generated/prisma/enums";
 import { PaymentError } from "@/lib/payment/errors";
 import {
+  assertRegistrationProofSize,
   grossAmountToInteger,
   mapMidtransStatus,
   midtransUrls,
   resolvePaymentTransition,
   sanitizedNotification,
   verifyMidtransSignature,
+  validateRegistrationProof,
 } from "@/lib/payment/rules";
+
+describe("Bukti transfer pendaftaran", () => {
+  it("menerima JPG, PNG, dan PDF berdasarkan MIME serta signature", () => {
+    expect(
+      validateRegistrationProof(
+        { size: 3, type: "image/jpeg" },
+        new Uint8Array([0xff, 0xd8, 0xff]),
+      ),
+    ).toBe("jpg");
+    expect(
+      validateRegistrationProof(
+        { size: 8, type: "image/png" },
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      ),
+    ).toBe("png");
+    expect(
+      validateRegistrationProof(
+        { size: 5, type: "application/pdf" },
+        new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+      ),
+    ).toBe("pdf");
+  });
+
+  it("menolak file kosong, lebih dari 500 KB, dan signature palsu", () => {
+    expect(() => assertRegistrationProofSize({ size: 0 })).toThrow(PaymentError);
+    expect(() =>
+      assertRegistrationProofSize({ size: 500 * 1024 + 1 }),
+    ).toThrow("maksimal 500 KB");
+    expect(() =>
+      validateRegistrationProof(
+        { size: 4, type: "image/png" },
+        new Uint8Array([1, 2, 3, 4]),
+      ),
+    ).toThrow("JPG, PNG, atau PDF");
+  });
+});
 
 describe("Midtrans environment URLs", () => {
   it("menggunakan seluruh endpoint Sandbox ketika production false", () => {
