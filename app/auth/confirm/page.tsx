@@ -14,11 +14,12 @@ export default async function ConfirmEmailPage({
 }) {
   const params = await searchParams;
   const code = typeof params.code === "string" ? params.code : "";
+  const flowId = typeof params.sb_flow_id === "string" ? params.sb_flow_id : null;
   const tokenHash = typeof params.token_hash === "string" ? params.token_hash : "";
   const type = typeof params.type === "string" ? params.type : "";
   const rawNext = typeof params.next === "string" ? params.next : undefined;
   if (code) {
-    redirect(authCodeCallbackPath(code, type === "recovery" || rawNext === "/reset-password"));
+    redirect(authCodeCallbackPath(code, flowId));
   }
   if (params.error || params.error_code) {
     redirect(params.error_code === "otp_expired" ? "/login?auth=otp_expired" : "/login?auth=invalid");

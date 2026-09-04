@@ -24,8 +24,8 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const code = typeof params.code === "string" ? params.code : "";
-  const recovery = params.type === "recovery" || params.next === "/reset-password";
-  if (code) redirect(authCodeCallbackPath(code, recovery));
+  const flowId = typeof params.sb_flow_id === "string" ? params.sb_flow_id : null;
+  if (code) redirect(authCodeCallbackPath(code, flowId));
   if (params.error || params.error_code) {
     redirect(params.error_code === "otp_expired" ? "/login?auth=otp_expired" : "/login?auth=invalid");
   }

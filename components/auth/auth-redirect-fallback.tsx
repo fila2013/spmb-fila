@@ -3,6 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  authCodeCallbackPath,
+  isAuthReturnPath,
+} from "@/lib/auth/confirmation";
 import { createClient } from "@/lib/supabase/client";
 
 function authErrorPath(code: string | null | undefined) {
@@ -15,6 +19,13 @@ export function AuthRedirectFallback() {
   const router = useRouter();
 
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const code = query.get("code");
+    if (code && isAuthReturnPath(window.location.pathname)) {
+      router.replace(authCodeCallbackPath(code, query.get("sb_flow_id")));
+      return;
+    }
+
     if (!window.location.hash) return;
     const params = new URLSearchParams(window.location.hash.slice(1));
     const errorCode = params.get("error_code");

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useActionState, useState } from "react";
 
 import {
   forgotPasswordAction,
@@ -21,25 +22,45 @@ type FieldProps = {
 
 function Field({ label, name, type, autoComplete, error }: FieldProps) {
   const errorId = `${name}-error`;
+  const isPassword = type === "password";
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
-    <label className="block text-sm font-semibold text-slate-800">
-      {label}
-      <input
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        required
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? errorId : undefined}
-        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-700/10"
-      />
+    <div className="block text-sm font-semibold text-slate-800">
+      <label htmlFor={name}>{label}</label>
+      <div className="relative mt-2">
+        <input
+          id={name}
+          name={name}
+          type={isPassword && passwordVisible ? "text" : type}
+          autoComplete={autoComplete}
+          required
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          className={`w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-700/10 ${isPassword ? "pr-12" : ""}`}
+        />
+        {isPassword ? (
+          <button
+            type="button"
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            aria-label={passwordVisible ? "Sembunyikan password" : "Tampilkan password"}
+            aria-pressed={passwordVisible}
+            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-slate-500 transition hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700"
+          >
+            {passwordVisible ? (
+              <EyeOff aria-hidden="true" size={20} />
+            ) : (
+              <Eye aria-hidden="true" size={20} />
+            )}
+          </button>
+        ) : null}
+      </div>
       {error ? (
         <span id={errorId} className="mt-1 block text-xs font-medium text-red-700">
           {error[0]}
         </span>
       ) : null}
-    </label>
+    </div>
   );
 }
 

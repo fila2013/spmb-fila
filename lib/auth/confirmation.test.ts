@@ -5,6 +5,7 @@ import {
   authCodeCallbackPath,
   callbackConfirmationDestination,
   confirmationDestination,
+  isAuthReturnPath,
 } from "@/lib/auth/confirmation";
 
 describe("auth confirmation destination", () => {
@@ -14,9 +15,6 @@ describe("auth confirmation destination", () => {
     );
     expect(authConfirmationUrl("https://spmb.example.com/")).toBe(
       "https://spmb.example.com/auth/confirm",
-    );
-    expect(authConfirmationUrl("https://spmb.example.com/", true)).toBe(
-      "https://spmb.example.com/auth/confirm?next=%2Freset-password",
     );
   });
 
@@ -29,24 +27,33 @@ describe("auth confirmation destination", () => {
     );
   });
 
-  it("mempertahankan session recovery hanya untuk halaman reset password", () => {
+  it("mempertahankan session hanya jika Supabase menandai recovery", () => {
     expect(confirmationDestination("recovery")).toBe(
       "/reset-password",
     );
-    expect(callbackConfirmationDestination("/reset-password")).toBe(
+    expect(callbackConfirmationDestination("recovery")).toBe(
       "/reset-password",
     );
-    expect(authCodeCallbackPath("abc 123", true)).toBe(
-      "/auth/callback?code=abc+123&next=%2Freset-password",
+    expect(authCodeCallbackPath("abc 123", "flow_1234")).toBe(
+      "/auth/callback?code=abc+123&sb_flow_id=flow_1234",
     );
   });
 
   it("tidak menerima tujuan callback lain setelah konfirmasi akun", () => {
-    expect(callbackConfirmationDestination("/dashboard")).toBe(
+    expect(callbackConfirmationDestination(null)).toBe(
+      "/login?auth=confirmed",
+    );
+    expect(callbackConfirmationDestination("signup")).toBe(
       "/login?auth=confirmed",
     );
     expect(callbackConfirmationDestination("https://evil.example")).toBe(
       "/login?auth=confirmed",
     );
+  });
+
+  it("hanya menangkap authorization code pada halaman auth publik", () => {
+    expect(isAuthReturnPath("/register")).toBe(true);
+    expect(isAuthReturnPath("/auth/confirm")).toBe(true);
+    expect(isAuthReturnPath("/admin/peserta")).toBe(false);
   });
 });

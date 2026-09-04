@@ -123,9 +123,10 @@ http://localhost:3000/auth/confirm
 Tambahkan URL ekuivalen untuk domain preview/production dan set
 `NEXT_PUBLIC_APP_URL` ke origin deployment tanpa path, misalnya
 `https://spmb.example.com`. Konfirmasi email dan reset password memerlukan
-konfigurasi email/SMTP Supabase yang aktif. Redirect URL recovery membawa
-`?next=/reset-password`; path `/auth/confirm` tetap harus tercantum dalam
-allowlist Supabase.
+konfigurasi email/SMTP Supabase yang aktif. Pada **Authentication → URL
+Configuration**, isi **Site URL** dengan origin yang sama tanpa menambahkan path
+seperti `/register` (contoh benar: `https://spmb.example.com`), lalu pastikan
+`/auth/confirm` dan `/auth/callback` tercantum dalam allowlist Redirect URLs.
 
 Pada **Authentication → Providers → Email**, opsi **Confirm Email** wajib aktif.
 Jika Supabase mengembalikan session langsung saat signup, aplikasi membatalkan
@@ -146,23 +147,23 @@ signup** agar tombolnya menggunakan URL berikut:
 Atur template **Reset password/Recovery** dengan pola berikut:
 
 ```html
-<a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">
+<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery">
   Reset password
 </a>
 ```
 
-Aplikasi mengarahkan `RedirectTo` signup ke `/auth/confirm` dan recovery ke
-`/auth/confirm?next=/reset-password`. Karena itu template signup memakai `?`
-sebelum `token_hash`, sedangkan template recovery memakai `&`. Endpoint tersebut
-hanya menampilkan tombol; OTP baru diverifikasi melalui request POST setelah
-pengguna menekan tombol. Setelah konfirmasi signup berhasil, session verifikasi
-ditutup dan pengguna diarahkan ke halaman login. Session recovery tetap
-dipertahankan hingga password baru selesai disimpan.
+Aplikasi mengarahkan `RedirectTo` signup dan recovery ke `/auth/confirm` tanpa
+query string agar cocok dengan Redirect URL Supabase secara persis. Endpoint
+tersebut hanya menampilkan tombol; OTP baru diverifikasi melalui request POST
+setelah pengguna menekan tombol. Setelah konfirmasi signup berhasil, session
+verifikasi ditutup dan pengguna diarahkan ke halaman login. Supabase menandai
+authorization code recovery secara internal; session recovery tetap dipertahankan
+hingga password baru selesai disimpan.
 
 Sebagai fallback untuk variasi link Supabase, aplikasi juga menangani authorization
-code pada `/`, `/auth/confirm`, atau `/auth/callback`, serta token session pada URL
-fragment. Signup selalu berakhir di `/login?auth=confirmed`; recovery selalu
-berakhir di `/reset-password`.
+code yang tersasar ke halaman auth publik, termasuk `/register`, serta token session
+pada URL fragment. Signup selalu berakhir di `/login?auth=confirmed`; recovery
+selalu berakhir di `/reset-password`.
 
 Konten beranda dapat dikelola melalui `/admin/konten/beranda`. Link YouTube
 dinormalisasi menjadi video ID dan ditampilkan memakai embed privacy-enhanced

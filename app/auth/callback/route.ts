@@ -6,9 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
-  const next = callbackConfirmationDestination(
-    request.nextUrl.searchParams.get("next"),
-  );
+  const flowId = request.nextUrl.searchParams.get("sb_flow_id");
 
   if (!code) {
     const authStatus =
@@ -21,7 +19,10 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.exchangeCodeForSession(
+    code,
+    flowId ? { flowId } : undefined,
+  );
 
   if (error || !data.user.email) {
     return NextResponse.redirect(
@@ -33,6 +34,11 @@ export async function GET(request: NextRequest) {
   }
 
   await ensureUserProfile({ id: data.user.id, email: data.user.email });
+  const redirectType =
+    "redirectType" in data && data.redirectType === "recovery"
+      ? data.redirectType
+      : null;
+  const next = callbackConfirmationDestination(redirectType);
   if (next === "/reset-password") {
     return NextResponse.redirect(new URL(next, request.url));
   }

@@ -1,9 +1,18 @@
-import { safeRedirectPath } from "@/lib/auth/redirect";
+const AUTH_RETURN_PATHS = new Set([
+  "/",
+  "/auth/confirm",
+  "/forgot-password",
+  "/login",
+  "/register",
+  "/reset-password",
+]);
 
-export function authConfirmationUrl(appUrl: string, recovery = false) {
-  const url = new URL("/auth/confirm", appUrl);
-  if (recovery) url.searchParams.set("next", "/reset-password");
-  return url.toString();
+export function authConfirmationUrl(appUrl: string) {
+  return new URL("/auth/confirm", appUrl).toString();
+}
+
+export function isAuthReturnPath(pathname: string) {
+  return AUTH_RETURN_PATHS.has(pathname);
 }
 
 export function confirmationDestination(type: string) {
@@ -11,14 +20,14 @@ export function confirmationDestination(type: string) {
   return "/reset-password";
 }
 
-export function callbackConfirmationDestination(next: string | null) {
-  return safeRedirectPath(next, "/login?auth=confirmed") === "/reset-password"
+export function callbackConfirmationDestination(redirectType: string | null) {
+  return redirectType === "recovery"
     ? "/reset-password"
     : "/login?auth=confirmed";
 }
 
-export function authCodeCallbackPath(code: string, recovery = false) {
+export function authCodeCallbackPath(code: string, flowId?: string | null) {
   const params = new URLSearchParams({ code });
-  if (recovery) params.set("next", "/reset-password");
+  if (flowId) params.set("sb_flow_id", flowId);
   return `/auth/callback?${params.toString()}`;
 }
