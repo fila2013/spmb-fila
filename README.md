@@ -154,6 +154,11 @@ menekan tombol. Setelah konfirmasi signup berhasil, session verifikasi ditutup
 dan pengguna diarahkan ke halaman login. Session recovery tetap dipertahankan
 hingga password baru selesai disimpan.
 
+Konten beranda dapat dikelola melalui `/admin/konten/beranda`. Link YouTube
+dinormalisasi menjadi video ID dan ditampilkan memakai embed privacy-enhanced
+dengan autoplay mute. Blok Assessment dan Announcement yang memiliki tanggal
+menampilkan tombol Google Calendar dengan judul dan catatan terisi otomatis.
+
 Trigger database membuat profile `users` dengan role `wali_murid`. Metadata Auth
 yang dikirim client tidak pernah menjadi sumber role. Setelah calon admin membuat
 dan mengonfirmasi akun, pemberian role awal dilakukan eksplisit dan tercatat:

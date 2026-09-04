@@ -5,6 +5,7 @@ import {
   StatusPengumuman,
   TahapKonten,
 } from "@/generated/prisma/enums";
+import { youtubeVideoId } from "@/lib/stages/rules";
 
 const uuid = z.uuid("ID tidak valid.");
 const optionalUuid = z.preprocess((value) => value === "" ? null : value, uuid.nullable());
@@ -15,6 +16,13 @@ const optionalDate = z.preprocess(
 const optionalText = (max: number) => z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? null : value,
   z.string().trim().max(max).nullable(),
+);
+const optionalYoutubeVideoId = z.preprocess(
+  (value) => {
+    if (typeof value !== "string" || value.trim() === "") return null;
+    return youtubeVideoId(value) ?? value;
+  },
+  z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Link YouTube tidak valid.").nullable(),
 );
 
 export const stageIdSchema = uuid;
@@ -46,6 +54,7 @@ export const stageContentInputSchema = z.object({
   tanggal: optionalDate,
   isiTeks: optionalText(10_000),
   gambarUrl: optionalText(2_000).default(null),
+  youtubeVideoId: optionalYoutubeVideoId.default(null),
   urutanLayout: z.coerce.number().int().min(0).max(10_000),
   statusAktif: z.boolean(),
   jalurId: optionalUuid,

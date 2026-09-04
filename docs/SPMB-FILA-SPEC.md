@@ -33,6 +33,8 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - **File bukti pembayaran pendaftaran manual dan DU dapat dihapus Admin setelah pemeriksaan selesai.** Penghapusan hanya menghapus object Storage dan mengosongkan `file_bukti_url`; record transaksi, jenis, metode, nominal, status, timestamp, dan audit tetap dipertahankan.
 - **Konfirmasi email wajib aktif di Supabase Auth.** Jika signup menghasilkan session langsung, aplikasi memperlakukannya sebagai salah konfigurasi dan tidak mengaktifkan akun tersebut.
 - **Beranda memiliki CMS informasi publik.** Admin dapat menambah, melihat, mengubah, mengurutkan, mengaktifkan/nonaktifkan, mengunggah gambar, dan menghapus blok informasi beranda. Perubahan penting dicatat pada audit log.
+- **Konten beranda dapat memuat video YouTube.** Admin memasukkan link YouTube, aplikasi hanya menyimpan video ID tervalidasi, dan video ditampilkan di bawah judul dengan autoplay mute yang kompatibel dengan kebijakan browser.
+- **Konten Assessment dan Announcement bertanggal menyediakan pengingat Google Calendar.** Event all-day dibentuk otomatis dari tahap, nama anak, judul, tanggal, dan catatan admin; wali tetap menekan tombol untuk menambahkan event ke kalender miliknya.
 - **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
 - **Prisma** adalah ORM utama untuk akses PostgreSQL.

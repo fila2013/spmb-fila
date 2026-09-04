@@ -23,6 +23,12 @@ describe("Phase 7 schemas", () => {
     expect(value).toMatchObject({ tanggal: null, isiTeks: "Info", jalurId: null, kategoriId: null, urutanLayout: 0 });
   });
 
+  it("menormalisasi link YouTube menjadi video ID", () => {
+    const value = stageContentInputSchema.parse({ tahap: "HOME", judul: "Profil sekolah", tanggal: "", isiTeks: "", gambarUrl: null, youtubeVideoId: "https://youtu.be/dQw4w9WgXcQ", urutanLayout: "0", statusAktif: true, jalurId: "", kategoriId: "" });
+    expect(value.youtubeVideoId).toBe("dQw4w9WgXcQ");
+    expect(stageContentInputSchema.safeParse({ ...value, youtubeVideoId: "https://example.com/video" }).success).toBe(false);
+  });
+
   it("mensyaratkan keputusan dan tanggal rilis valid", () => {
     expect(announcementInputSchema.safeParse({ statusAkhir: "DITERIMA", tanggalRilis: "2026-09-30" }).success).toBe(true);
     expect(announcementInputSchema.safeParse({ statusAkhir: "DITERIMA", tanggalRilis: "30-09-2026" }).success).toBe(false);

@@ -328,18 +328,19 @@ model Pembayaran {
 }
 
 model KontenTahap {
-  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tahap        TahapKonten
-  judul        String      @db.VarChar(200)
-  tanggal      DateTime?   @db.Date
-  isiTeks      String?     @map("isi_teks")
-  gambarUrl    String?     @map("gambar_url")
-  urutanLayout Int         @default(0) @map("urutan_layout")
-  statusAktif  Boolean     @default(true) @map("status_aktif")
-  jalurId      String?     @map("jalur_id") @db.Uuid
-  kategoriId   String?     @map("kategori_id") @db.Uuid
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tahap          TahapKonten
+  judul          String      @db.VarChar(200)
+  tanggal        DateTime?   @db.Date
+  isiTeks        String?     @map("isi_teks")
+  gambarUrl      String?     @map("gambar_url")
+  youtubeVideoId String?     @map("youtube_video_id") @db.VarChar(11)
+  urutanLayout   Int         @default(0) @map("urutan_layout")
+  statusAktif    Boolean     @default(true) @map("status_aktif")
+  jalurId        String?     @map("jalur_id") @db.Uuid
+  kategoriId     String?     @map("kategori_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   jalur    Jalur?             @relation(fields: [jalurId], references: [id], onDelete: SetNull)
   kategori KategoriPendaftar? @relation(fields: [kategoriId], references: [id], onDelete: SetNull)

@@ -41,6 +41,7 @@ function contentSnapshot(content: KontenTahap) {
     tanggal: dateOnly(content.tanggal),
     isiTeks: content.isiTeks,
     gambarUrl: content.gambarUrl,
+    youtubeVideoId: content.youtubeVideoId,
     urutanLayout: content.urutanLayout,
     statusAktif: content.statusAktif,
     jalurId: content.jalurId,
@@ -63,6 +64,13 @@ function assertContentScope(input: StageContentInput) {
     throw new StageError(
       "INVALID_HOME_SCOPE",
       "Konten beranda harus ditampilkan untuk semua jalur dan kategori.",
+      422,
+    );
+  }
+  if (input.tahap !== TahapKonten.HOME && input.youtubeVideoId !== null) {
+    throw new StageError(
+      "INVALID_VIDEO_SCOPE",
+      "Video YouTube hanya dapat digunakan pada konten beranda.",
       422,
     );
   }
@@ -211,7 +219,7 @@ function matchingContentWhere(tahap: TahapKonten, child: { jalurId: string | nul
 }
 
 function publicContent(content: KontenTahap) {
-  return { id: content.id, judul: content.judul, tanggal: dateOnly(content.tanggal), isiTeks: content.isiTeks, gambarUrl: content.gambarUrl, urutanLayout: content.urutanLayout };
+  return { id: content.id, judul: content.judul, tanggal: dateOnly(content.tanggal), isiTeks: content.isiTeks, gambarUrl: content.gambarUrl, youtubeVideoId: content.youtubeVideoId, urutanLayout: content.urutanLayout };
 }
 
 export async function listHomeContent() {

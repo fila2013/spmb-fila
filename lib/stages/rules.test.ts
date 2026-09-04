@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { StatusKeseluruhan, StatusPengumuman } from "@/generated/prisma/enums";
 import {
   isAnnouncementReleased,
+  googleCalendarReminderUrl,
   jakartaDateString,
   mayViewAnnouncement,
   mayViewAssessment,
   releasedOverallStatus,
   stageContentSlug,
+  youtubeVideoId,
 } from "@/lib/stages/rules";
 
 describe("Phase 7 stage rules", () => {
@@ -40,5 +42,24 @@ describe("Phase 7 stage rules", () => {
     expect(stageContentSlug("HOME")).toBe("beranda");
     expect(stageContentSlug("ADMISSION_FEE")).toBe("admission-fee");
     expect(stageContentSlug("JOIN_WA")).toBe("join-wa");
+  });
+
+  it("mengekstrak ID dari format link YouTube yang didukung", () => {
+    expect(youtubeVideoId("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(youtubeVideoId("https://youtu.be/dQw4w9WgXcQ?t=12")).toBe("dQw4w9WgXcQ");
+    expect(youtubeVideoId("https://www.youtube.com/shorts/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(youtubeVideoId("https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ")).toBeNull();
+  });
+
+  it("membentuk event Google Calendar all-day dari tanggal dan catatan admin", () => {
+    const calendar = new URL(googleCalendarReminderUrl({
+      title: "Assessment SPMB — Ahmad",
+      date: "2026-09-30",
+      details: "Datang pukul 08.00 dan membawa alat tulis.",
+    }));
+    expect(calendar.origin).toBe("https://calendar.google.com");
+    expect(calendar.searchParams.get("action")).toBe("TEMPLATE");
+    expect(calendar.searchParams.get("dates")).toBe("20260930/20261001");
+    expect(calendar.searchParams.get("details")).toContain("membawa alat tulis");
   });
 });

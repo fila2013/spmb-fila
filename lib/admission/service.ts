@@ -59,6 +59,7 @@ function publicContent(content: KontenTahap) {
     tanggal: content.tanggal?.toISOString().slice(0, 10) ?? null,
     isiTeks: content.isiTeks,
     gambarUrl: content.gambarUrl,
+    youtubeVideoId: content.youtubeVideoId,
     urutanLayout: content.urutanLayout,
   };
 }

@@ -48,6 +48,7 @@ function contentValues(formData: FormData, gambarUrl: string | null) {
     tanggal: formData.get("tanggal"),
     isiTeks: formData.get("isiTeks"),
     gambarUrl,
+    youtubeVideoId: formData.get("youtubeVideoId"),
     urutanLayout: formData.get("urutanLayout"),
     statusAktif: formData.get("statusAktif") === "on",
     jalurId: formData.get("jalurId"),

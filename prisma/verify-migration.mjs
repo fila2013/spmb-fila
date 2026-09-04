@@ -76,6 +76,13 @@ const homeContentMigrationSql = await readFile(
   ),
   "utf8",
 );
+const homeYoutubeVideoMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260904100000_home_youtube_video/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -104,6 +111,7 @@ try {
   await client.query(dynamicRegistrationPaymentMigrationSql);
   await client.query(paymentProofDeletionMigrationSql);
   await client.query(homeContentMigrationSql);
+  await client.query(homeYoutubeVideoMigrationSql);
 
   const contentStages = await client.query(
     "SELECT enumlabel FROM pg_enum WHERE enumtypid = 'tahap_konten'::regtype",
@@ -134,8 +142,8 @@ try {
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 29,
-    `Expected 29 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 30,
+    `Expected 30 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -157,6 +165,32 @@ try {
     assert(error.code === "23514", "Constraint kuota tidak tervalidasi.");
   } finally {
     await client.query("ROLLBACK TO SAVEPOINT invalid_quota");
+  }
+
+  await client.query(
+    "INSERT INTO konten_tahap (tahap, judul, youtube_video_id) VALUES ('home', 'Video valid', 'dQw4w9WgXcQ')",
+  );
+  await client.query("SAVEPOINT invalid_youtube_id");
+  try {
+    await client.query(
+      "INSERT INTO konten_tahap (tahap, judul, youtube_video_id) VALUES ('home', 'Video invalid', 'bukan-id')",
+    );
+    throw new Error("Video ID YouTube invalid tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint video ID YouTube tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_youtube_id");
+  }
+  await client.query("SAVEPOINT invalid_youtube_scope");
+  try {
+    await client.query(
+      "INSERT INTO konten_tahap (tahap, judul, youtube_video_id) VALUES ('assessment', 'Scope invalid', 'dQw4w9WgXcQ')",
+    );
+    throw new Error("Video YouTube di luar beranda tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint scope video YouTube tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_youtube_scope");
   }
 
   const userId = "10000000-0000-4000-8000-000000000001";
@@ -281,7 +315,7 @@ try {
     await client.query("ROLLBACK TO SAVEPOINT duplicate_active_du");
   }
 
-  console.log("Migration Phase 1–9, pembayaran dinamis, retention, CMS beranda, dan constraint tervalidasi.");
+  console.log("Migration Phase 1–9, pembayaran dinamis, retention, CMS beranda/YouTube, dan constraint tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();
