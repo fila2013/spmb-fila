@@ -48,7 +48,7 @@ export async function confirmEmailAction(formData: FormData) {
 
   await ensureUserProfile({ id: data.user.id, email: data.user.email });
   if (parsed.data.type === "recovery") {
-    redirect(confirmationDestination(parsed.data.type, parsed.data.next));
+    redirect(confirmationDestination(parsed.data.type));
   }
 
   await supabase.auth.signOut();

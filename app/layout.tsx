@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AuthRedirectFallback } from "@/components/auth/auth-redirect-fallback";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
     >
       <body className="min-h-full">
+        <AuthRedirectFallback />
         <a
           href="#konten-utama"
           className="sr-only z-50 rounded-md bg-emerald-950 px-4 py-2 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { StageContentBlocks } from "@/components/stages/stage-content";
+import { authCodeCallbackPath } from "@/lib/auth/confirmation";
 import { listHomeContent } from "@/lib/stages/service";
 
 const alurPendaftaran = [
@@ -15,7 +17,18 @@ const alurPendaftaran = [
   "Selesaikan daftar ulang",
 ];
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const code = typeof params.code === "string" ? params.code : "";
+  const recovery = params.type === "recovery" || params.next === "/reset-password";
+  if (code) redirect(authCodeCallbackPath(code, recovery));
+  if (params.error || params.error_code) {
+    redirect(params.error_code === "otp_expired" ? "/login?auth=otp_expired" : "/login?auth=invalid");
+  }
   await connection();
   const homeContent = await listHomeContent();
   return (

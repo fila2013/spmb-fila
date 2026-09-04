@@ -159,7 +159,7 @@ export async function forgotPasswordAction(
   const supabase = await createClient();
   const environment = getAppEnvironment();
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: authConfirmationUrl(environment.NEXT_PUBLIC_APP_URL),
+    redirectTo: authConfirmationUrl(environment.NEXT_PUBLIC_APP_URL, true),
   });
 
   return {
