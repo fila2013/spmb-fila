@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { ensureUserProfile } from "@/lib/auth/profile";
-import { safeRedirectPath } from "@/lib/auth/redirect";
+import { confirmationDestination } from "@/lib/auth/confirmation";
 import { createClient } from "@/lib/supabase/server";
 
 const confirmationSchema = z.object({
@@ -47,6 +47,10 @@ export async function confirmEmailAction(formData: FormData) {
   }
 
   await ensureUserProfile({ id: data.user.id, email: data.user.email });
-  redirect(safeRedirectPath(parsed.data.next));
-}
+  if (parsed.data.type === "recovery") {
+    redirect(confirmationDestination(parsed.data.type, parsed.data.next));
+  }
 
+  await supabase.auth.signOut();
+  redirect("/login?auth=confirmed");
+}

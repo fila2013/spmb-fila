@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { UserRole } from "@/generated/prisma/enums";
 import type { AuthActionState } from "@/lib/auth/action-state";
+import { authConfirmationUrl } from "@/lib/auth/confirmation";
 import { loginErrorMessage, signupErrorMessage } from "@/lib/auth/messages";
 import {
   forgotPasswordSchema,
@@ -48,7 +49,7 @@ export async function registerAction(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/confirm`,
+      emailRedirectTo: authConfirmationUrl(environment.NEXT_PUBLIC_APP_URL),
     },
   });
 
@@ -158,7 +159,7 @@ export async function forgotPasswordAction(
   const supabase = await createClient();
   const environment = getAppEnvironment();
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${environment.NEXT_PUBLIC_APP_URL}/auth/confirm`,
+    redirectTo: authConfirmationUrl(environment.NEXT_PUBLIC_APP_URL),
   });
 
   return {

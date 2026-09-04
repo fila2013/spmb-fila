@@ -19,6 +19,13 @@ const optionalText = (max: number) => z.preprocess(
 
 export const stageIdSchema = uuid;
 export const stageTypeSchema = z.enum([
+  TahapKonten.HOME,
+  TahapKonten.ASSESSMENT,
+  TahapKonten.ANNOUNCEMENT,
+  TahapKonten.ADMISSION_FEE,
+  TahapKonten.JOIN_WA,
+]);
+export const participantStageTypeSchema = z.enum([
   TahapKonten.ASSESSMENT,
   TahapKonten.ANNOUNCEMENT,
   TahapKonten.ADMISSION_FEE,
@@ -28,6 +35,10 @@ export const stageTypeParamSchema = z
   .string()
   .transform((value) => value.toUpperCase().replaceAll("-", "_"))
   .pipe(stageTypeSchema);
+export const participantStageTypeParamSchema = z
+  .string()
+  .transform((value) => value.toUpperCase().replaceAll("-", "_"))
+  .pipe(participantStageTypeSchema);
 
 export const stageContentInputSchema = z.object({
   tahap: stageTypeSchema,
@@ -42,6 +53,10 @@ export const stageContentInputSchema = z.object({
 });
 
 export const updateStageContentSchema = stageContentInputSchema.extend({ id: uuid });
+export const deleteStageContentSchema = z.object({
+  id: uuid,
+  confirmation: z.literal("HAPUS"),
+});
 
 export const assessmentInputSchema = z.object({
   status: z.enum([

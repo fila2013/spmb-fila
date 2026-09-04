@@ -12,6 +12,7 @@ import { StageError } from "@/lib/stages/errors";
 import {
   announcementInputSchema,
   assessmentInputSchema,
+  deleteStageContentSchema,
   stageContentInputSchema,
   stageIdSchema,
   updateStageContentSchema,
@@ -19,11 +20,17 @@ import {
 import { stageContentSlug } from "@/lib/stages/rules";
 import {
   createStageContent,
+  deleteStageContent,
   updateAnnouncement,
   updateAssessment,
   updateStageContent,
   uploadStageImage,
 } from "@/lib/stages/service";
+
+function revalidateContentPaths(tahap: string) {
+  revalidatePath(`/admin/konten/${stageContentSlug(tahap)}`);
+  if (tahap === "HOME") revalidatePath("/");
+}
 
 function errorState(error: unknown): StageActionState {
   if (error instanceof ZodError) {
@@ -65,7 +72,7 @@ export async function createStageContentAction(_state: StageActionState, formDat
     const validated = stageContentInputSchema.parse(contentValues(formData, existingImageValue(formData)));
     const input = { ...validated, gambarUrl: await uploadedImageValue(formData) ?? validated.gambarUrl };
     await createStageContent(input, admin.userId);
-    revalidatePath(`/admin/konten/${stageContentSlug(input.tahap)}`);
+    revalidateContentPaths(input.tahap);
     return { status: "success", message: "Konten berhasil ditambahkan." };
   } catch (error) { return errorState(error); }
 }
@@ -76,8 +83,21 @@ export async function updateStageContentAction(_state: StageActionState, formDat
     const validated = updateStageContentSchema.parse({ id: formData.get("id"), ...contentValues(formData, existingImageValue(formData)) });
     const input = { ...validated, gambarUrl: await uploadedImageValue(formData) ?? validated.gambarUrl };
     await updateStageContent(input, admin.userId);
-    revalidatePath(`/admin/konten/${stageContentSlug(input.tahap)}`);
+    revalidateContentPaths(input.tahap);
     return { status: "success", message: "Konten berhasil diperbarui." };
+  } catch (error) { return errorState(error); }
+}
+
+export async function deleteStageContentAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
+  try {
+    const admin = await requireRole(UserRole.ADMIN);
+    const input = deleteStageContentSchema.parse({
+      id: formData.get("id"),
+      confirmation: formData.get("confirmation"),
+    });
+    const deleted = await deleteStageContent(input.id, admin.userId);
+    revalidateContentPaths(deleted.tahap);
+    return { status: "success", message: "Konten berhasil dihapus." };
   } catch (error) { return errorState(error); }
 }
 

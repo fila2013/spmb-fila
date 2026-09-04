@@ -92,6 +92,7 @@ enum StatusPembayaran {
 }
 
 enum TahapKonten {
+  HOME          @map("home")
   ASSESSMENT    @map("assessment")
   ANNOUNCEMENT  @map("announcement")
   ADMISSION_FEE @map("admission_fee")

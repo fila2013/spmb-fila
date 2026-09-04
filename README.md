@@ -135,7 +135,7 @@ menekannya, gunakan halaman konfirmasi dua langkah. Atur template **Confirm
 signup** agar tombolnya menggunakan URL berikut:
 
 ```html
-<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email&next=/dashboard">
+<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">
   Konfirmasi email
 </a>
 ```
@@ -150,7 +150,9 @@ Atur template **Reset password/Recovery** dengan pola berikut:
 
 Aplikasi mengarahkan `RedirectTo` ke `/auth/confirm`. Endpoint tersebut hanya
 menampilkan tombol; OTP baru diverifikasi melalui request POST setelah pengguna
-menekan tombol.
+menekan tombol. Setelah konfirmasi signup berhasil, session verifikasi ditutup
+dan pengguna diarahkan ke halaman login. Session recovery tetap dipertahankan
+hingga password baru selesai disimpan.
 
 Trigger database membuat profile `users` dengan role `wali_murid`. Metadata Auth
 yang dikirim client tidak pernah menjadi sumber role. Setelah calon admin membuat

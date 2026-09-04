@@ -69,6 +69,13 @@ const paymentProofDeletionMigrationSql = await readFile(
   ),
   "utf8",
 );
+const homeContentMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260904090000_home_content/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -96,6 +103,15 @@ try {
   await client.query(phase9WhatsappConfirmationMigrationSql);
   await client.query(dynamicRegistrationPaymentMigrationSql);
   await client.query(paymentProofDeletionMigrationSql);
+  await client.query(homeContentMigrationSql);
+
+  const contentStages = await client.query(
+    "SELECT enumlabel FROM pg_enum WHERE enumtypid = 'tahap_konten'::regtype",
+  );
+  assert(
+    contentStages.rows.some(({ enumlabel }) => enumlabel === "home"),
+    "Enum konten beranda tidak ditemukan.",
+  );
 
   const tables = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
@@ -118,8 +134,8 @@ try {
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 28,
-    `Expected 28 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 29,
+    `Expected 29 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -265,7 +281,7 @@ try {
     await client.query("ROLLBACK TO SAVEPOINT duplicate_active_du");
   }
 
-  console.log("Migration Phase 1–9, pembayaran dinamis, retention, dan constraint tervalidasi.");
+  console.log("Migration Phase 1–9, pembayaran dinamis, retention, CMS beranda, dan constraint tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

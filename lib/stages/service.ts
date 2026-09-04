@@ -55,6 +55,19 @@ function contentData(input: StageContentInput) {
   };
 }
 
+function assertContentScope(input: StageContentInput) {
+  if (
+    input.tahap === TahapKonten.HOME &&
+    (input.jalurId !== null || input.kategoriId !== null)
+  ) {
+    throw new StageError(
+      "INVALID_HOME_SCOPE",
+      "Konten beranda harus ditampilkan untuk semua jalur dan kategori.",
+      422,
+    );
+  }
+}
+
 async function assertContentReferences(jalurId: string | null, kategoriId: string | null) {
   const [jalur, kategori] = await Promise.all([
     jalurId ? prisma.jalur.findUnique({ where: { id: jalurId }, select: { id: true } }) : true,
@@ -72,6 +85,7 @@ export function listStageContent(tahap?: TahapKonten) {
 }
 
 export async function createStageContent(input: StageContentInput, actorId: string) {
+  assertContentScope(input);
   await assertContentReferences(input.jalurId, input.kategoriId);
   return prisma.$transaction(async (transaction) => {
     const content = await transaction.kontenTahap.create({ data: contentData(input), include: contentInclude });
@@ -81,15 +95,23 @@ export async function createStageContent(input: StageContentInput, actorId: stri
 }
 
 export async function updateStageContent(input: UpdateStageContentInput, actorId: string) {
+  assertContentScope(input);
   await assertContentReferences(input.jalurId, input.kategoriId);
-  return prisma.$transaction(async (transaction) => {
+  const result = await prisma.$transaction(async (transaction) => {
     const previous = await transaction.kontenTahap.findUnique({ where: { id: input.id } });
     if (!previous) throw new StageError("NOT_FOUND", "Konten tahap tidak ditemukan.", 404);
     const { id, ...values } = input;
     const content = await transaction.kontenTahap.update({ where: { id }, data: contentData(values), include: contentInclude });
     await transaction.auditLog.create({ data: { actorId, action: "UPDATE_STAGE_CONTENT", entity: "konten_tahap", entityId: content.id, detail: { before: contentSnapshot(previous), after: contentSnapshot(content) } } });
-    return content;
+    return { content, previousImageUrl: previous.gambarUrl };
   });
+  if (
+    result.previousImageUrl &&
+    result.previousImageUrl !== result.content.gambarUrl
+  ) {
+    await removeCmsImage(result.previousImageUrl);
+  }
+  return result.content;
 }
 
 export async function uploadStageImage(file: File) {
@@ -105,6 +127,60 @@ export async function uploadStageImage(file: File) {
   const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert: false });
   if (error) throw new StageError("UPLOAD_FAILED", "Gambar belum dapat diunggah.", 502);
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+function cmsImagePath(publicUrl: string | null) {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET_CMS;
+  if (!bucket || !publicUrl) return null;
+  try {
+    const pathname = decodeURIComponent(new URL(publicUrl).pathname);
+    const prefix = `/storage/v1/object/public/${bucket}/`;
+    return pathname.startsWith(prefix) ? pathname.slice(prefix.length) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function removeCmsImage(publicUrl: string | null) {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET_CMS;
+  const path = cmsImagePath(publicUrl);
+  if (!bucket || !path) return;
+  const { error } = await createAdminClient().storage.from(bucket).remove([path]);
+  if (error) {
+    console.error("File gambar CMS lama belum dapat dihapus.", {
+      name: error.name,
+      statusCode: error.statusCode,
+    });
+  }
+}
+
+export async function deleteStageContent(id: string, actorId: string) {
+  const content = await prisma.$transaction(async (transaction) => {
+    const current = await transaction.kontenTahap.findUnique({ where: { id } });
+    if (!current) {
+      throw new StageError("NOT_FOUND", "Konten tahap tidak ditemukan.", 404);
+    }
+    if (current.tahap !== TahapKonten.HOME) {
+      throw new StageError(
+        "DELETE_NOT_ALLOWED",
+        "Penghapusan melalui fitur ini hanya tersedia untuk konten beranda.",
+        409,
+      );
+    }
+    await transaction.kontenTahap.delete({ where: { id } });
+    await transaction.auditLog.create({
+      data: {
+        actorId,
+        action: "DELETE_STAGE_CONTENT",
+        entity: "konten_tahap",
+        entityId: id,
+        detail: { before: contentSnapshot(current) },
+      },
+    });
+    return current;
+  });
+  await removeCmsImage(content.gambarUrl);
+  return { id: content.id, tahap: content.tahap };
 }
 
 async function getOwnedStageChild(childId: string, userId: string) {
@@ -136,6 +212,19 @@ function matchingContentWhere(tahap: TahapKonten, child: { jalurId: string | nul
 
 function publicContent(content: KontenTahap) {
   return { id: content.id, judul: content.judul, tanggal: dateOnly(content.tanggal), isiTeks: content.isiTeks, gambarUrl: content.gambarUrl, urutanLayout: content.urutanLayout };
+}
+
+export async function listHomeContent() {
+  const content = await prisma.kontenTahap.findMany({
+    where: {
+      tahap: TahapKonten.HOME,
+      statusAktif: true,
+      jalurId: null,
+      kategoriId: null,
+    },
+    orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }],
+  });
+  return content.map(publicContent);
 }
 
 export async function getAssessmentForWali(childId: string, userId: string) {

@@ -33,6 +33,7 @@ export function releasedOverallStatus(status: StatusPengumuman) {
 }
 
 export function stageContentSlug(tahap: string) {
+  if (tahap === "HOME") return "beranda";
   return tahap.toLowerCase().replaceAll("_", "-");
 }
 

@@ -37,6 +37,7 @@ describe("Phase 7 stage rules", () => {
   });
 
   it("membentuk slug CMS untuk tahap bertanda underscore", () => {
+    expect(stageContentSlug("HOME")).toBe("beranda");
     expect(stageContentSlug("ADMISSION_FEE")).toBe("admission-fee");
     expect(stageContentSlug("JOIN_WA")).toBe("join-wa");
   });

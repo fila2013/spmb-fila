@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { connection } from "next/server";
+
+import { StageContentBlocks } from "@/components/stages/stage-content";
+import { listHomeContent } from "@/lib/stages/service";
 
 const alurPendaftaran = [
   "Buat akun",
@@ -11,7 +15,9 @@ const alurPendaftaran = [
   "Selesaikan daftar ulang",
 ];
 
-export default function Home() {
+export default async function Home() {
+  await connection();
+  const homeContent = await listHomeContent();
   return (
     <div className="bg-[radial-gradient(circle_at_top_right,_rgba(217,158,54,0.14),_transparent_34%),linear-gradient(180deg,#f4fbf7_0%,#ffffff_55%)]">
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
@@ -49,6 +55,8 @@ export default function Home() {
           </p>
         </aside>
       </section>
+
+      {homeContent.length ? <section className="mx-auto w-full max-w-6xl px-5 py-14 sm:px-8" aria-labelledby="informasi-title"><div className="mb-8 max-w-2xl"><p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">Informasi terbaru</p><h2 id="informasi-title" className="mt-2 text-3xl font-bold text-emerald-950">Pengumuman dari panitia SPMB</h2></div><StageContentBlocks content={homeContent} /></section> : null}
 
       <section
         className="border-y border-emerald-950/10 bg-white/80"
