@@ -17,6 +17,8 @@ export function jalurFormValues(formData: FormData) {
     kuotaMaks: nullableNumber(formData, "kuotaMaks"),
     fallbackJalurId: stringValue(formData, "fallbackJalurId"),
     hapusDataJikaGagal: formData.get("hapusDataJikaGagal") === "on",
+    pilihanJalurFinalAktif:
+      formData.get("pilihanJalurFinalAktif") === "on",
   };
 }
 
@@ -40,4 +42,3 @@ export function biayaFormValues(formData: FormData) {
     statusAktif: formData.get("statusAktif") === "on",
   };
 }
-

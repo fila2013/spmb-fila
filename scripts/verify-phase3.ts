@@ -130,6 +130,7 @@ try {
       kuotaMaks: 5,
       fallbackJalurId: null,
       hapusDataJikaGagal: false,
+      pilihanJalurFinalAktif: false,
     }),
   });
   jalurId = jalur.id;
@@ -168,6 +169,7 @@ try {
       kuotaMaks: 6,
       fallbackJalurId: null,
       hapusDataJikaGagal: false,
+      pilihanJalurFinalAktif: false,
     }),
   });
   await request(`/api/admin/kategori/${kategoriId}`, cookie, {

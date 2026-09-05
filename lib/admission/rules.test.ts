@@ -15,6 +15,8 @@ describe("Phase 9 admission rules", () => {
     expect(admissionFeeVisibleStatuses).toContain(StatusKeseluruhan.SELESAI);
     expect(admissionFeeUploadStatuses).toContain(StatusKeseluruhan.MENUNGGU_DU);
     expect(admissionFeeUploadStatuses).not.toContain(StatusKeseluruhan.MENUNGGU_JOIN_WA);
+    expect(admissionFeeVisibleStatuses).not.toContain(StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR);
+    expect(admissionFeeUploadStatuses).not.toContain(StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR);
     expect(joinWaVisibleStatuses).toEqual([
       StatusKeseluruhan.MENUNGGU_JOIN_WA,
       StatusKeseluruhan.SELESAI,

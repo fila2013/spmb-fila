@@ -4,9 +4,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import {
   JenisPembayaran,
   StatusAssessment,
+  StatusKeseluruhan,
 } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { createCsv, createXlsx, type ReportRow } from "@/lib/reporting/export";
+import { finalRouteChoiceLabel } from "@/lib/final-route-choice/rules";
 import {
   announcementLabels,
   assessmentLabels,
@@ -22,6 +24,7 @@ const participantInclude = {
   user: { select: { email: true } },
   jalur: { select: { nama: true } },
   jalurAsal: { select: { nama: true } },
+  menungguFallbackJalur: { select: { nama: true } },
   kategori: { select: { nama: true } },
   hasilAssessment: { select: { status: true } },
   pengumuman: { select: { statusAkhir: true, tanggalRilis: true } },
@@ -36,13 +39,20 @@ type Participant = Prisma.CalonMuridGetPayload<{ include: typeof participantIncl
 
 function databaseFilters(filters: ReportingFilters): Prisma.CalonMuridWhereInput {
   return {
-    ...(filters.q ? {
-      OR: [
-        { namaAnak: { contains: filters.q, mode: "insensitive" } },
-        { user: { email: { contains: filters.q, mode: "insensitive" } } },
-      ],
-    } : {}),
-    ...(filters.jalurId ? { jalurId: filters.jalurId } : {}),
+    AND: [
+      ...(filters.q ? [{
+        OR: [
+          { namaAnak: { contains: filters.q, mode: "insensitive" as const } },
+          { user: { email: { contains: filters.q, mode: "insensitive" as const } } },
+        ],
+      }] : []),
+      ...(filters.jalurId ? [{
+        OR: [
+          { jalurId: filters.jalurId },
+          { menungguFallbackJalurId: filters.jalurId },
+        ],
+      }] : []),
+    ],
     ...(filters.kategoriId ? { kategoriId: filters.kategoriId } : {}),
     ...(filters.statusKeseluruhan ? { statusKeseluruhan: filters.statusKeseluruhan } : {}),
   };
@@ -78,8 +88,14 @@ export function participantToReportRow(participant: Participant): ReportRow {
     "ID Peserta": participant.id,
     "Nama Calon Murid": participant.namaAnak,
     "Email Wali": participant.user.email,
-    "Jalur": participant.jalur?.nama ?? "",
+    "Jalur": participant.jalur?.nama ?? participant.menungguFallbackJalur?.nama ?? "",
     "Jalur Asal": participant.jalurAsal?.nama ?? "",
+    "Pilihan Jalur Final": participant.pilihanJalurFinal
+      ? finalRouteChoiceLabel(participant.pilihanJalurFinal)
+      : participant.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR
+        ? "Belum memilih"
+        : "",
+    "Tanggal Pilihan Jalur": formattedDate(participant.pilihanJalurFinalAt),
     "Kategori": participant.kategori?.nama ?? "",
     "Subkategori": subcategory,
     "Status Keseluruhan": overallStatusLabel(participant.statusKeseluruhan),

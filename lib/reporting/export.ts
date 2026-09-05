@@ -6,6 +6,8 @@ export const reportColumns = [
   "Email Wali",
   "Jalur",
   "Jalur Asal",
+  "Pilihan Jalur Final",
+  "Tanggal Pilihan Jalur",
   "Kategori",
   "Subkategori",
   "Status Keseluruhan",
@@ -57,7 +59,10 @@ export async function createXlsx(rows: ReportRow[]) {
     key: header,
     width: header.includes("Nama") ? 26 : header.includes("Email") ? 30 : 22,
   }));
-  worksheet.autoFilter = { from: "A1", to: "T1" };
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: reportColumns.length },
+  };
   worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   worksheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF064E3B" } };
   worksheet.getRow(1).alignment = { vertical: "middle", wrapText: true };

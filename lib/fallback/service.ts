@@ -5,7 +5,6 @@ import {
   StatusKeseluruhan,
   StatusPengumuman,
 } from "@/generated/prisma/enums";
-import { selectionAvailability } from "@/lib/calon-murid/rules";
 import { FallbackError } from "@/lib/fallback/errors";
 import {
   assertDeletionConfirmed,
@@ -27,21 +26,10 @@ async function lockRoute(transaction: Transaction, id: string) {
 }
 
 function fallbackAvailability(route: {
-  statusAktif: boolean;
-  periodeMulai: Date | null;
-  periodeSelesai: Date | null;
   kuotaMaks: number | null;
   kuotaTerpakai: number;
 }) {
-  const availability = selectionAvailability(route);
-  if (!availability.available && availability.reason !== "FULL") {
-    throw new FallbackError(
-      "FALLBACK_ROUTE_CLOSED",
-      "Jalur fallback sedang tidak aktif atau berada di luar periode pendaftaran.",
-      409,
-    );
-  }
-  return availability;
+  return { available: hasQuotaCapacity(route) };
 }
 
 async function transferWaitingChild(
@@ -305,6 +293,7 @@ export async function listFallbackQueue(jalurId: string) {
     include: {
       user: { select: { email: true } },
       jalur: { select: { id: true, nama: true } },
+      jalurAsal: { select: { id: true, nama: true } },
       kategori: { select: { id: true, nama: true } },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -325,17 +314,13 @@ export async function reprocessFallbackQueueInTransaction(
   const route = await transaction.jalur.findUnique({ where: { id: jalurId } });
   if (!route) throw new FallbackError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
 
-  const availability = selectionAvailability(route);
   let stoppedReason: "EMPTY" | "FULL" | "CLOSED" = "EMPTY";
   let processed = 0;
-  if (!availability.available && availability.reason !== "FULL") {
-    stoppedReason = "CLOSED";
-  } else {
-    while (hasQuotaCapacity({
-      kuotaMaks: route.kuotaMaks,
-      kuotaTerpakai: route.kuotaTerpakai + processed,
-    })) {
-      const candidateRows = await transaction.$queryRaw<Array<{ id: string }>>`
+  while (hasQuotaCapacity({
+    kuotaMaks: route.kuotaMaks,
+    kuotaTerpakai: route.kuotaTerpakai + processed,
+  })) {
+    const candidateRows = await transaction.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM "calon_murid"
         WHERE "menunggu_fallback_jalur_id" = ${jalurId}::uuid
@@ -343,33 +328,32 @@ export async function reprocessFallbackQueueInTransaction(
         ORDER BY "created_at" ASC, id ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
-      `;
-      const candidateId = candidateRows[0]?.id;
-      if (!candidateId) break;
-      const candidate = await transaction.calonMurid.findUnique({
-        where: { id: candidateId },
-        select: {
-          id: true,
-          jalurId: true,
-          jalurAsalId: true,
-          menungguFallbackJalurId: true,
-        },
-      });
-      if (!candidate) continue;
-      await transferWaitingChild(
-        transaction,
-        candidate,
-        jalurId,
-        actorId,
-        source,
-      );
-      processed += 1;
-    }
-    if (!hasQuotaCapacity({
-      kuotaMaks: route.kuotaMaks,
-      kuotaTerpakai: route.kuotaTerpakai + processed,
-    })) stoppedReason = "FULL";
+    `;
+    const candidateId = candidateRows[0]?.id;
+    if (!candidateId) break;
+    const candidate = await transaction.calonMurid.findUnique({
+      where: { id: candidateId },
+      select: {
+        id: true,
+        jalurId: true,
+        jalurAsalId: true,
+        menungguFallbackJalurId: true,
+      },
+    });
+    if (!candidate) continue;
+    await transferWaitingChild(
+      transaction,
+      candidate,
+      jalurId,
+      actorId,
+      source,
+    );
+    processed += 1;
   }
+  if (!hasQuotaCapacity({
+    kuotaMaks: route.kuotaMaks,
+    kuotaTerpakai: route.kuotaTerpakai + processed,
+  })) stoppedReason = "FULL";
 
   const remaining = await transaction.calonMurid.count({
     where: {

@@ -22,6 +22,7 @@ type JalurValue = {
   kuotaTerpakai: number;
   fallbackJalurId: string | null;
   hapusDataJikaGagal: boolean;
+  pilihanJalurFinalAktif: boolean;
 };
 
 type KategoriValue = {
@@ -117,7 +118,9 @@ export function JalurForm({
       <div className="grid gap-3 rounded-xl bg-slate-50 p-3 text-sm">
         <label className="flex items-center gap-2 font-semibold text-slate-800"><input type="checkbox" name="statusAktif" defaultChecked={value?.statusAktif ?? true} /> Aktifkan jalur</label>
         <label className="flex items-start gap-2 font-semibold text-slate-800"><input className="mt-1" type="checkbox" name="hapusDataJikaGagal" defaultChecked={value?.hapusDataJikaGagal ?? false} /> Hapus data calon murid jika gagal</label>
+        <label className="flex items-start gap-2 font-semibold text-slate-800"><input className="mt-1" type="checkbox" name="pilihanJalurFinalAktif" defaultChecked={value?.pilihanJalurFinalAktif ?? false} /> Izinkan peserta diterima memilih jalur final</label>
         <p className="text-xs leading-5 text-slate-500">Auto-delete tidak dapat diaktifkan bersama jalur fallback. Eksekusinya tetap memerlukan konfirmasi admin pada Phase 8.</p>
+        <p className="text-xs leading-5 text-slate-500">Pilihan jalur final hanya tersedia jika jalur fallback diatur. Peserta yang diterima wajib memilih tetap di jalur ini atau pindah ke fallback sebelum daftar ulang.</p>
       </div>
       <Notice state={state} />
       <button disabled={pending} className="rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60">{pending ? "Menyimpan…" : value ? "Simpan perubahan" : "Tambah jalur"}</button>
@@ -176,4 +179,3 @@ export function BiayaForm({
     </form>
   );
 }
-

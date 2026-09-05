@@ -43,6 +43,7 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - `MIDTRANS_SERVER_KEY` hanya server-side.
 - Nominal pembayaran pendaftaran berasal dari matrix `Jalur × Kategori`; wali murid tidak pernah mengisi nominal.
 - Auto-transfer TCP → Reguler dan fallback FIFO adalah business rule inti.
+- **Pilihan kelas final untuk peserta TCP yang diterima bersifat opsional per jalur dan dikendalikan Admin.** Jika aktif, semua kategori pada jalur TCP wajib memilih satu kali antara tetap di TCP atau pindah ke Reguler sebelum DU. Pilihan tidak dapat diubah. Memilih Reguler langsung melepaskan kuota TCP; bila Reguler penuh, peserta masuk FIFO Reguler tanpa kembali menahan kuota TCP.
 - Auto-delete hanya menghapus data calon murid yang gagal, bukan akun wali murid atau anak lain.
 - Jejak keuangan pembayaran tetap disimpan ketika calon murid dihapus. Relasi aktif `calon_murid_id` menggunakan `ON DELETE SET NULL`, sedangkan UUID referensi non-PII, nominal, metode, status, referensi Midtrans, payload audit yang sudah disanitasi, dan timestamp dipertahankan untuk audit keuangan.
 - MVP hanya memiliki dua role: Wali Murid dan Admin.
@@ -316,6 +317,7 @@ Setiap jalur memiliki:
 - kuota terpakai.
 - fallback optional.
 - flag auto-delete saat gagal.
+- flag pilihan jalur final setelah diterima.
 
 Jika kuota tercapai, jalur tidak boleh dipilih calon murid baru.
 
@@ -476,7 +478,36 @@ Jika penuh:
 - Masuk FIFO berdasarkan `created_at`.
 - Wali murid melihat status Menunggu.
 
-## 5.8 Reprocess FIFO
+## 5.8 Pilihan Kelas Final TCP yang Diterima
+
+Admin dapat mengaktifkan `pilihan_jalur_final_aktif` pada jalur TCP yang memiliki `fallback_jalur_id = Reguler`. Fitur berlaku untuk seluruh kategori pada jalur tersebut.
+
+Saat pengumuman `diterima` dirilis:
+
+- Status menjadi `menunggu_pilihan_jalur`.
+- DU belum dapat diakses.
+- Wali wajib memilih satu kali dan mengonfirmasi bahwa pilihan bersifat final.
+
+Jika wali memilih tetap di TCP:
+
+- `jalur_id` tetap TCP.
+- Kuota TCP tetap digunakan.
+- Pilihan final disimpan sebagai `tetap_jalur_asal`.
+- Status menjadi `diterima` dan wali dapat melanjutkan DU.
+
+Jika wali memilih Reguler:
+
+- Kuota TCP langsung berkurang satu secara atomik.
+- `jalur_asal_id` menyimpan TCP.
+- Pilihan final disimpan sebagai `jalur_fallback`.
+- Jika kuota Reguler tersedia, kuota Reguler bertambah satu, `jalur_id` menjadi Reguler, dan status menjadi `diterima`.
+- Jika kuota Reguler penuh, `jalur_id` dikosongkan, `menunggu_fallback_jalur_id` menjadi Reguler, dan status menjadi `menunggu_kuota_fallback`.
+- Peserta yang menunggu diproses bersama antrean FIFO Reguler berdasarkan `created_at ASC` lalu `id ASC`.
+- Pilihan tidak dapat diubah dan kuota TCP tidak diambil kembali selama menunggu.
+
+Perubahan pilihan, kuota, status, dan antrean wajib berada dalam satu transaksi dengan row locking serta dicatat pada audit log.
+
+## 5.9 Reprocess FIFO
 
 Saat kuota Reguler bertambah:
 1. Ambil kandidat menunggu berdasarkan `created_at ASC`.
@@ -489,7 +520,7 @@ Sediakan:
 - `GET /api/admin/jalur/:id/antrian-fallback`
 - `POST /api/admin/jalur/:id/proses-ulang-antrian`
 
-## 5.9 Auto-delete
+## 5.10 Auto-delete
 
 Untuk jalur dengan `hapus_data_jika_gagal = true`:
 
@@ -505,7 +536,7 @@ Untuk jalur dengan `hapus_data_jika_gagal = true`:
 
 **Catatan implementasi:** karena pembayaran adalah data keuangan, jangan membuat keputusan hard-delete pembayaran secara sembarangan. Gunakan desain retention yang menjaga jejak transaksi tanpa mempertahankan data pribadi yang tidak diperlukan.
 
-## 5.10 Enrollment Gate
+## 5.11 Enrollment Gate
 
 Enrollment hanya boleh diakses jika pembayaran pendaftaran:
 
@@ -515,7 +546,7 @@ verified
 
 Backend wajib memvalidasi gate ini, bukan hanya frontend.
 
-## 5.11 Announcement
+## 5.12 Announcement
 
 Admin mengisi hasil per anak.
 
@@ -528,7 +559,7 @@ Fallback:
 
 Tanggal rilis harus dihormati. Sebelum tanggal rilis, user tidak boleh melihat hasil final.
 
-## 5.12 Admission Fee / DU
+## 5.13 Admission Fee / DU
 
 Hanya calon murid `diterima` yang dapat melihat tahap DU.
 
@@ -539,7 +570,7 @@ DU:
 - Upload bukti.
 - Admin verifikasi.
 
-## 5.13 Join WA
+## 5.14 Join WA
 
 Admin menyediakan link grup setelah pembayaran DU terverifikasi.
 
@@ -715,6 +746,7 @@ kuota_maks
 kuota_terpakai
 fallback_jalur_id
 hapus_data_jika_gagal
+pilihan_jalur_final_aktif
 created_at
 updated_at
 ```
@@ -764,6 +796,8 @@ sub_kategori_enum
 sub_kategori_text
 jalur_asal_id
 menunggu_fallback_jalur_id
+pilihan_jalur_final
+pilihan_jalur_final_at
 status_keseluruhan
 created_at
 updated_at
@@ -777,6 +811,7 @@ menunggu_verifikasi_bayar
 enrollment
 menunggu_asesmen
 menunggu_pengumuman
+menunggu_pilihan_jalur
 diterima
 tidak_diterima
 menunggu_kuota_fallback
@@ -1043,6 +1078,7 @@ POST  /api/calon-murid
 GET   /api/calon-murid/:id
 PATCH /api/calon-murid/:id/jalur
 PATCH /api/calon-murid/:id/kategori
+PATCH /api/calon-murid/:id/pilihan-jalur-final
 ```
 
 ### Pembayaran
@@ -1282,6 +1318,7 @@ menunggu_verifikasi_bayar  → Menunggu Pembayaran
 enrollment                 → Lengkapi Data
 menunggu_asesmen           → Menunggu Assessment
 menunggu_pengumuman        → Menunggu Pengumuman
+menunggu_pilihan_jalur     → Pilih Kelas Final
 diterima                   → Diterima
 tidak_diterima             → Tidak Diterima
 menunggu_kuota_fallback    → Menunggu Kuota
@@ -1411,6 +1448,9 @@ Codex wajib mengerjakan secara bertahap:
 
 ### Phase 8 — Fallback
 - TCP → Reguler.
+- Pilihan kelas final peserta TCP yang diterima, dapat diaktifkan Admin.
+- Pilihan satu kali: tetap TCP atau pindah Reguler untuk semua kategori.
+- Pemindahan ke Reguler langsung melepaskan kuota TCP.
 - FIFO.
 - Reprocess.
 - Audit.
@@ -1463,6 +1503,8 @@ MVP dianggap selesai jika:
 - Assessment dapat dikelola.
 - Announcement dapat dikelola.
 - TCP fallback ke Reguler berjalan.
+- Peserta TCP yang diterima dapat memilih kelas final satu kali saat fitur aktif.
+- Pilihan Reguler melepaskan kuota TCP dan masuk FIFO bila Reguler penuh.
 - Reguler penuh menghasilkan Menunggu Kuota.
 - FIFO berjalan.
 - Penambahan kuota memproses antrian.

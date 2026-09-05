@@ -24,6 +24,10 @@ export const statusPresentation: Record<
     label: "Menunggu Pengumuman",
     className: "bg-violet-100 text-violet-900",
   },
+  [StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR]: {
+    label: "Pilih Kelas Final",
+    className: "bg-amber-100 text-amber-900",
+  },
   [StatusKeseluruhan.DITERIMA]: {
     label: "Diterima",
     className: "bg-emerald-100 text-emerald-900",

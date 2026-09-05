@@ -34,6 +34,7 @@ enum StatusKeseluruhan {
   ENROLLMENT                @map("enrollment")
   MENUNGGU_ASESMEN          @map("menunggu_asesmen")
   MENUNGGU_PENGUMUMAN       @map("menunggu_pengumuman")
+  MENUNGGU_PILIHAN_JALUR    @map("menunggu_pilihan_jalur")
   DITERIMA                  @map("diterima")
   TIDAK_DITERIMA            @map("tidak_diterima")
   MENUNGGU_KUOTA_FALLBACK   @map("menunggu_kuota_fallback")
@@ -42,6 +43,13 @@ enum StatusKeseluruhan {
   SELESAI                   @map("selesai")
 
   @@map("status_keseluruhan")
+}
+
+enum PilihanJalurFinal {
+  TETAP_JALUR_ASAL @map("tetap_jalur_asal")
+  JALUR_FALLBACK   @map("jalur_fallback")
+
+  @@map("pilihan_jalur_final")
 }
 
 enum FormType {
@@ -167,17 +175,18 @@ model RekeningBank {
 }
 
 model Jalur {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nama               String    @unique @db.VarChar(50)
-  statusAktif        Boolean   @default(true) @map("status_aktif")
-  periodeMulai       DateTime? @map("periode_mulai") @db.Date
-  periodeSelesai     DateTime? @map("periode_selesai") @db.Date
-  kuotaMaks          Int?      @map("kuota_maks")
-  kuotaTerpakai      Int       @default(0) @map("kuota_terpakai")
-  fallbackJalurId    String?   @map("fallback_jalur_id") @db.Uuid
-  hapusDataJikaGagal Boolean   @default(false) @map("hapus_data_jika_gagal")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama                   String    @unique @db.VarChar(50)
+  statusAktif            Boolean   @default(true) @map("status_aktif")
+  periodeMulai           DateTime? @map("periode_mulai") @db.Date
+  periodeSelesai         DateTime? @map("periode_selesai") @db.Date
+  kuotaMaks              Int?      @map("kuota_maks")
+  kuotaTerpakai          Int       @default(0) @map("kuota_terpakai")
+  fallbackJalurId        String?   @map("fallback_jalur_id") @db.Uuid
+  hapusDataJikaGagal     Boolean   @default(false) @map("hapus_data_jika_gagal")
+  pilihanJalurFinalAktif Boolean   @default(false) @map("pilihan_jalur_final_aktif")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   fallbackJalur    Jalur?             @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
   sumberFallback   Jalur[]            @relation("JalurFallback")
@@ -239,6 +248,8 @@ model CalonMurid {
   subKategoriText         String?            @map("sub_kategori_text") @db.VarChar(150)
   jalurAsalId             String?            @map("jalur_asal_id") @db.Uuid
   menungguFallbackJalurId String?            @map("menunggu_fallback_jalur_id") @db.Uuid
+  pilihanJalurFinal       PilihanJalurFinal? @map("pilihan_jalur_final")
+  pilihanJalurFinalAt     DateTime?          @map("pilihan_jalur_final_at") @db.Timestamptz(6)
   statusKeseluruhan       StatusKeseluruhan  @default(PILIH_JALUR) @map("status_keseluruhan")
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -259,6 +270,7 @@ model CalonMurid {
   @@index([kategoriId])
   @@index([statusKeseluruhan])
   @@index([menungguFallbackJalurId, createdAt])
+  @@index([pilihanJalurFinal, pilihanJalurFinalAt])
   @@map("calon_murid")
 }
 

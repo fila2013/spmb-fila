@@ -15,7 +15,9 @@ import {
 } from "@/components/admin/stage-forms";
 import {
   MetodePembayaran,
+  PilihanJalurFinal,
   StatusAssessment,
+  StatusKeseluruhan,
   StatusPembayaran,
   StatusUndanganWa,
   UserRole,
@@ -98,12 +100,15 @@ export default async function ParticipantDetailPage({
   }
   const du = admission.payment;
   const whatsapp = admission.whatsapp;
+  const announcementLocked = Boolean(participant.pilihanJalurFinal) ||
+    participant.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
+    participant.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
 
   return (
     <AdminShell
       activePath="/admin/peserta"
       title={participant.namaAnak}
-      description={`${participant.user.email} · ${participant.jalur?.nama ?? "Tanpa jalur"} · ${participant.kategori?.nama ?? "Tanpa kategori"}`}
+      description={`${participant.user.email} · ${participant.jalur?.nama ?? participant.menungguFallbackJalur?.nama ?? participant.jalurAsal?.nama ?? "Tanpa jalur"} · ${participant.kategori?.nama ?? "Tanpa kategori"}`}
       email={admin.email}
     >
       <Link href="/admin/peserta" className="mb-5 inline-flex text-sm font-bold text-emerald-800 hover:underline">← Kembali ke peserta</Link>
@@ -114,7 +119,8 @@ export default async function ParticipantDetailPage({
         </section>
         <section className="rounded-2xl border border-emerald-950/10 bg-white p-5">
           <h2 className="mb-4 text-lg font-bold text-emerald-950">Pengumuman</h2>
-          <AnnouncementResultForm id={participant.id} statusAkhir={participant.pengumuman?.statusAkhir ?? null} tanggalRilis={dateOnly(participant.pengumuman?.tanggalRilis ?? null) ?? ""} childName={participant.namaAnak} requiresDeleteConfirmation={Boolean(participant.jalur?.hapusDataJikaGagal && !participant.jalur.fallbackJalurId)} />
+          {announcementLocked ? <p className="rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">Hasil pengumuman sudah dirilis dan dikunci. Tahap selanjutnya dikelola oleh pilihan wali atau antrean kuota.</p> : <AnnouncementResultForm id={participant.id} statusAkhir={participant.pengumuman?.statusAkhir ?? null} tanggalRilis={dateOnly(participant.pengumuman?.tanggalRilis ?? null) ?? ""} childName={participant.namaAnak} requiresDeleteConfirmation={Boolean(participant.jalur?.hapusDataJikaGagal && !participant.jalur.fallbackJalurId)} finalRouteChoiceEnabled={Boolean(participant.jalur?.pilihanJalurFinalAktif)} />}
+          {participant.pilihanJalurFinal ? <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950"><p className="font-bold">Pilihan jalur final wali</p><p className="mt-1">{participant.pilihanJalurFinal === PilihanJalurFinal.TETAP_JALUR_ASAL ? `Tetap ${participant.jalurAsal?.nama ?? participant.jalur?.nama ?? "jalur asal"}` : `Pindah ke ${participant.jalur?.nama ?? participant.menungguFallbackJalur?.nama ?? "jalur fallback"}`}</p><p className="mt-1 text-xs">Pilihan ini final{participant.pilihanJalurFinalAt ? ` · ${participant.pilihanJalurFinalAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}` : ""}.{participant.menungguFallbackJalur ? ` Sedang menunggu kuota ${participant.menungguFallbackJalur.nama}.` : ""}</p></div> : null}
         </section>
         <section className="rounded-2xl border border-emerald-950/10 bg-white p-5 lg:col-span-2">
           <h2 className="mb-4 text-lg font-bold text-emerald-950">Pembayaran pendaftaran</h2>

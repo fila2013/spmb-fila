@@ -15,6 +15,7 @@ const validJalur = {
   kuotaMaks: 60,
   fallbackJalurId: null,
   hapusDataJikaGagal: false,
+  pilihanJalurFinalAktif: false,
 };
 
 describe("master data schemas", () => {
@@ -50,6 +51,22 @@ describe("master data schemas", () => {
     ).toBe(true);
   });
 
+  it("memerlukan fallback untuk pilihan jalur final", () => {
+    expect(
+      createJalurSchema.safeParse({
+        ...validJalur,
+        pilihanJalurFinalAktif: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      createJalurSchema.safeParse({
+        ...validJalur,
+        fallbackJalurId: "b2ad565e-5f24-4bb0-8a1c-f54cb908dd47",
+        pilihanJalurFinalAktif: true,
+      }).success,
+    ).toBe(true);
+  });
+
   it("menolak nominal nol", () => {
     expect(
       createBiayaSchema.safeParse({
@@ -61,4 +78,3 @@ describe("master data schemas", () => {
     ).toBe(false);
   });
 });
-

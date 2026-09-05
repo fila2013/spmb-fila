@@ -192,7 +192,7 @@ try {
 
   const quotaIncrease = await api(`/api/admin/jalur/${regular.id}`, admin.cookie, {
     method: "PATCH",
-    body: JSON.stringify({ nama: regular.nama, statusAktif: true, periodeMulai: null, periodeSelesai: null, kuotaMaks: 2, fallbackJalurId: null, hapusDataJikaGagal: false }),
+    body: JSON.stringify({ nama: regular.nama, statusAktif: true, periodeMulai: null, periodeSelesai: null, kuotaMaks: 2, fallbackJalurId: null, hapusDataJikaGagal: false, pilihanJalurFinalAktif: false }),
   });
   if (quotaIncrease.response.status !== 200) throw new Error(`Update kuota gagal: ${quotaIncrease.response.status}`);
   const [secondAfterAuto, thirdAfterAuto] = await Promise.all([

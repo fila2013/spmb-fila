@@ -31,7 +31,7 @@ describe("reporting exports", () => {
     await workbook.xlsx.load(bytes.buffer as ArrayBuffer);
     const worksheet = workbook.getWorksheet("Rekap Peserta");
     expect(worksheet?.getCell("B2").value).toBe("'+CMD");
-    expect(worksheet?.getCell("Q2").value).toBe(2_500_000);
+    expect(worksheet?.getCell("S2").value).toBe(2_500_000);
     expect(worksheet?.autoFilter).toBeTruthy();
   });
 });

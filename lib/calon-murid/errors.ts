@@ -4,6 +4,8 @@ export type CalonMuridErrorCode =
   | "CLOSED"
   | "QUOTA_FULL"
   | "FEE_NOT_CONFIGURED"
+  | "FINAL_ROUTE_CHOICE_DISABLED"
+  | "FINAL_ROUTE_CHOICE_LOCKED"
   | "INTEGRITY_ERROR";
 
 export class CalonMuridError extends Error {

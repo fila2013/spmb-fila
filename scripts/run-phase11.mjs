@@ -22,6 +22,7 @@ const scripts = [
   "verify-phase8.ts",
   "verify-phase9.ts",
   "verify-phase10.ts",
+  "verify-final-route-choice.ts",
   "verify-admin-deletion.ts",
 ];
 

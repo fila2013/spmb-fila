@@ -35,6 +35,7 @@ describe("Phase 7 stage rules", () => {
     expect(mayViewAssessment(StatusKeseluruhan.MENUNGGU_ASESMEN)).toBe(true);
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_ASESMEN)).toBe(false);
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_PENGUMUMAN)).toBe(true);
+    expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR)).toBe(true);
     expect(mayViewAnnouncement(StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK)).toBe(true);
   });
 

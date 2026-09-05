@@ -21,6 +21,8 @@ type Transaction = Prisma.TransactionClient;
 
 const detailInclude = {
   jalur: true,
+  jalurAsal: true,
+  menungguFallbackJalur: true,
   kategori: true,
 } satisfies Prisma.CalonMuridInclude;
 

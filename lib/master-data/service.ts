@@ -32,6 +32,7 @@ function jalurSnapshot(jalur: Jalur) {
     kuotaTerpakai: jalur.kuotaTerpakai,
     fallbackJalurId: jalur.fallbackJalurId,
     hapusDataJikaGagal: jalur.hapusDataJikaGagal,
+    pilihanJalurFinalAktif: jalur.pilihanJalurFinalAktif,
   };
 }
 
@@ -119,6 +120,25 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
         throw new MasterDataError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
       }
       assertQuotaCanBeSet(input.kuotaMaks, previous.kuotaTerpakai);
+      if (
+        previous.pilihanJalurFinalAktif &&
+        (!input.pilihanJalurFinalAktif ||
+          input.fallbackJalurId !== previous.fallbackJalurId)
+      ) {
+        const pendingChoices = await transaction.calonMurid.count({
+          where: {
+            jalurId: previous.id,
+            statusKeseluruhan: "MENUNGGU_PILIHAN_JALUR",
+          },
+        });
+        if (pendingChoices > 0) {
+          throw new MasterDataError(
+            "CONFLICT",
+            "Selesaikan pilihan jalur final peserta yang masih menunggu sebelum menonaktifkan fitur atau mengganti fallback.",
+            409,
+          );
+        }
+      }
       if (input.fallbackJalurId) {
         const cycle = await transaction.$queryRaw<Array<{ id: string }>>`
           WITH RECURSIVE fallback_chain AS (

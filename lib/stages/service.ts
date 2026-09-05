@@ -2,6 +2,7 @@ import "server-only";
 
 import type { KontenTahap, Prisma } from "@/generated/prisma/client";
 import {
+  PilihanJalurFinal,
   StatusAssessment,
   StatusKeseluruhan,
   StatusPengumuman,
@@ -10,6 +11,7 @@ import {
 import { assertOwnership } from "@/lib/auth/authorization";
 import { FallbackError } from "@/lib/fallback/errors";
 import { handleRejectedDecisionInTransaction } from "@/lib/fallback/service";
+import { releasedStatusAfterAcceptedDecision } from "@/lib/final-route-choice/rules";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { StageError } from "@/lib/stages/errors";
@@ -18,7 +20,6 @@ import {
   isAnnouncementReleased,
   mayViewAnnouncement,
   mayViewAssessment,
-  releasedOverallStatus,
 } from "@/lib/stages/rules";
 import type {
   AnnouncementInput,
@@ -195,7 +196,15 @@ async function getOwnedStageChild(childId: string, userId: string) {
   const child = await prisma.calonMurid.findUnique({
     where: { id: childId },
     include: {
-      jalur: { select: { id: true, nama: true } },
+      jalur: {
+        select: {
+          id: true,
+          nama: true,
+          pilihanJalurFinalAktif: true,
+          fallbackJalur: { select: { id: true, nama: true } },
+        },
+      },
+      jalurAsal: { select: { id: true, nama: true } },
       kategori: { select: { id: true, nama: true } },
       hasilAssessment: true,
       pengumuman: true,
@@ -207,12 +216,13 @@ async function getOwnedStageChild(childId: string, userId: string) {
   return child;
 }
 
-function matchingContentWhere(tahap: TahapKonten, child: { jalurId: string | null; kategoriId: string | null }) {
+function matchingContentWhere(tahap: TahapKonten, child: { jalurId: string | null; kategoriId: string | null; menungguFallbackJalurId?: string | null }) {
+  const contentJalurId = child.jalurId ?? child.menungguFallbackJalurId;
   return {
     tahap,
     statusAktif: true,
     AND: [
-      { OR: [{ jalurId: null }, { jalurId: child.jalurId ?? "00000000-0000-0000-0000-000000000000" }] },
+      { OR: [{ jalurId: null }, { jalurId: contentJalurId ?? "00000000-0000-0000-0000-000000000000" }] },
       { OR: [{ kategoriId: null }, { kategoriId: child.kategoriId ?? "00000000-0000-0000-0000-000000000000" }] },
     ],
   } satisfies Prisma.KontenTahapWhereInput;
@@ -253,14 +263,18 @@ async function synchronizeReleasedAnnouncement(transaction: Transaction, childId
     include: { pengumuman: true, jalur: true },
   });
   const announcement = child?.pengumuman;
-  if (!child || !announcement?.statusAkhir || !isAnnouncementReleased(announcement.tanggalRilis)) return;
+  if (!child?.jalur || !announcement?.statusAkhir || !isAnnouncementReleased(announcement.tanggalRilis)) return;
   if (child.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_PENGUMUMAN) return;
 
   if (announcement.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
     const effect = await handleRejectedDecisionInTransaction(transaction, childId, null);
     if (effect.type !== "NONE") return;
   }
-  const nextStatus = releasedOverallStatus(announcement.statusAkhir);
+  const nextStatus = releasedStatusAfterAcceptedDecision({
+    statusAkhir: announcement.statusAkhir,
+    finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
+    fallbackJalurId: child.jalur.fallbackJalurId,
+  });
   await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
   await transaction.auditLog.create({ data: { action: "RELEASE_ANNOUNCEMENT", entity: "calon_murid", entityId: childId, detail: { statusAkhir: announcement.statusAkhir, tanggalRilis: dateOnly(announcement.tanggalRilis), nextStatus } } });
 }
@@ -277,6 +291,14 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   const waitingQuota = current.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
   const released = Boolean(announcement?.statusAkhir && isAnnouncementReleased(announcement.tanggalRilis));
   const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
+  const choiceRequired =
+    current.statusKeseluruhan ===
+    StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR;
+  const choiceSource = current.jalurAsal ?? current.jalur;
+  const choiceTarget =
+    current.pilihanJalurFinal === PilihanJalurFinal.JALUR_FALLBACK
+      ? current.menungguFallbackJalur ?? current.jalur
+      : current.jalur?.fallbackJalur ?? null;
   return {
     child: { id: current.id, namaAnak: current.namaAnak, jalur: current.jalur?.nama ?? null, kategori: current.kategori?.nama ?? null },
     released,
@@ -284,6 +306,20 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
     fallbackJalur: current.menungguFallbackJalur?.nama ?? null,
     tanggalRilis: dateOnly(announcement?.tanggalRilis ?? null),
     statusAkhir: released ? announcement?.statusAkhir ?? null : null,
+    finalRouteChoice:
+      choiceRequired || current.pilihanJalurFinal
+        ? {
+            required: choiceRequired,
+            selected: current.pilihanJalurFinal,
+            selectedAt: current.pilihanJalurFinalAt,
+            source: choiceSource
+              ? { id: choiceSource.id, nama: choiceSource.nama }
+              : null,
+            target: choiceTarget
+              ? { id: choiceTarget.id, nama: choiceTarget.nama }
+              : null,
+          }
+        : null,
     content: content.map(publicContent),
   };
 }
@@ -291,7 +327,7 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
 export function listParticipants(query?: string) {
   return prisma.calonMurid.findMany({
     where: query ? { OR: [{ namaAnak: { contains: query, mode: "insensitive" } }, { user: { email: { contains: query, mode: "insensitive" } } }] } : undefined,
-    include: { user: { select: { email: true } }, jalur: { select: { nama: true } }, kategori: { select: { nama: true } }, hasilAssessment: true, pengumuman: true },
+    include: { user: { select: { email: true } }, jalur: { select: { nama: true } }, jalurAsal: { select: { nama: true } }, menungguFallbackJalur: { select: { nama: true } }, kategori: { select: { nama: true } }, hasilAssessment: true, pengumuman: true },
     orderBy: [{ createdAt: "desc" }],
   });
 }
@@ -302,6 +338,8 @@ export async function getParticipant(childId: string) {
     include: {
       user: { select: { email: true } },
       jalur: true,
+      jalurAsal: true,
+      menungguFallbackJalur: true,
       kategori: true,
       hasilAssessment: true,
       pengumuman: true,
@@ -333,7 +371,14 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
   return prisma.$transaction(async (transaction) => {
     await transaction.$queryRaw`SELECT id FROM "calon_murid" WHERE id = ${childId}::uuid FOR UPDATE`;
     const child = await transaction.calonMurid.findUnique({ where: { id: childId }, include: { jalur: true, hasilAssessment: true, pengumuman: true } });
-    if (!child?.jalur) throw new StageError("NOT_FOUND", "Peserta atau jalur tidak ditemukan.", 404);
+    if (!child) throw new StageError("NOT_FOUND", "Peserta tidak ditemukan.", 404);
+    if (child.pilihanJalurFinal) {
+      throw new StageError(
+        "FINAL_ROUTE_CHOICE_LOCKED",
+        "Hasil pengumuman dikunci karena wali murid sudah menyimpan pilihan jalur final.",
+        409,
+      );
+    }
     if (child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK) {
       throw new FallbackError(
         "QUEUE_MANAGED_BY_SYSTEM",
@@ -341,6 +386,17 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
         409,
       );
     }
+    if (
+      child.statusKeseluruhan ===
+      StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR
+    ) {
+      throw new StageError(
+        "FINAL_ROUTE_CHOICE_PENDING",
+        "Hasil sudah dirilis dan sedang menunggu pilihan jalur final dari wali murid.",
+        409,
+      );
+    }
+    if (!child.jalur) throw new StageError("NOT_FOUND", "Jalur peserta tidak ditemukan.", 404);
     if (!child.hasilAssessment || child.hasilAssessment.status === StatusAssessment.BELUM) throw new StageError("ASSESSMENT_REQUIRED", "Hasil assessment harus diisi terlebih dahulu.", 409);
     const tanggalRilis = new Date(`${input.tanggalRilis}T00:00:00.000Z`);
     const released = isAnnouncementReleased(tanggalRilis);
@@ -359,7 +415,13 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
     const result = await transaction.pengumuman.upsert({ where: { calonMuridId: childId }, update: { ...announcementData, tanggalRilis, updatedById: actorId }, create: { calonMuridId: childId, ...announcementData, tanggalRilis, updatedById: actorId } });
 
     let effect: Awaited<ReturnType<typeof handleRejectedDecisionInTransaction>> = { type: "NONE" };
-    let nextStatus: StatusKeseluruhan = released ? releasedOverallStatus(input.statusAkhir) : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
+    let nextStatus: StatusKeseluruhan = released
+      ? releasedStatusAfterAcceptedDecision({
+          statusAkhir: input.statusAkhir,
+          finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
+          fallbackJalurId: child.jalur.fallbackJalurId,
+        })
+      : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
     if (released && input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
       effect = await handleRejectedDecisionInTransaction(transaction, childId, actorId, deletionConfirmation);
       if (effect.type === "TRANSFERRED") nextStatus = StatusKeseluruhan.DITERIMA;

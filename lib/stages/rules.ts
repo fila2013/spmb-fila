@@ -106,6 +106,7 @@ export function mayViewAssessment(status: StatusKeseluruhan) {
 export function mayViewAnnouncement(status: StatusKeseluruhan) {
   const allowed: StatusKeseluruhan[] = [
     StatusKeseluruhan.MENUNGGU_PENGUMUMAN,
+    StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR,
     StatusKeseluruhan.DITERIMA,
     StatusKeseluruhan.TIDAK_DITERIMA,
     StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,

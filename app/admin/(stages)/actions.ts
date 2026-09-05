@@ -127,7 +127,9 @@ export async function updateAnnouncementAction(_state: StageActionState, formDat
   revalidatePath(`/anak/${id}/pengumuman`);
   if (result.deleted) redirect("/admin/peserta?deleted=1");
   revalidatePath(`/admin/peserta/${id}`);
-  const message = result.effect.type === "TRANSFERRED"
+  const message = result.nextStatus === "MENUNGGU_PILIHAN_JALUR"
+    ? "Pengumuman dirilis; wali perlu memilih kelas final sebelum daftar ulang."
+    : result.effect.type === "TRANSFERRED"
     ? "Peserta otomatis dipindahkan ke jalur fallback dan diterima."
     : result.effect.type === "QUEUED"
       ? "Jalur fallback penuh; peserta masuk antrian FIFO."

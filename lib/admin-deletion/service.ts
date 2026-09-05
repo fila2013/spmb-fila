@@ -181,6 +181,8 @@ export async function deleteParticipant(
               kategori: participant.kategori,
               jalurAsalId: participant.jalurAsalId,
               menungguFallbackJalurId: participant.menungguFallbackJalurId,
+              pilihanJalurFinal: participant.pilihanJalurFinal,
+              pilihanJalurFinalAt: participant.pilihanJalurFinalAt,
               statusKeseluruhan: participant.statusKeseluruhan,
               assessmentStatus: participant.hasilAssessment?.status ?? null,
               announcementStatus: participant.pengumuman?.statusAkhir ?? null,

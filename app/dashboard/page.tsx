@@ -33,6 +33,8 @@ function nextLink(child: {
   }
   if (
     child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PENGUMUMAN ||
+    child.statusKeseluruhan ===
+      StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
     child.statusKeseluruhan === StatusKeseluruhan.TIDAK_DITERIMA ||
     child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK
   ) {
@@ -107,7 +109,7 @@ export default async function DashboardPage({
                   <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
                 </div>
                 <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-                  <div><dt className="text-slate-500">Jalur</dt><dd className="font-semibold text-slate-800">{child.jalur?.nama ?? "Belum dipilih"}</dd></div>
+                  <div><dt className="text-slate-500">Jalur</dt><dd className="font-semibold text-slate-800">{child.jalur?.nama ?? child.menungguFallbackJalur?.nama ?? child.jalurAsal?.nama ?? "Belum dipilih"}</dd></div>
                   <div><dt className="text-slate-500">Kategori</dt><dd className="font-semibold text-slate-800">{child.kategori?.nama ?? "Belum dipilih"}</dd></div>
                 </dl>
                 {href ? (

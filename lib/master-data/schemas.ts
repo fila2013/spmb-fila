@@ -43,6 +43,7 @@ export const createJalurSchema = z
     kuotaMaks: nullableQuotaSchema,
     fallbackJalurId: nullableUuidSchema,
     hapusDataJikaGagal: z.boolean(),
+    pilihanJalurFinalAktif: z.boolean(),
   })
   .superRefine((value, context) => {
     validatePeriod(value, context);
@@ -51,6 +52,13 @@ export const createJalurSchema = z
         code: "custom",
         path: ["hapusDataJikaGagal"],
         message: "Auto-delete tidak boleh aktif bersamaan dengan fallback.",
+      });
+    }
+    if (value.pilihanJalurFinalAktif && !value.fallbackJalurId) {
+      context.addIssue({
+        code: "custom",
+        path: ["pilihanJalurFinalAktif"],
+        message: "Pilihan jalur final memerlukan jalur fallback.",
       });
     }
   });
@@ -88,4 +96,3 @@ export type CreateKategoriInput = z.infer<typeof createKategoriSchema>;
 export type UpdateKategoriInput = z.infer<typeof updateKategoriSchema>;
 export type CreateBiayaInput = z.infer<typeof createBiayaSchema>;
 export type UpdateBiayaInput = z.infer<typeof updateBiayaSchema>;
-
