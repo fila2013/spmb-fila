@@ -28,6 +28,7 @@ if (!supabaseUrl || !publishableKey || !secretKey || !databaseUrl) {
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
 const adminClient = createClient(supabaseUrl, secretKey, { auth: { autoRefreshToken: false, persistSession: false } });
+const publicClient = createClient(supabaseUrl, publishableKey, { auth: { autoRefreshToken: false, persistSession: false } });
 const marker = randomUUID().slice(0, 8);
 const password = randomBytes(24).toString("base64url");
 const authIds: string[] = [];
@@ -50,15 +51,30 @@ async function retry<T>(operation: () => Promise<T>) {
 }
 
 async function loginCookie(email: string) {
+  const { data: login, error: loginError } = await publicClient.auth.signInWithPassword({ email, password });
+  if (loginError || !login.session) throw loginError ?? new Error("Login akun uji gagal.");
   const cookies = new Map<string, string>();
   const client = createServerClient(supabaseUrl!, publishableKey!, {
     cookies: {
-      getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
+      getAll: () => [],
       setAll: (values: Array<{ name: string; value: string }>) => values.forEach(({ name, value }) => cookies.set(name, value)),
     },
   });
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error || !data.session) throw error ?? new Error("Login akun uji gagal.");
+  const { error } = await client.auth.setSession({
+    access_token: login.session.access_token,
+    refresh_token: login.session.refresh_token,
+  });
+  if (error) throw error;
+  const verificationClient = createServerClient(supabaseUrl!, publishableKey!, {
+    cookies: {
+      getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
+      setAll: () => undefined,
+    },
+  });
+  const { data: claims, error: claimsError } = await verificationClient.auth.getClaims();
+  if (claimsError || !claims?.claims.sub) {
+    throw claimsError ?? new Error("Cookie SSR uji tidak menghasilkan claims.");
+  }
   return [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
 }
 
@@ -166,7 +182,7 @@ try {
   });
   const releaseAfter = await prisma.calonMurid.findUniqueOrThrow({ where: { id: releaseChild.id } });
   if (released.response.status !== 200 || releaseAfter.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR) {
-    throw new Error("Pengumuman diterima tidak membuka tahap pilihan kelas final.");
+    throw new Error(`Pengumuman diterima tidak membuka tahap pilihan kelas final: HTTP ${released.response.status}, status ${releaseAfter.statusKeseluruhan}, body ${JSON.stringify(released.body)}.`);
   }
 
   const stayChild = releaseChild;
@@ -206,7 +222,7 @@ try {
   const queueAfter = await prisma.calonMurid.findUniqueOrThrow({ where: { id: queuedChild.id } });
   const tcpAfterQueue = await prisma.jalur.findUniqueOrThrow({ where: { id: tcp.id } });
   if (queued.response.status !== 200 || queued.body.data?.queued !== true || queueAfter.jalurId !== null || queueAfter.menungguFallbackJalurId !== regular.id || queueAfter.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK || tcpAfterQueue.kuotaTerpakai !== 1) {
-    throw new Error("Jalur Reguler penuh tidak melepas TCP atau masuk antrean dengan benar.");
+    throw new Error(`Jalur Reguler penuh tidak melepas TCP atau masuk antrean dengan benar: HTTP ${queued.response.status}, body ${JSON.stringify(queued.body)}, jalur ${queueAfter.jalurId}, target ${queueAfter.menungguFallbackJalurId}, status ${queueAfter.statusKeseluruhan}, kuota TCP ${tcpAfterQueue.kuotaTerpakai}.`);
   }
   const quotaIncrease = await api(`/api/admin/jalur/${regular.id}`, admin.cookie, {
     method: "PATCH",
