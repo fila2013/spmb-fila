@@ -1,327 +1,237 @@
 # AGENTS.md — SPMB Fila
 
-## 1. Project Identity
+## Identitas dan sumber keputusan
 
-Project ini adalah **SPMB Fila**, aplikasi Sistem Penerimaan Murid Baru untuk SDIT Fitrah Insani Langkapura.
+SPMB Fila adalah Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura.
+Audit dokumentasi: **7 September 2026**, berdasarkan source, konfigurasi, migration,
+dan test repository. Status implementasi di bawah tidak membuktikan deployment
+atau migration sudah diterapkan pada database remote.
 
-Source of truth utama:
-- `docs/SPMB-FILA-SPEC.md`
-- PRD/technical documents lain di `docs/` bila tersedia.
+Baca [specification](docs/SPMB-FILA-SPEC.md), terutama **Final Decisions**, sebelum
+mengubah domain. Dokumen pendukung: `docs/TECHNICAL_SPEC.md`,
+`docs/MVP_Roadmap_dan_ENV_Checklist.md`, `docs/PRD_SPMB_SDIT_Fitrah_Insani.md`,
+dan `docs/wireframe.html`. Keputusan final terbaru mengatasi dokumen desain lama.
+Jangan mengarang business rule; konflik yang memengaruhi pembayaran, kuota,
+authorization, schema, atau delete harus diklarifikasi sebelum implementasi.
 
-Baca dokumen yang relevan sebelum mengubah kode.
+## Stack dan arsitektur aktual
 
----
-
-## 2. Tech Stack
-
-- Next.js
-- React
-- TypeScript
-- App Router
-- Tailwind CSS
-- Next.js Route Handlers
-- Prisma ORM
-- PostgreSQL via Supabase
-- Supabase Auth
-- Supabase Storage
-- Vercel
-- Midtrans Snap untuk pembayaran pendaftaran
-
----
-
-## 3. Core Architecture
+- Next.js **16.3.3**, App Router, React **19.2.8**, React Compiler aktif.
+- TypeScript strict, alias `@/*` ke root; Tailwind CSS 4, Lucide, clsx/tailwind-merge.
+- Prisma **7.10.0**, `@prisma/adapter-pg` dan `pg`; PostgreSQL di Supabase.
+- Supabase Auth (`@supabase/ssr`, `@supabase/supabase-js`) dan Storage.
+- Zod 4 untuk validasi; ExcelJS untuk ekspor XLSX.
+- Midtrans Snap melalui `fetch` server-side; Snap.js pada browser.
+- Vitest 4.1.11, Playwright 1.62.1 (Chromium), ESLint 9.
+- Node `>=20.19 <25`; package manager `npm@11.12.1`, lockfile npm.
+- Target hosting Vercel; tidak ada backend terpisah, Docker setup, atau workflow
+  CI yang disimpan dalam repository. Prisma Composer bukan runtime aplikasi ini.
 
 ```text
-Browser
-  ↓
-Next.js
-  ↓
-Route Handler / Server Logic
-  ↓
-Prisma
-  ↓
-Supabase PostgreSQL
+Browser → Next.js pages / Client Components
+        → Server Components / Server Actions / Route Handlers
+        → lib/<domain>/service.ts → Prisma + adapter-pg → Supabase PostgreSQL
+                                 → Supabase Auth / Storage
+                                 → Midtrans Snap API
+Midtrans → POST /api/webhooks/midtrans → payment service → PostgreSQL
 ```
 
-Supabase juga digunakan untuk:
-- Auth
-- Storage
-
-Midtrans dipanggil dari server.
-
-**Business-critical logic wajib server-side.**
-
----
-
-## 4. Non-Negotiable Rules
-
-### Authentication
-
-Gunakan **Supabase Auth**.
-
-Jangan:
-- membuat authentication manual;
-- menyimpan password plaintext;
-- membuat password hashing sendiri untuk menggantikan Supabase Auth.
-
-Tabel aplikasi `users` menyimpan profile dan role.
-
-### Authorization
-
-Selalu validasi:
-1. session;
-2. role;
-3. ownership data.
-
-Jangan percaya `user_id` yang dikirim client.
-
-### Secrets
-
-`SUPABASE_SERVICE_ROLE_KEY` dan `MIDTRANS_SERVER_KEY`:
-- hanya server-side;
-- tidak boleh `NEXT_PUBLIC_`;
-- tidak boleh di-log;
-- tidak boleh di-commit;
-- jangan pernah ditulis di source code.
-
-### Database
-
-Prisma adalah ORM utama.
-
-Gunakan migration yang aman.
-
-Jangan melakukan perubahan schema destruktif tanpa menjelaskan dampaknya.
-
----
-
-## 5. Critical Business Rules
-
-### Payment
-
-Nominal pembayaran pendaftaran:
-
-```text
-Jalur × Kategori → biaya_pendaftaran.nominal
-```
-
-**User tidak pernah mengisi nominal.**
-
-Backend harus mengambil nominal dari database.
-
-Jika biaya belum diatur:
-- jangan membuat transaksi;
-- jangan mengarahkan user ke Midtrans.
-
-### Midtrans
-
-- Pembayaran pendaftaran menggunakan Midtrans Snap production.
-- Pembayaran DU tetap manual pada MVP.
-- Snap token dibuat server-side.
-- `MIDTRANS_SERVER_KEY` hanya server-side.
-- Status final pembayaran berasal dari webhook.
-- Webhook wajib memverifikasi signature.
-- Webhook harus idempotent.
-- `midtrans_order_id` unique.
-
-Webhook endpoint:
-
-```text
-POST /api/webhooks/midtrans
-```
-
-Webhook tidak membutuhkan session login.
-
-### Quota
-
-Kuota adalah critical section.
-
-Semua operasi berikut harus atomik:
-- pendaftaran jalur;
-- pendaftaran kategori;
-- auto-transfer;
-- proses ulang FIFO.
-
-Gunakan database transaction + row locking/strategi atomic yang setara.
-
-Frontend quota check bukan security boundary.
-
-### TCP → Reguler
-
-Jika TCP gagal:
-
-```text
-Reguler tersedia
-  → pindah otomatis
-  → langsung diterima
-  → tidak perlu assessment ulang
-```
-
-Jika Reguler penuh:
-
-```text
-status = menunggu_kuota_fallback
-```
-
-Masuk FIFO.
-
-Tidak boleh langsung dianggap `tidak_diterima`.
-
-### Auto-delete
-
-Reguler/Pindahan dapat memiliki:
-
-```text
-hapus_data_jika_gagal = true
-```
-
-Saat gagal:
-- wajib konfirmasi admin;
-- wajib audit snapshot sebelum delete;
-- hanya calon murid yang gagal yang dihapus;
-- akun wali murid tetap;
-- anak lain tetap.
-
-Perhatikan retention data pembayaran agar jejak keuangan tetap dapat diaudit.
-
----
-
-## 6. Status Gate
-
-Backend wajib mencegah user melompati tahap.
-
-Contoh:
-
-```text
-payment != verified
-→ enrollment forbidden
-```
-
-Jangan hanya mengandalkan redirect atau hidden UI.
-
----
-
-## 7. Coding Rules
-
-- TypeScript strict.
-- Hindari `any` kecuali benar-benar diperlukan.
-- Reuse domain logic.
-- Jangan menaruh business rule kompleks langsung di komponen UI.
-- Validasi input di server.
-- Gunakan schema validation yang konsisten.
-- Error response harus konsisten.
-- Jangan expose internal error detail ke user.
-- Jangan log secret atau data pribadi yang tidak perlu.
-
----
-
-## 8. Testing Rules
-
-Business-critical code harus memiliki test.
-
-Minimal test untuk:
-- auth authorization;
-- ownership;
-- quota race condition;
-- biaya matrix;
-- Midtrans webhook signature;
-- Midtrans idempotency;
-- payment state transition;
-- enrollment gate;
-- TCP → Reguler;
-- FIFO fallback;
-- reprocess queue;
-- auto-delete;
-- multi-child account.
-
-Sebelum menyatakan task selesai, jalankan test/lint/typecheck yang relevan.
-
----
-
-## 9. Development Workflow
-
-Kerjakan secara incremental:
-
-```text
-Understand
-  ↓
-Plan
-  ↓
-Implement
-  ↓
-Test
-  ↓
-Review diff
-  ↓
-Report
-```
-
-Jangan mengimplementasikan seluruh aplikasi sekaligus.
-
-Untuk task besar:
-1. pecah menjadi task kecil;
-2. selesaikan satu layer;
-3. test;
-4. baru lanjut.
-
----
-
-## 10. Dokumen & Scope
-
-Jangan membuat fitur Phase 2 sebelum MVP selesai.
-
-Phase 2 antara lain:
-- notifikasi otomatis;
-- WhatsApp API;
-- role Bendahara/Asesor;
-- Midtrans DU;
-- analytics;
-- bulk import;
-- multi-tenant;
-- promo;
-- advanced form builder.
-
-Jika requirement tidak jelas:
-1. cari di `docs/`;
-2. cek business rules;
-3. jangan menebak untuk hal yang berdampak pada database, pembayaran, kuota, authorization, atau delete;
-4. minta keputusan manusia bila diperlukan.
-
----
-
-## 11. Git Discipline
-
-- Satu perubahan logis per commit bila memungkinkan.
-- Commit message jelas.
-- Jangan commit `.env.local`.
-- Jangan commit credential.
-- Jangan force-push tanpa instruksi.
-- Jangan menghapus migration existing sembarangan.
-- Review `git diff` sebelum menyelesaikan task.
-
----
-
-## 12. Definition of Done
-
-Task selesai hanya jika:
-- implementasi sesuai spec;
-- authorization benar;
-- tidak ada secret exposure;
-- lint/typecheck/test relevan lulus;
-- migration aman bila ada perubahan database;
-- tidak merusak business rules existing;
-- perubahan dijelaskan secara ringkas.
-
----
-
-## 13. Important
-
-**Jangan mengarang business rule.**
-
-Jika ada konflik antara implementasi lama dan `docs/SPMB-FILA-SPEC.md`, jangan langsung memilih implementasi lama.
-
-Identifikasi konflik dan gunakan keputusan final dalam specification.
-
-Khusus pembayaran, kuota, auto-transfer, auto-delete, authorization, dan migration production: prioritaskan correctness daripada kecepatan.
+`proxy.ts` memperbarui cookie session dan menangani variasi redirect auth.
+Proxy bukan authorization bisnis. `lib/auth/session.ts` memvalidasi claims,
+profile aktif, role, dan ownership pada server. Profile aplikasi `users`
+terhubung ke `auth.users` melalui UUID Supabase; migration memasang trigger sync.
+Prisma memakai `DATABASE_URL` untuk runtime, sedangkan Prisma CLI menggunakan
+`DIRECT_URL` dari `prisma.config.ts`. Client dihasilkan ke `generated/prisma`.
+
+## Struktur folder
+
+| Lokasi | Tanggung jawab |
+|---|---|
+| `app/(auth)`, `app/auth` | Register/login/reset password, callback dan konfirmasi email dua langkah |
+| `app/dashboard`, `app/anak` | Dashboard wali dan alur pendaftaran per anak |
+| `app/admin` | Dashboard, master data, peserta/wali, form builder, CMS, pembayaran, laporan; Server Actions dalam route groups |
+| `app/api` | Route Handlers wali/admin dan webhook Midtrans |
+| `components` | UI per domain: auth, admin, calon-murid, payment, enrollment, stages, admission |
+| `lib/auth`, `lib/supabase`, `lib/env`, `lib/prisma.ts` | Auth, client layanan, validasi environment, akses database |
+| `lib/master-data`, `lib/calon-murid` | Jalur/kategori/biaya, ownership dan alokasi kuota |
+| `lib/payment`, `lib/payment-settings` | Snap/webhook, transfer manual, bukti dan rekening sekolah |
+| `lib/enrollment`, `lib/stages`, `lib/admission` | Form, CMS/assessment/pengumuman, DU dan konfirmasi WA |
+| `lib/fallback`, `lib/final-route-choice`, `lib/admin-deletion` | FIFO, pilihan kelas TCP, penghapusan dan retention |
+| `lib/reporting` | Filter, pemetaan data, CSV/XLSX dan audit ekspor |
+| `prisma` | Schema, migration SQL, seed dan verifier constraint/RLS |
+| `scripts` | Integration test, runner Phase 11, bootstrap admin/Storage |
+| `e2e` | Smoke browser mobile dan fixture staging |
+| `docs`, `public` | Requirement/checklist/wireframe dan asset statis |
+| `generated/prisma`, `.next` | Output generated/build, diabaikan Git; jangan edit manual |
+
+Domain umumnya memisahkan `service.ts`, `rules.ts`, `schemas.ts`, `http.ts`,
+`errors.ts`, dan test yang berdekatan. Reuse domain logic dari action/route;
+jangan menaruh business rule kompleks di komponen UI.
+
+## Command development dan verifikasi
+
+Setup lengkap dan pemuatan `.env.local` untuk Prisma CLI ada di [README](README.md).
+
+| Command | Fungsi |
+|---|---|
+| `npm ci` | Install sesuai lockfile; postinstall menjalankan Prisma generate |
+| `npm run dev` | Frontend dan backend Next.js di port 3000 |
+| `npm run build` / `npm start` | Generate Prisma + build; menjalankan hasil build |
+| `npm run lint` / `npm run typecheck` / `npm test` | ESLint, TypeScript, unit test |
+| `npm run test:watch` | Vitest watch |
+| `npm run check` | Lint → typecheck → unit → build |
+| `npm run prisma:validate` | Validasi schema tanpa migration |
+| `npm run prisma:format` | Memformat schema; gunakan hanya bila schema memang diubah |
+| `npm run prisma:migrate:deploy` | Menerapkan migration existing pada database target |
+| `npm run prisma:seed` | Seed development; dapat memperbarui field/config existing |
+| `npm run storage:ensure-buckets` | Membuat/memperbarui konfigurasi bucket Supabase |
+| `npm run auth:set-admin -- email@example.com` | Memberi role admin pada akun yang sudah dibuat |
+| `npm run prisma:verify-migration` | Uji database staging dengan transaksi yang di-rollback |
+| `npm run test:integration` | Runner seluruh integration, perlu build dan staging |
+| `npm run test:e2e:install` / `npm run test:e2e` | Install Chromium / smoke browser, perlu build dan staging |
+| `npm run test:phase11` | Check lokal, build, migration verification, integration dan E2E |
+
+Integration individual: `test:auth-integration`, `test:phase3-integration` sampai
+`test:phase10-integration`, `test:dynamic-payment-integration`,
+`test:final-route-choice-integration`, `test:admin-deletion-integration`.
+Runner `scripts/run-phase11.mjs` mencakup seluruh suite tersebut, menggunakan
+`127.0.0.1:3000`, dan dapat memakai server yang sudah aktif; pastikan server
+itu memakai environment staging yang sama.
+
+## Aturan penting
+
+### Auth, data dan secrets
+
+- Supabase Auth wajib; tidak boleh membuat password hashing/auth manual.
+- Validasi session, profile aktif, role, ownership dan input di server. Jangan
+  percaya `user_id`, role metadata, nominal, atau kuota terpakai dari client.
+- `SUPABASE_SECRET_KEY` (fallback `SUPABASE_SERVICE_ROLE_KEY`), database URL,
+  dan `MIDTRANS_SERVER_KEY` hanya server-side; jangan log/commit/expose ke browser.
+- Gunakan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; nama anon key pada dokumen
+  lama bukan environment yang dibaca implementasi sekarang.
+- Konfirmasi email wajib aktif. Role awal selalu wali; promosi admin eksplisit.
+- Gunakan Zod dan kontrak error domain; jangan expose internal error atau PII
+  yang tidak diperlukan. Bukti pembayaran private, akses melalui signed URL.
+
+### Pembayaran dan status gate
+
+- Nominal pendaftaran berasal dari `Jalur × Kategori → biaya_pendaftaran.nominal`.
+  Bila matrix aktif belum tersedia, jangan buat transaksi atau buka Snap.
+- Admin memilih `MIDTRANS`/`MANUAL` di `/admin/settings`; mode manual memerlukan
+  minimal satu rekening sekolah. Upload JPG/PNG/PDF maksimal **500 KB** yang valid
+  langsung `VERIFIED` dan membuka enrollment, tanpa verifikasi admin.
+- Snap token dibuat server-side. Hasil final Midtrans hanya dari webhook:
+  signature SHA-512, merchant dan nominal harus sesuai; idempotent dan
+  `midtrans_order_id` unique. Callback browser bukan bukti pembayaran.
+- `POST /api/webhooks/midtrans` tidak memerlukan session dan dikecualikan proxy.
+- Local/Preview wajib Sandbox (`MIDTRANS_IS_PRODUCTION=false`). Production
+  mengikuti gate merchant/domain/smoke test di checklist Midtrans.
+- Enrollment wajib payment `VERIFIED`; submit final memvalidasi kedua form dan
+  mengunci jawaban. Pengumuman tidak boleh membocorkan hasil sebelum tanggal
+  rilis Asia/Jakarta. DU menunggu diterima dan penyelesaian pilihan kelas bila aktif.
+- DU tetap manual: bukti maksimal **5 MB**, preview/verifikasi admin dan nominal
+  aktual dari admin. Setelah verified, admin menyediakan link WA; wali membuka
+  link lalu mengonfirmasi bergabung untuk mengubah status ke `SELESAI`.
+
+### Kuota, fallback, pilihan kelas dan penghapusan
+
+- Semua alokasi/perubahan kuota, auto-transfer, pilihan final dan reprocess FIFO
+  harus atomik melalui transaction + row locking/strategi setara. Jangan
+  mengandalkan pengecekan frontend; pertahankan constraint SQL custom.
+- TCP gagal → Reguler tersedia: langsung diterima tanpa asesmen/pembayaran ulang.
+  Jika penuh: `MENUNGGU_KUOTA_FALLBACK`, FIFO berdasarkan `created_at`.
+  Tambah kuota memicu reprocess; admin juga dapat memproses manual.
+- Pilihan final TCP diterima bersifat opsional per jalur, berlaku semua kategori.
+  Jika aktif, wali wajib memilih sekali sebelum DU. Pilih Reguler langsung
+  melepas kuota TCP; bila penuh masuk FIFO tanpa kembali menahan kuota TCP.
+- Auto-delete Reguler/Pindahan dengan `hapus_data_jika_gagal=true` memerlukan
+  konfirmasi admin dan audit snapshot sebelum delete. Hanya anak gagal itu
+  yang dihapus; akun wali dan anak lain tetap.
+- Penghapusan peserta manual admin adalah operasi terpisah. Penghapusan akun
+  wali hanya boleh setelah tidak ada anak, dengan konfirmasi eksplisit;
+  jangan mengubah auto-delete menjadi penghapusan akun otomatis.
+- Ledger pembayaran dipertahankan dengan `ON DELETE SET NULL`, UUID referensi
+  non-PII dan detail audit yang disanitasi. Hapus file bukti setelah pemeriksaan
+  hanya menghapus object/path; transaksi, nominal, status dan audit tetap ada.
+
+## Fitur yang sudah diimplementasikan
+
+Source dan suite test tersedia untuk cakupan Phase 0–11:
+
+- Fondasi schema/migration, RLS, trigger profile Auth, auth cookie, verifikasi
+  email dua langkah, reset password dan role/ownership.
+- Master jalur/kategori/kuota/periode, matrix biaya dan pendaftaran multi-anak.
+- Snap/webhook/retry, pembayaran manual dinamis, rekening sekolah, preview dan
+  penghapusan bukti dengan retention.
+- Form builder sederhana, draft Data Pribadi/Observasi dan final enrollment.
+- CMS beranda/YouTube, konten tahap, assessment/pengumuman dan tombol Calendar.
+- TCP fallback FIFO, reprocess, pilihan kelas final, auto-delete serta pengelolaan
+  penghapusan peserta/akun wali dengan audit.
+- DU manual, tautan grup dan konfirmasi wali, laporan filter dan ekspor CSV/XLSX.
+- Unit, integration staging dan smoke E2E Chromium mobile.
+
+## Sedang dikerjakan / belum terverifikasi
+
+Tidak ada task implementasi aktif yang dapat dipastikan dari working tree saat
+awal audit (bersih). Fokus lanjutan adalah **validasi kesiapan Phase 12 Production**;
+ini rekomendasi pekerjaan berikutnya, bukan klaim sedang ada deployment berjalan.
+Migration terakhir adalah `20260905100000_allow_released_tcp_queue` setelah fitur
+pilihan kelas final. Penerapan migration di staging/production, SMTP, konfigurasi
+bucket dan merchant live perlu diverifikasi pada layanan masing-masing.
+
+## Known issues dan batasan
+
+- `prisma.config.ts` memakai `dotenv/config` (default `.env`), sedangkan Next.js
+  dan banyak script memakai `.env.local`. Prisma CLI perlu environment dimuat
+  eksplisit; lihat command README. Jangan menggandakan secret ke source.
+- Seed observasi 3–10 masih placeholder. Seed tidak mengisi matrix biaya,
+  rekening, konten operasional atau akun admin; konfigurasi tersebut wajib diisi.
+  Rerun seed dapat menimpa properti field dan flag jalur existing.
+- Guard Midtrans production menolak Preview/Development bila `VERCEL_ENV` ada,
+  tetapi tidak menolak `true` bila variable itu tidak ada. Tetap gunakan false
+  di lokal; jangan menganggap guard sebagai isolasi production menyeluruh.
+- Penghapusan akun wali melibatkan PostgreSQL dan Supabase Auth secara terpisah.
+  Jika Auth gagal, akun tetap nonaktif dan penghapusan perlu dicoba kembali.
+- Verifier migration hanya menjalankan subset SQL dalam schema sementara dan
+  belum memasukkan dua migration pilihan kelas final tanggal 5 September.
+  Jangan menganggap verifier membuktikan seluruh migration sudah diterapkan;
+  cek `migrate status` dan integration final-route-choice.
+- Checklist lama masih memuat rencana production dan klaim historis yang belum
+  diverifikasi ulang. E2E hanya smoke subset; bukan seluruh perjalanan browser.
+- Audit lokal: lint, typecheck, 29 file / 132 unit test dan Next.js build lulus.
+  Dependency/Prisma Client existing dipakai; fresh install belum diuji ulang. Integration/E2E remote tidak dijalankan
+  dalam audit dokumentasi ini; tidak ada klaim seluruh MVP lolos production.
+
+## Next task (urutan yang disarankan)
+
+1. Jalankan quality gate staging lengkap pada environment terisolasi setelah
+   memastikan migration terbaru, Storage dan credential Sandbox sesuai.
+2. Selesaikan konten/form observasi, kuota/periode, matrix biaya dan rekening
+   bersama panitia; uji alur multi-anak sampai konfirmasi WA.
+3. Tinjau guard environment Midtrans ketika `VERCEL_ENV` tidak ada dan sinkronkan
+   checklist lama dengan Final Decisions; lakukan perubahan kode sebagai task terpisah.
+4. Verifikasi Phase 12: Supabase/Vercel Production terpisah, Auth/SMTP/domain,
+   merchant/webhook live, migration aman dan smoke test yang dikoordinasikan.
+
+Phase 2 tetap ditunda: notifikasi otomatis, WhatsApp API, Bendahara/Asesor,
+Midtrans DU, analytics, bulk import, multi-tenant, promo dan advanced form builder.
+
+## Workflow dan Definition of Done
+
+Understand → Plan → Implement satu perubahan → Test → Review diff → Report.
+Baca guide Next.js lokal yang relevan sebelum coding. TypeScript strict; hindari
+`any`; perubahan domain kritis wajib test (auth/ownership, race kuota, biaya,
+webhook signature/idempotency/transisi, gate, fallback/FIFO/pilihan final,
+auto-delete/retention dan multi-anak). Jalankan lint/typecheck/test relevan;
+integration/E2E hanya staging, bukan data production. Verifier migration juga
+menulis fixture dalam transaksi, sehingga bukan inspeksi database read-only.
+
+Jangan edit migration yang sudah diterapkan atau melakukan perubahan destruktif
+tanpa menjelaskan dampak. Jangan commit env/credential atau force-push tanpa
+instruksi. Review `git diff`; laporkan hasil verifikasi, keterbatasan dan risiko.
+Task selesai bila sesuai spec, authorization benar, tidak ada secret exposure,
+check relevan lulus dan migration aman bila ada. Dokumentasi status harus
+membedakan implementasi, hasil test lokal dan bukti operasi remote.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
