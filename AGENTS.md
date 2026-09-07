@@ -172,12 +172,14 @@ Source dan suite test tersedia untuk cakupan Phase 0–11:
 
 ## Sedang dikerjakan / belum terverifikasi
 
-Tidak ada task implementasi aktif yang dapat dipastikan dari working tree saat
-awal audit (bersih). Fokus lanjutan adalah **validasi kesiapan Phase 12 Production**;
-ini rekomendasi pekerjaan berikutnya, bukan klaim sedang ada deployment berjalan.
-Migration terakhir adalah `20260905100000_allow_released_tcp_queue` setelah fitur
-pilihan kelas final. Penerapan migration di staging/production, SMTP, konfigurasi
-bucket dan merchant live perlu diverifikasi pada layanan masing-masing.
+Fresh setup pada checkout baru sudah dijalankan 7 September 2026. `npm ci`,
+postinstall Prisma generate, lint, typecheck, 29 file / 132 unit test, dan build
+dengan environment contoh lulus setelah script typecheck diperbaiki agar menjalankan
+`next typegen` sebelum `tsc`. Checkout belum memiliki `.env.local`; validasi staging
+dan **kesiapan Phase 12 Production** tetap menjadi pekerjaan berikutnya. Migration
+terakhir adalah `20260905100000_allow_released_tcp_queue` setelah fitur pilihan kelas
+final. Penerapan migration di staging/production, SMTP, konfigurasi bucket dan
+merchant live perlu diverifikasi pada layanan masing-masing.
 
 ## Known issues dan batasan
 
@@ -198,9 +200,10 @@ bucket dan merchant live perlu diverifikasi pada layanan masing-masing.
   cek `migrate status` dan integration final-route-choice.
 - Checklist lama masih memuat rencana production dan klaim historis yang belum
   diverifikasi ulang. E2E hanya smoke subset; bukan seluruh perjalanan browser.
-- Audit lokal: lint, typecheck, 29 file / 132 unit test dan Next.js build lulus.
-  Dependency/Prisma Client existing dipakai; fresh install belum diuji ulang. Integration/E2E remote tidak dijalankan
-  dalam audit dokumentasi ini; tidak ada klaim seluruh MVP lolos production.
+- Audit lokal: fresh `npm ci` dan Prisma generate lulus; lint, typecheck, 29 file /
+  132 unit test dan Next.js build juga lulus. Build memakai nilai dummy dari
+  `.env.example` dan tidak membuktikan koneksi layanan. Integration/E2E remote tidak
+  dijalankan; tidak ada klaim seluruh MVP lolos production.
 
 ## Next task (urutan yang disarankan)
 

@@ -330,12 +330,17 @@ tervalidasi oleh audit ini.
 - Penghapusan akun wali yang gagal di Supabase Auth meninggalkan akun nonaktif
   agar dapat dicoba ulang; penghapusan Auth dan transaksi DB tidak atomik bersama.
 - Pada komputer audit, launcher `npm` mengarah ke npm CLI global yang hilang.
-  Ini masalah instalasi/PATH lokal; pastikan `npm --version` berfungsi pada
-  komputer baru. Pemeriksaan audit memakai CLI dependency langsung.
-- Hasil audit lokal: **lint, typecheck, 29 file / 132 unit test dan Next.js build
-  lulus**, memakai dependency/Prisma Client yang sudah terpasang. Fresh `npm ci`
-  dan postinstall generate tidak diuji ulang. Integration/E2E,
-  migration remote dan deployment tidak dijalankan pada audit dokumentasi ini.
+  Ini masalah instalasi/PATH lokal; `corepack npm` berhasil menyediakan versi
+  project tanpa mengubah instalasi npm global. Pastikan salah satu launcher bekerja
+  sebelum setup pada komputer lain.
+- `npm audit --omit=dev` melaporkan satu advisory moderate dan satu high pada
+  `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
+  PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
+  jangan menjalankan force-fix tanpa review dependency terpisah.
+- Hasil verifikasi lokal terbaru: fresh `npm ci`, postinstall Prisma generate,
+  **lint, typecheck, 29 file / 132 unit test dan Next.js build lulus**. Build memakai
+  nilai dummy `.env.example`; Integration/E2E, migration remote dan deployment belum
+  dijalankan karena `.env.local` staging belum tersedia.
 
 Pekerjaan berikutnya: quality gate staging lengkap, finalisasi konten panitia,
 peninjauan guard environment Midtrans, lalu verifikasi kesiapan Phase 12.

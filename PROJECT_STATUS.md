@@ -49,14 +49,17 @@ layanan remote atau sudah beroperasi di production.
 
 ## In-progress features / pekerjaan aktif
 
-Tidak ada implementasi fitur setengah jadi yang dapat dipastikan dari working
-tree pada awal audit. Pekerjaan sesi terakhir adalah **audit dan pembaruan
-dokumentasi**, tanpa perubahan source aplikasi.
+Fresh setup pada checkout baru sudah diselesaikan 7 September 2026. Instalasi
+menemukan bahwa `npm run typecheck` gagal pada checkout tanpa `.next` karena helper
+global `LayoutProps` belum dihasilkan. Script `typecheck` kini menjalankan
+`next typegen` sebelum `tsc --noEmit`, sesuai panduan lokal Next.js 16.
 
-- `AGENTS.md` dan `README.md` sudah diperbarui.
-- Dokumen ini menambahkan snapshot serah terima.
-- Validasi Phase 12 Production adalah pekerjaan lanjutan yang direkomendasikan;
-  tidak ada bukti deployment sedang berjalan atau sudah selesai dalam sesi ini.
+- Fresh `npm ci` dan postinstall Prisma generate berhasil.
+- Lint, typecheck, 29 file / 132 unit test, dan build dengan `.env.example` lulus.
+- `.env.local` staging belum tersedia; migration status, Integration/E2E, Storage,
+  Auth, Midtrans Sandbox, dan layanan remote belum diverifikasi.
+- Validasi Phase 12 Production tetap pekerjaan lanjutan; tidak ada bukti deployment
+  sedang berjalan atau sudah selesai.
 
 Jangan menandai fitur sebagai in-progress hanya karena sudah tercantum dalam
 roadmap. Periksa perubahan terbaru di Git dan instruksi pengguna saat melanjutkan.
@@ -65,8 +68,6 @@ roadmap. Periksa perubahan terbaru di Git dan instruksi pengguna saat melanjutka
 
 ### Untuk kesiapan MVP dan production
 
-- Fresh setup pada komputer baru: install dependency, generate Prisma Client
-  dan jalankan pemeriksaan dari checkout yang sudah disinkronkan.
 - Verifikasi migration yang benar-benar diterapkan pada staging, terutama dua
   migration pilihan kelas final TCP tanggal 5 September 2026.
 - Jalankan ulang quality gate staging lengkap, termasuk dynamic payment,
@@ -93,6 +94,7 @@ tersebut sebelum MVP selesai atau tanpa perubahan scope dari pengguna.
 | Observasi 3–10 masih placeholder pada seed | `prisma/seed.ts` | Konten perlu diselesaikan panitia; jangan mengarang pertanyaan bisnis. Seed ulang juga dapat memperbarui properti field dan flag jalur existing. |
 | Penghapusan Auth dan DB bukan satu transaksi atomik | `lib/admin-deletion/service.ts` | Jika Supabase Auth gagal, akun tetap nonaktif dan penghapusan dapat dicoba ulang. Ini jalur pemulihan yang diimplementasikan, bukan bukti kegagalan yang terjadi di production. |
 | Launcher npm pada komputer audit rusak | `npm --version` gagal menemukan npm CLI global | Masalah instalasi/PATH lokal; tidak otomatis berlaku pada komputer lain. Pastikan npm bekerja sebelum fresh setup. |
+| Audit npm menemukan advisory `mysql2` transitif Prisma CLI | `prisma@7.10.0` development dependency membawa `mysql2@3.15.3` | Aplikasi memakai PostgreSQL/`pg`, bukan MySQL. Saran otomatis adalah downgrade major Prisma 6; jangan force-fix. Tinjau pembaruan upstream sebagai task dependency terpisah. |
 | Coverage browser masih smoke subset | `e2e/mvp-critical.spec.ts` | Jangan menyamakan E2E yang tersedia dengan seluruh perjalanan browser sampai selesai. |
 | Dokumen checklist lama belum sepenuhnya sinkron | `docs/` dibanding Final Decisions | Ikuti specification terbaru; jangan mengandalkan klaim historis migration/deployment tanpa bukti remote. |
 
@@ -102,38 +104,36 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan berikut dijalankan pada sesi audit dokumentasi sebelumnya, menggunakan
-dependency dan Prisma Client yang sudah terpasang:
+Pemeriksaan berikut dijalankan pada fresh checkout 7 September 2026:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
 | Vitest | 29 file, 132 test lulus |
-| Next.js production build | Lulus |
-| Diff dokumentasi AGENTS/README | `git diff --check` lulus |
-| Fresh `npm ci` / postinstall generate | Belum diuji ulang |
-| Integration/E2E staging | Tidak dijalankan pada audit ini |
-| Migration remote / deployment / transaksi live | Tidak dijalankan atau diverifikasi pada audit ini |
+| Next.js production build | Lulus dengan nilai dummy `.env.example`; tidak membuktikan koneksi layanan |
+| Fresh `npm ci` / postinstall generate | Lulus, 653 package dan Prisma Client 7.10.0 |
+| Integration/E2E staging | Belum dijalankan; `.env.local` staging tidak tersedia |
+| Migration remote / deployment / transaksi live | Belum dijalankan atau diverifikasi |
 
-Command audit menggunakan `node node_modules/eslint/bin/eslint.js .`,
-`node node_modules/typescript/bin/tsc --noEmit`,
-`node node_modules/vitest/vitest.mjs run`, dan
-`node node_modules/next/dist/bin/next build` karena launcher npm lokal bermasalah.
-Hasil tersebut bukan klaim fresh `npm run check` atau quality gate Phase 11 lulus.
+Launcher npm global lokal masih bermasalah, sehingga setup menggunakan
+`corepack npm@11.12.1`. `npm run check` tanpa `.env.local` mencapai build lalu
+berhenti pada validasi `DATABASE_URL`/`DIRECT_URL`; build terpisah dengan nilai
+dummy `.env.example` lulus. Hasil ini bukan klaim quality gate Phase 11 staging.
 
 ## Pekerjaan terakhir dan titik lanjut untuk komputer lain
 
-### Snapshot Git saat serah terima ditulis
+### Snapshot Git saat pekerjaan dilanjutkan
 
-- HEAD: `22199cd` — `fix: allow released TCP quota queue state`.
+- HEAD: `450ef65` — `docs: update project handover context`.
+- Commit source terakhir: `22199cd` — `fix: allow released TCP quota queue state`.
 - Commit sebelumnya: `ea9a128` — `feat: add final TCP route choice`.
 - Sebelumnya lagi: `42df40e` — `fix: route password recovery to reset form`.
 - Migration terakhir: `20260905100000_allow_released_tcp_queue`, mengikuti
   `20260905090000_tcp_final_route_choice`.
-- Perubahan dokumentasi sesi ini **belum di-commit/push oleh Codex**:
-  `AGENTS.md`, `README.md`, dan file baru `PROJECT_STATUS.md`.
-- Source aplikasi, schema dan migration tidak diubah dalam pekerjaan dokumentasi.
+- Working tree berisi perbaikan script `typecheck` di `package.json` dan pembaruan
+  hasil verifikasi pada dokumentasi; perubahan ini belum di-commit/push.
+- Source domain aplikasi, schema dan migration tidak diubah.
 
 Clone/pull di komputer lain hanya membawa perubahan yang sudah dipublikasikan
 ke remote. Pastikan ketiga dokumen dipindahkan melalui commit/push yang disepakati
@@ -145,10 +145,9 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
 
 1. Baca AGENTS, README, dokumen ini dan Final Decisions; periksa `git status`
    serta `git log` agar snapshot tidak menimpa pekerjaan yang lebih baru.
-2. Pastikan Node `>=20.19 <25` dan npm 11.12.1 berfungsi. Ikuti README untuk
-   membuat `.env.local` staging, lalu `npm ci`. Jangan menampilkan secret di log.
-3. Jalankan `npm run check` untuk memvalidasi checkout/fresh dependency lokal.
-4. Pastikan kedua URL database menunjuk staging yang sama, lalu periksa status:
+2. Ikuti README untuk membuat `.env.local` menggunakan credential staging melalui
+   saluran aman. Jangan menampilkan secret di log.
+3. Pastikan kedua URL database menunjuk staging yang sama, lalu periksa status:
 
    ```bash
    node --env-file=.env.local node_modules/prisma/build/index.js migrate status
@@ -157,7 +156,7 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
    Bila ada migration tertunda, review SQL/dampaknya dan terapkan pada staging
    dalam scope pekerjaan database yang disepakati. Jangan reset, mengedit migration
    existing atau seed ulang data yang telah dikustomisasi tanpa meninjau dampak.
-5. Pastikan Auth/Storage/Sandbox staging siap dan port 3000 tidak memakai server
+4. Pastikan Auth/Storage/Sandbox staging siap dan port 3000 tidak memakai server
    dengan environment lain. Install Chromium lalu jalankan quality gate:
 
    ```bash
@@ -167,18 +166,19 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
 
    Suite ini menulis fixture staging dan meminta transaksi Snap Sandbox.
    Guard Sandbox tidak membuktikan URL Supabase adalah staging; cek target juga.
-6. Catat hasil/failure yang benar-benar direproduksi. Prioritaskan final route
+5. Catat hasil/failure yang benar-benar direproduksi. Prioritaskan final route
    choice: pilih sekali, lepas kuota TCP, antre Reguler penuh, reprocess FIFO dan
    gate DU. Lanjutkan perbaikan kode hanya dalam task implementasi yang diotorisasi.
-7. Selesaikan konfigurasi panitia dan validasi Phase 12. Perbarui snapshot ini
+6. Selesaikan konfigurasi panitia dan validasi Phase 12. Perbarui snapshot ini
    dengan tanggal, commit, hasil test dan next task setelah setiap milestone.
 
 ### Konteks singkat yang dapat diberikan ke Codex berikutnya
 
-> Lanjutkan SPMB Fila dari PROJECT_STATUS.md. Pekerjaan terakhir adalah audit dan
-> dokumentasi; source tidak diubah. Mulai dengan verifikasi checkout, fresh setup
-> dan quality gate staging, terutama pilihan kelas final TCP serta FIFO. Jangan
-> menganggap deployment/migration production sudah terverifikasi. Baca Final
+> Lanjutkan SPMB Fila dari PROJECT_STATUS.md. Fresh setup dan gate lokal sudah
+> dijalankan; script typecheck diperbaiki agar menghasilkan route types Next.js.
+> Berikutnya siapkan `.env.local` staging melalui saluran aman, verifikasi migration,
+> lalu jalankan quality gate staging terutama pilihan kelas final TCP serta FIFO.
+> Jangan menganggap deployment/migration production sudah terverifikasi. Baca Final
 > Decisions dan laporkan temuan aktual sebelum memperluas scope implementasi.
 
 ## Aturan yang tidak boleh hilang saat handoff
@@ -191,5 +191,5 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
   menunggu kuota, bukan langsung tidak diterima.
 - Auto-delete anak gagal tidak menghapus wali/anak lain; ledger pembayaran tetap.
 - Jangan mengarang requirement, membuka secret atau menjalankan fixture pada
-  production. Permintaan sesi ini hanya dokumentasi; pending task di atas tidak
-  berarti deployment, migration remote atau perubahan source sudah diotorisasi.
+  production. Pending task tidak berarti deployment, migration remote atau
+  perubahan source yang berbeda sudah diotorisasi.
