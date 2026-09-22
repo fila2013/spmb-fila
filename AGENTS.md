@@ -3,7 +3,7 @@
 ## Identitas dan sumber keputusan
 
 SPMB Fila adalah Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura.
-Audit dokumentasi: **7 September 2026**, berdasarkan source, konfigurasi, migration,
+Audit dokumentasi: **22 September 2026**, berdasarkan source, konfigurasi, migration,
 dan test repository. Status implementasi di bawah tidak membuktikan deployment
 atau migration sudah diterapkan pada database remote.
 
@@ -119,7 +119,8 @@ itu memakai environment staging yang sama.
   Bila matrix aktif belum tersedia, jangan buat transaksi atau buka Snap.
 - Admin memilih `MIDTRANS`/`MANUAL` di `/admin/settings`; mode manual memerlukan
   minimal satu rekening sekolah. Upload JPG/PNG/PDF maksimal **500 KB** yang valid
-  langsung `VERIFIED` dan membuka enrollment, tanpa verifikasi admin.
+  sebelum hold berakhir langsung `VERIFIED`, mengonfirmasi kuota dan membuka
+  enrollment, tanpa verifikasi admin.
 - Snap token dibuat server-side. Hasil final Midtrans hanya dari webhook:
   signature SHA-512, merchant dan nominal harus sesuai; idempotent dan
   `midtrans_order_id` unique. Callback browser bukan bukti pembayaran.
@@ -135,6 +136,13 @@ itu memakai environment staging yang sama.
 
 ### Kuota, fallback, pilihan kelas dan penghapusan
 
+- `kuota_terpakai` jalur/kategori hanya menghitung pembayaran pendaftaran
+  `VERIFIED`. Konfirmasi kategori membuat hold `PENDING_PAYMENT` terpisah dengan
+  default 24 jam yang dapat dikonfigurasi. Ketersediaan publik menghitung counter
+  permanen + hold aktif; hold lewat waktu langsung diabaikan walau cron belum jalan.
+- Settlement/capture Midtrans atau upload bukti manual valid mempromosikan hold
+  dan counter tepat satu kali. Deny/cancel/expire serta scheduled cleanup melepas
+  hold tanpa decrement counter permanen. Endpoint cron wajib memakai `CRON_SECRET`.
 - Semua alokasi/perubahan kuota, auto-transfer, pilihan final dan reprocess FIFO
   harus atomik melalui transaction + row locking/strategi setara. Jangan
   mengandalkan pengecekan frontend; pertahankan constraint SQL custom.
@@ -161,6 +169,8 @@ Source dan suite test tersedia untuk cakupan Phase 0–11:
 - Fondasi schema/migration, RLS, trigger profile Auth, auth cookie, verifikasi
   email dua langkah, reset password dan role/ownership.
 - Master jalur/kategori/kuota/periode, matrix biaya dan pendaftaran multi-anak.
+- Temporary hold kuota jalur/kategori dengan expiry configurable, countdown,
+  proteksi kursi terakhir, promosi saat payment verified dan cleanup terjadwal.
 - Snap/webhook/retry, pembayaran manual dinamis, rekening sekolah, preview dan
   penghapusan bukti dengan retention.
 - Form builder sederhana, draft Data Pribadi/Observasi dan final enrollment.
@@ -172,14 +182,17 @@ Source dan suite test tersedia untuk cakupan Phase 0–11:
 
 ## Sedang dikerjakan / belum terverifikasi
 
-Fresh setup pada checkout baru sudah dijalankan 7 September 2026. `npm ci`,
-postinstall Prisma generate, lint, typecheck, 29 file / 132 unit test, dan build
-dengan environment contoh lulus setelah script typecheck diperbaiki agar menjalankan
-`next typegen` sebelum `tsc`. Checkout belum memiliki `.env.local`; validasi staging
-dan **kesiapan Phase 12 Production** tetap menjadi pekerjaan berikutnya. Migration
-terakhir adalah `20260905100000_allow_released_tcp_queue` setelah fitur pilihan kelas
-final. Penerapan migration di staging/production, SMTP, konfigurasi bucket dan
-merchant live perlu diverifikasi pada layanan masing-masing.
+Fresh setup pada checkout baru sudah dijalankan 7 September 2026. Perubahan hold
+kuota ditambahkan 22 September 2026. Migration
+`20260922090000_registration_quota_holds` sudah diterapkan ke database Supabase
+yang dikonfigurasi `.env.local`; status Prisma menunjukkan 16 migration up to date,
+counter konsisten dan constraint hold aktif. `CRON_SECRET` lokal sudah valid dan
+konfigurasi Vercel dinyatakan sudah diisi oleh pemilik project. Target database
+belum dapat dibuktikan sebagai staging, sehingga integration/E2E yang menulis
+fixture belum dijalankan. Smoke endpoint cron lokal lulus (`401` tanpa secret dan
+`200` dengan Bearer secret valid). Validasi **kesiapan Phase 12 Production**, SMTP,
+bucket, deployment Vercel dan merchant live tetap perlu diverifikasi pada layanan
+masing-masing.
 
 ## Known issues dan batasan
 
@@ -200,15 +213,17 @@ merchant live perlu diverifikasi pada layanan masing-masing.
   cek `migrate status` dan integration final-route-choice.
 - Checklist lama masih memuat rencana production dan klaim historis yang belum
   diverifikasi ulang. E2E hanya smoke subset; bukan seluruh perjalanan browser.
-- Audit lokal: fresh `npm ci` dan Prisma generate lulus; lint, typecheck, 29 file /
-  132 unit test dan Next.js build juga lulus. Build memakai nilai dummy dari
-  `.env.example` dan tidak membuktikan koneksi layanan. Integration/E2E remote tidak
-  dijalankan; tidak ada klaim seluruh MVP lolos production.
+- Audit lokal perubahan hold: lint, typecheck, 30 file / 140 unit test, Prisma
+  validate dan Next.js build lulus. Build memakai nilai `.env.example` dan tidak
+  membuktikan koneksi layanan. Integration/E2E remote tidak dijalankan karena
+  target Supabase pada `.env.local` tidak memiliki penanda staging eksplisit dan
+  `CRON_SECRET` belum valid; tidak ada klaim seluruh MVP lolos production.
 
 ## Next task (urutan yang disarankan)
 
 1. Jalankan quality gate staging lengkap pada environment terisolasi setelah
-   memastikan migration terbaru, Storage dan credential Sandbox sesuai.
+   memastikan migration terbaru, Storage, `CRON_SECRET`, dan credential Sandbox
+   sesuai. Prioritaskan race hold terakhir, promosi kuota, expire/retry, dan cron.
 2. Selesaikan konten/form observasi, kuota/periode, matrix biaya dan rekening
    bersama panitia; uji alur multi-anak sampai konfirmasi WA.
 3. Tinjau guard environment Midtrans ketika `VERCEL_ENV` tidak ada dan sinkronkan

@@ -99,6 +99,15 @@ enum StatusPembayaran {
   @@map("status_pembayaran")
 }
 
+enum StatusHoldKuota {
+  PENDING_PAYMENT @map("pending_payment")
+  VERIFIED        @map("verified")
+  EXPIRED         @map("expired")
+  CANCELLED       @map("cancelled")
+
+  @@map("status_hold_kuota")
+}
+
 enum TahapKonten {
   HOME          @map("home")
   ASSESSMENT    @map("assessment")
@@ -151,10 +160,11 @@ model User {
 }
 
 model PengaturanPembayaran {
-  id          String                    @id @default("pendaftaran") @db.VarChar(30)
-  mode        ModePembayaranPendaftaran @default(MIDTRANS)
-  updatedById String?                   @map("updated_by") @db.Uuid
-  updatedAt   DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  String                    @id @default("pendaftaran") @db.VarChar(30)
+  mode                ModePembayaranPendaftaran @default(MIDTRANS)
+  holdDurationMinutes Int                       @default(1440) @map("hold_duration_minutes")
+  updatedById         String?                   @map("updated_by") @db.Uuid
+  updatedAt           DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   updatedBy User? @relation("PengaturanPembayaranUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
@@ -188,13 +198,14 @@ model Jalur {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  fallbackJalur    Jalur?             @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
-  sumberFallback   Jalur[]            @relation("JalurFallback")
+  fallbackJalur    Jalur?                 @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
+  sumberFallback   Jalur[]                @relation("JalurFallback")
   biayaPendaftaran BiayaPendaftaran[]
-  calonMuridAktif  CalonMurid[]       @relation("CalonMuridJalur")
-  calonMuridAsal   CalonMurid[]       @relation("CalonMuridJalurAsal")
-  antrianFallback  CalonMurid[]       @relation("CalonMuridMenungguFallback")
+  calonMuridAktif  CalonMurid[]           @relation("CalonMuridJalur")
+  calonMuridAsal   CalonMurid[]           @relation("CalonMuridJalurAsal")
+  antrianFallback  CalonMurid[]           @relation("CalonMuridMenungguFallback")
   kontenTahap      KontenTahap[]
+  holdKuota        HoldKuotaPendaftaran[] @relation("HoldKuotaJalur")
 
   @@index([statusAktif, periodeMulai, periodeSelesai])
   @@index([fallbackJalurId])
@@ -216,6 +227,7 @@ model KategoriPendaftar {
   biayaPendaftaran BiayaPendaftaran[]
   calonMurid       CalonMurid[]
   kontenTahap      KontenTahap[]
+  holdKuota        HoldKuotaPendaftaran[]
 
   @@index([statusAktif, periodeMulai, periodeSelesai])
   @@map("kategori_pendaftar")
@@ -254,16 +266,17 @@ model CalonMurid {
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user                  User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  jalur                 Jalur?             @relation("CalonMuridJalur", fields: [jalurId], references: [id], onDelete: Restrict)
-  kategori              KategoriPendaftar? @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
-  jalurAsal             Jalur?             @relation("CalonMuridJalurAsal", fields: [jalurAsalId], references: [id], onDelete: SetNull)
-  menungguFallbackJalur Jalur?             @relation("CalonMuridMenungguFallback", fields: [menungguFallbackJalurId], references: [id], onDelete: SetNull)
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  jalur                 Jalur?                @relation("CalonMuridJalur", fields: [jalurId], references: [id], onDelete: Restrict)
+  kategori              KategoriPendaftar?    @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
+  jalurAsal             Jalur?                @relation("CalonMuridJalurAsal", fields: [jalurAsalId], references: [id], onDelete: SetNull)
+  menungguFallbackJalur Jalur?                @relation("CalonMuridMenungguFallback", fields: [menungguFallbackJalurId], references: [id], onDelete: SetNull)
   formResponses         FormResponse[]
   pembayaran            Pembayaran[]
   hasilAssessment       HasilAssessment?
   pengumuman            Pengumuman?
   statusGrupWa          StatusGrupWa?
+  holdKuotaPendaftaran  HoldKuotaPendaftaran?
 
   @@index([userId])
   @@index([jalurId])
@@ -337,6 +350,28 @@ model Pembayaran {
   @@index([calonMuridReference])
   @@index([status, createdAt])
   @@map("pembayaran")
+}
+
+model HoldKuotaPendaftaran {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calonMuridId String          @unique @map("calon_murid_id") @db.Uuid
+  jalurId      String?         @map("jalur_id") @db.Uuid
+  kategoriId   String          @map("kategori_id") @db.Uuid
+  status       StatusHoldKuota @default(PENDING_PAYMENT)
+  expiresAt    DateTime        @map("expires_at") @db.Timestamptz(6)
+  verifiedAt   DateTime?       @map("verified_at") @db.Timestamptz(6)
+  releasedAt   DateTime?       @map("released_at") @db.Timestamptz(6)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calonMurid CalonMurid        @relation(fields: [calonMuridId], references: [id], onDelete: Cascade)
+  jalur      Jalur?            @relation("HoldKuotaJalur", fields: [jalurId], references: [id], onDelete: Restrict)
+  kategori   KategoriPendaftar @relation(fields: [kategoriId], references: [id], onDelete: Restrict)
+
+  @@index([status, expiresAt])
+  @@index([jalurId, status, expiresAt])
+  @@index([kategoriId, status, expiresAt])
+  @@map("hold_kuota_pendaftaran")
 }
 
 model KontenTahap {

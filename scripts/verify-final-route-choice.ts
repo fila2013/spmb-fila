@@ -10,6 +10,7 @@ import {
   KategoriTipe,
   PilihanJalurFinal,
   StatusAssessment,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPengumuman,
   UserRole,
@@ -116,6 +117,15 @@ async function createWaitingChoiceChild(input: {
       createdAt: new Date(input.createdAt),
       hasilAssessment: { create: { status: StatusAssessment.HADIR } },
       pengumuman: { create: { statusAkhir: StatusPengumuman.DITERIMA, tanggalRilis: new Date("2020-01-01T00:00:00.000Z") } },
+      holdKuotaPendaftaran: {
+        create: {
+          jalurId: input.routeId,
+          kategoriId: input.categoryId,
+          status: StatusHoldKuota.VERIFIED,
+          expiresAt: new Date(input.createdAt),
+          verifiedAt: new Date(input.createdAt),
+        },
+      },
     },
   });
   childIds.push(child.id);
@@ -173,6 +183,15 @@ try {
       kategoriId: categoryA.id,
       statusKeseluruhan: StatusKeseluruhan.MENUNGGU_PENGUMUMAN,
       hasilAssessment: { create: { status: StatusAssessment.HADIR } },
+      holdKuotaPendaftaran: {
+        create: {
+          jalurId: tcp.id,
+          kategoriId: categoryA.id,
+          status: StatusHoldKuota.VERIFIED,
+          expiresAt: new Date(),
+          verifiedAt: new Date(),
+        },
+      },
     },
   });
   childIds.push(releaseChild.id);

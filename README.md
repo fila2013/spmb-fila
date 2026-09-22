@@ -7,10 +7,11 @@ mendukung Midtrans Snap atau transfer manual, sedangkan DU tetap manual.
 
 ## Status project
 
-Audit repository **7 September 2026**: implementasi cakupan Phase 0–11 tersedia,
+Audit repository **22 September 2026**: implementasi cakupan Phase 0–11 tersedia,
 termasuk multi-anak, kuota/matrix biaya, enrollment, CMS, assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
-retention, serta laporan CSV/XLSX. Ketersediaan kode bukan bukti kesiapan live.
+retention, laporan CSV/XLSX, serta temporary hold kuota pembayaran. Ketersediaan
+kode bukan bukti kesiapan live.
 Status database remote, deployment, SMTP dan merchant Production belum
 diverifikasi dalam audit ini. Phase 12 Production masih memerlukan validasi.
 
@@ -95,6 +96,7 @@ tidak memuat credential. Kontrak aktual ada di `lib/env/schema.ts`.
 | `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` | Wajib sama persis dengan `MIDTRANS_CLIENT_KEY`; tersedia di browser |
 | `MIDTRANS_IS_PRODUCTION` | Isi `false` di lokal/staging; `true` hanya untuk live setelah gate Production |
 | `MIDTRANS_NOTIFICATION_URL` | Opsional: override webhook HTTPS publik, misalnya endpoint Preview untuk Sandbox |
+| `CRON_SECRET` | Server-only: secret acak minimal 16 karakter untuk autentikasi scheduled cleanup hold kuota |
 | `VERCEL_ENV` | Disediakan Vercel (`development`, `preview`, `production`); tidak perlu dipalsukan di lokal |
 | `NODE_ENV` | Dikelola Next.js/runtime; tidak perlu diisi manual |
 
@@ -113,7 +115,7 @@ perlu URL-encoding bila mengandung karakter khusus.
 Schema: `prisma/schema.prisma`; seluruh SQL incremental ada di `prisma/migrations`.
 Migration mencakup tabel domain, RLS, trigger profile Supabase Auth, retention
 pembayaran dan constraint kuota/status. Migration terakhir:
-`20260905100000_allow_released_tcp_queue`.
+`20260922090000_registration_quota_holds`.
 
 **Prisma CLI tidak otomatis membaca `.env.local`.** `prisma.config.ts` memakai
 `dotenv/config`, yang default-nya membaca `.env`. Muat file lokal secara eksplisit
@@ -148,10 +150,10 @@ memperbarui flag jalur dan properti field; jangan menjalankannya otomatis pada
 production yang sudah dikustomisasi.
 
 `npm run prisma:verify-migration` adalah pengujian constraint/RLS di staging:
-script membuat schema sementara, menerapkan subset migration dan memasukkan fixture
-dalam transaksi lalu rollback. Verifier belum mencakup migration pilihan kelas
-final TCP tanggal 5 September; gunakan integration final-route-choice dan
-`migrate status` untuk pemeriksaan terkait. Ini bukan perintah
+script membuat schema sementara, menerapkan subset migration termasuk temporary
+hold kuota dan memasukkan fixture dalam transaksi lalu rollback. Verifier belum
+mencakup migration pilihan kelas final TCP tanggal 5 September; gunakan integration
+final-route-choice dan `migrate status` untuk pemeriksaan terkait. Ini bukan perintah
 untuk menerapkan migration atau inspeksi read-only production.
 
 ## 4. Storage dan Supabase Auth
@@ -232,8 +234,16 @@ berada bersama halaman. Supabase merupakan layanan eksternal yang harus aktif.
 Sebelum mencoba pendaftaran, admin perlu mengisi kuota/periode/keaktifan,
 matrix biaya untuk kombinasi jalur-kategori, field dan konten tahap.
 Mode manual memerlukan minimal satu rekening; upload valid maksimal 500 KB
-langsung memverifikasi pendaftaran. DU berbeda: upload maksimal 5 MB tetap
+sebelum timer habis langsung memverifikasi pembayaran dan mengonfirmasi kuota.
+DU berbeda: upload maksimal 5 MB tetap
 menunggu pemeriksaan admin dan nominal aktual.
+
+Pemilihan jalur tidak memakai kuota permanen. Setelah kategori dikonfirmasi,
+sistem membuat hold sementara dengan durasi dari `/admin/settings` (default
+24 jam). Ketersediaan publik menghitung `kuota_terpakai + hold aktif`; pembayaran
+Midtrans berhasil atau upload manual mempromosikan hold menjadi permanen secara
+atomik. Hold expire/cancel langsung diabaikan dari ketersediaan dan peserta dapat
+mencoba lagi.
 
 Untuk Snap, gunakan key/merchant Sandbox dan `MIDTRANS_IS_PRODUCTION=false`.
 Webhook berada di `POST /api/webhooks/midtrans`. Midtrans membutuhkan URL HTTPS
@@ -241,6 +251,14 @@ publik; localhost tidak menerima notifikasi internet secara langsung. Gunakan
 Preview staging dan atur Payment Notification URL di dashboard atau
 `MIDTRANS_NOTIFICATION_URL`. Callback browser tidak menentukan status final.
 Lihat [checklist Sandbox](docs/MIDTRANS_SANDBOX_CHECKLIST.md).
+
+Vercel Cron pada `vercel.json` memanggil
+`GET /api/cron/expire-registration-holds` setiap hari dan mengirim
+`Authorization: Bearer <CRON_SECRET>`. Jadwal harian kompatibel dengan Vercel
+Hobby. Cleanup mengubah hold expired menjadi `expired`, menolak transaksi
+pendaftaran yang masih pending, mengembalikan tahap peserta ke pilih jalur, dan
+mencatat audit. Karena query ketersediaan selalu memakai `expires_at > now()`,
+kursi kembali tersedia tepat setelah expiry tanpa menunggu cron harian.
 
 ## 6. Test dan pemeriksaan kualitas
 
@@ -337,10 +355,13 @@ tervalidasi oleh audit ini.
   `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
   PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
   jangan menjalankan force-fix tanpa review dependency terpisah.
-- Hasil verifikasi lokal terbaru: fresh `npm ci`, postinstall Prisma generate,
-  **lint, typecheck, 29 file / 132 unit test dan Next.js build lulus**. Build memakai
-  nilai dummy `.env.example`; Integration/E2E, migration remote dan deployment belum
-  dijalankan karena `.env.local` staging belum tersedia.
+- Hasil verifikasi terbaru: fresh `npm ci`, postinstall Prisma generate,
+  **lint, typecheck, 30 file / 140 unit test, Prisma validate dan Next.js build
+  lulus**. Migration hold diterapkan pada 22 September 2026 ke database yang
+  dikonfigurasi `.env.local` dan status Prisma menunjukkan 16 migration up to date.
+  `CRON_SECRET` lokal sudah valid dan smoke cron menghasilkan `401` tanpa secret
+  serta `200` dengan Bearer secret yang benar. Integration/E2E belum dijalankan
+  karena target database tersebut belum memiliki penanda staging eksplisit.
 
 Pekerjaan berikutnya: quality gate staging lengkap, finalisasi konten panitia,
 peninjauan guard environment Midtrans, lalu verifikasi kesiapan Phase 12.

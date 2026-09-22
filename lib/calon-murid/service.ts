@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
-import { StatusKeseluruhan } from "@/generated/prisma/enums";
+import {
+  StatusHoldKuota,
+  StatusKeseluruhan,
+} from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
 import {
@@ -16,6 +19,12 @@ import type {
   SelectKategoriInput,
 } from "@/lib/calon-murid/schemas";
 import { prisma } from "@/lib/prisma";
+import {
+  activeCategoryHoldCounts,
+  activeRouteHoldCounts,
+  countActiveRouteHoldsInTransaction,
+  reserveRegistrationQuotaInTransaction,
+} from "@/lib/quota-hold/service";
 
 type Transaction = Prisma.TransactionClient;
 
@@ -79,36 +88,6 @@ async function lockCategories(
   }
 }
 
-async function decrementRoute(transaction: Transaction, id: string | null) {
-  if (!id) return;
-  const result = await transaction.jalur.updateMany({
-    where: { id, kuotaTerpakai: { gt: 0 } },
-    data: { kuotaTerpakai: { decrement: 1 } },
-  });
-  if (result.count !== 1) {
-    throw new CalonMuridError(
-      "INTEGRITY_ERROR",
-      "Data kuota jalur tidak konsisten.",
-      409,
-    );
-  }
-}
-
-async function decrementCategory(transaction: Transaction, id: string | null) {
-  if (!id) return;
-  const result = await transaction.kategoriPendaftar.updateMany({
-    where: { id, kuotaTerpakai: { gt: 0 } },
-    data: { kuotaTerpakai: { decrement: 1 } },
-  });
-  if (result.count !== 1) {
-    throw new CalonMuridError(
-      "INTEGRITY_ERROR",
-      "Data kuota kategori tidak konsisten.",
-      409,
-    );
-  }
-}
-
 async function assertSelectionMutable(
   transaction: Transaction,
   child: { id: string; statusKeseluruhan: StatusKeseluruhan },
@@ -118,10 +97,14 @@ async function assertSelectionMutable(
     child.statusKeseluruhan ===
     StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR
   ) {
-    const paymentExists = await transaction.pembayaran.count({
-      where: { calonMuridReference: child.id },
+    const activeHold = await transaction.holdKuotaPendaftaran.count({
+      where: {
+        calonMuridId: child.id,
+        status: StatusHoldKuota.PENDING_PAYMENT,
+        expiresAt: { gt: new Date() },
+      },
     });
-    if (paymentExists === 0) return;
+    if (activeHold === 0) return;
   }
   throw new CalonMuridError(
     "INVALID_STAGE",
@@ -197,7 +180,11 @@ export async function createCalonMuridWithJalur(
     if (!route) {
       throw new CalonMuridError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
     }
-    assertSelectionAvailable(route);
+    const activeHolds = await countActiveRouteHoldsInTransaction(
+      transaction,
+      route.id,
+    );
+    assertSelectionAvailable({ ...route, kuotaDitahan: activeHolds });
 
     const child = await transaction.calonMurid.create({
       data: {
@@ -205,10 +192,6 @@ export async function createCalonMuridWithJalur(
         namaAnak: input.namaAnak,
         jalurId: input.jalurId,
       },
-    });
-    await transaction.jalur.update({
-      where: { id: route.id },
-      data: { kuotaTerpakai: { increment: 1 } },
     });
     await transaction.auditLog.create({
       data: {
@@ -240,7 +223,13 @@ export async function selectJalur(
     if (!route) {
       throw new CalonMuridError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
     }
-    assertSelectionAvailable(route);
+    const activeHolds = await countActiveRouteHoldsInTransaction(
+      transaction,
+      route.id,
+      new Date(),
+      previous.id,
+    );
+    assertSelectionAvailable({ ...route, kuotaDitahan: activeHolds });
 
     if (previous.kategoriId) {
       const fee = await activeFee(
@@ -257,11 +246,6 @@ export async function selectJalur(
       }
     }
 
-    await decrementRoute(transaction, previous.jalurId);
-    await transaction.jalur.update({
-      where: { id: route.id },
-      data: { kuotaTerpakai: { increment: 1 } },
-    });
     const child = await transaction.calonMurid.update({
       where: { id },
       data: { jalurId: route.id },
@@ -298,6 +282,7 @@ export async function selectKategori(
       );
     }
 
+    await lockRoutes(transaction, [previous.jalurId]);
     await lockCategories(transaction, [previous.kategoriId, input.kategoriId]);
     const category = await transaction.kategoriPendaftar.findUnique({
       where: { id: input.kategoriId },
@@ -305,9 +290,14 @@ export async function selectKategori(
     if (!category) {
       throw new CalonMuridError("NOT_FOUND", "Kategori tidak ditemukan.", 404);
     }
-    if (previous.kategoriId !== category.id) {
-      assertSelectionAvailable(category);
+    const route = await transaction.jalur.findUnique({
+      where: { id: previous.jalurId },
+    });
+    if (!route) {
+      throw new CalonMuridError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
     }
+    assertSelectionAvailable({ ...route, kuotaMaks: null });
+    assertSelectionAvailable({ ...category, kuotaMaks: null });
     const subCategory = normalizedSubKategori(category.tipe, input);
     const fee = await activeFee(transaction, previous.jalurId, category.id);
     if (!fee) {
@@ -318,13 +308,6 @@ export async function selectKategori(
       );
     }
 
-    if (previous.kategoriId !== category.id) {
-      await decrementCategory(transaction, previous.kategoriId);
-      await transaction.kategoriPendaftar.update({
-        where: { id: category.id },
-        data: { kuotaTerpakai: { increment: 1 } },
-      });
-    }
     const child = await transaction.calonMurid.update({
       where: { id },
       data: {
@@ -334,6 +317,15 @@ export async function selectKategori(
           StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR,
       },
     });
+    await reserveRegistrationQuotaInTransaction(
+      transaction,
+      {
+        id: child.id,
+        jalurId: previous.jalurId,
+        kategoriId: category.id,
+      },
+      userId,
+    );
     await transaction.auditLog.create({
       data: {
         actorId: userId,
@@ -353,29 +345,43 @@ export async function selectKategori(
 }
 
 export async function listSelectableJalur() {
-  const routes = await prisma.jalur.findMany({
-    orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
-  });
+  const [routes, holdCounts] = await Promise.all([
+    prisma.jalur.findMany({
+      orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
+    }),
+    activeRouteHoldCounts(),
+  ]);
   return routes.map((route) => ({
     ...route,
-    availability: selectionAvailability(route),
+    kuotaDitahan: holdCounts.get(route.id) ?? 0,
+    availability: selectionAvailability({
+      ...route,
+      kuotaDitahan: holdCounts.get(route.id) ?? 0,
+    }),
   }));
 }
 
 export async function listSelectableKategori(jalurId: string) {
-  const categories = await prisma.kategoriPendaftar.findMany({
-    include: {
-      biayaPendaftaran: {
-        where: { jalurId, statusAktif: true },
-        take: 1,
+  const [categories, holdCounts] = await Promise.all([
+    prisma.kategoriPendaftar.findMany({
+      include: {
+        biayaPendaftaran: {
+          where: { jalurId, statusAktif: true },
+          take: 1,
+        },
       },
-    },
-    orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
-  });
+      orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
+    }),
+    activeCategoryHoldCounts(),
+  ]);
   return categories.map((category) => ({
     ...category,
+    kuotaDitahan: holdCounts.get(category.id) ?? 0,
     fee: category.biayaPendaftaran[0] ?? null,
-    availability: selectionAvailability(category),
+    availability: selectionAvailability({
+      ...category,
+      kuotaDitahan: holdCounts.get(category.id) ?? 0,
+    }),
   }));
 }
 

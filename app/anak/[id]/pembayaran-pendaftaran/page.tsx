@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { SnapPaymentPanel } from "@/components/payment/snap-payment-panel";
 import { ManualRegistrationPaymentPanel } from "@/components/payment/manual-registration-payment-panel";
+import { QuotaHoldCountdown } from "@/components/payment/quota-hold-countdown";
 import {
   ModePembayaranPendaftaran,
   MetodePembayaran,
@@ -50,9 +51,12 @@ export default async function PaymentPreparationPage({
     throw error;
   }
 
-  const { child, payment, nominal, mode, bankAccounts } = summary;
+  const { child, payment, nominal, mode, bankAccounts, hold, holdActive } = summary;
   if (payment?.status === StatusPembayaran.VERIFIED) {
     redirect(paymentReturnUrl(child.id, "verified"));
+  }
+  if (!hold || !holdActive) {
+    redirect(`/anak/${child.id}/kategori?hold=expired`);
   }
   const subCategory = child.subKategoriEnum
     ? child.subKategoriEnum === "TKIT_FI_1"
@@ -101,6 +105,10 @@ export default async function PaymentPreparationPage({
             <p className="mt-1 text-3xl font-bold text-emerald-950">{rupiah(nominal)}</p>
             <p className="mt-2 text-xs leading-5 text-slate-600">Nominal diambil langsung oleh server dari matriks biaya aktif.</p>
           </div>
+          <QuotaHoldCountdown
+            childId={child.id}
+            expiresAt={hold.expiresAt.toISOString()}
+          />
           {midtrans && urls ? (
             <SnapPaymentPanel
               childId={child.id}

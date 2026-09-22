@@ -11,6 +11,7 @@ import {
   KategoriTipe,
   MetodePembayaran,
   StatusAssessment,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPembayaran,
   UserRole,
@@ -123,6 +124,15 @@ async function createSelectionChild(input: {
       menungguFallbackJalurId: input.waitingTargetId,
       createdAt: new Date(input.createdAt),
       hasilAssessment: { create: { status: StatusAssessment.HADIR } },
+      holdKuotaPendaftaran: {
+        create: {
+          jalurId: input.jalurId,
+          kategoriId: input.kategoriId,
+          status: StatusHoldKuota.VERIFIED,
+          expiresAt: new Date(input.createdAt),
+          verifiedAt: new Date(input.createdAt),
+        },
+      },
       ...(input.waitingTargetId ? { pengumuman: { create: { tanggalRilis: new Date("2020-01-01T00:00:00.000Z") } } } : {}),
     },
   });
@@ -201,7 +211,7 @@ try {
   ]);
   if (secondAfterAuto.statusKeseluruhan !== StatusKeseluruhan.DITERIMA || thirdAfterAuto.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK) throw new Error("Penambahan kuota tidak memproses FIFO tepat satu peserta.");
 
-  await prisma.jalur.update({ where: { id: regular.id }, data: { kuotaTerpakai: { decrement: 1 } } });
+  await prisma.jalur.update({ where: { id: regular.id }, data: { kuotaMaks: 3 } });
   const manual = await api(`/api/admin/jalur/${regular.id}/proses-ulang-antrian`, admin.cookie, { method: "POST", body: "{}" });
   if (manual.response.status !== 200 || manual.body.data?.processed !== 1) throw new Error("Proses ulang manual gagal.");
   const thirdAfterManual = await prisma.calonMurid.findUniqueOrThrow({ where: { id: third.id } });

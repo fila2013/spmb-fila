@@ -17,6 +17,12 @@ import {
   assertQuotaCanBeSet,
 } from "@/lib/master-data/rules";
 import { prisma } from "@/lib/prisma";
+import {
+  activeCategoryHoldCounts,
+  activeRouteHoldCounts,
+  countActiveCategoryHoldsInTransaction,
+  countActiveRouteHoldsInTransaction,
+} from "@/lib/quota-hold/service";
 
 function isoDate(value: Date | null) {
   return value?.toISOString().slice(0, 10) ?? null;
@@ -75,11 +81,18 @@ async function assertFallbackExists(fallbackJalurId: string | null) {
   }
 }
 
-export function listJalur() {
-  return prisma.jalur.findMany({
-    orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
-    include: { fallbackJalur: { select: { id: true, nama: true } } },
-  });
+export async function listJalur() {
+  const [routes, holdCounts] = await Promise.all([
+    prisma.jalur.findMany({
+      orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
+      include: { fallbackJalur: { select: { id: true, nama: true } } },
+    }),
+    activeRouteHoldCounts(),
+  ]);
+  return routes.map((route) => ({
+    ...route,
+    kuotaDitahan: holdCounts.get(route.id) ?? 0,
+  }));
 }
 
 export async function createJalur(input: CreateJalurInput, actorId: string) {
@@ -119,7 +132,15 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
       if (!previous) {
         throw new MasterDataError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
       }
-      assertQuotaCanBeSet(input.kuotaMaks, previous.kuotaTerpakai);
+      const activeHolds = await countActiveRouteHoldsInTransaction(
+        transaction,
+        previous.id,
+      );
+      assertQuotaCanBeSet(
+        input.kuotaMaks,
+        previous.kuotaTerpakai,
+        activeHolds,
+      );
       if (
         previous.pilihanJalurFinalAktif &&
         (!input.pilihanJalurFinalAktif ||
@@ -194,10 +215,17 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
   }
 }
 
-export function listKategori() {
-  return prisma.kategoriPendaftar.findMany({
-    orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
-  });
+export async function listKategori() {
+  const [categories, holdCounts] = await Promise.all([
+    prisma.kategoriPendaftar.findMany({
+      orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
+    }),
+    activeCategoryHoldCounts(),
+  ]);
+  return categories.map((category) => ({
+    ...category,
+    kuotaDitahan: holdCounts.get(category.id) ?? 0,
+  }));
 }
 
 export async function createKategori(
@@ -238,7 +266,16 @@ export async function updateKategori(
       if (!previous) {
         throw new MasterDataError("NOT_FOUND", "Kategori tidak ditemukan.", 404);
       }
-      assertQuotaCanBeSet(input.kuotaMaks, previous.kuotaTerpakai);
+      const activeHolds = await countActiveCategoryHoldsInTransaction(
+        transaction,
+        previous.id,
+        new Date(),
+      );
+      assertQuotaCanBeSet(
+        input.kuotaMaks,
+        previous.kuotaTerpakai,
+        activeHolds,
+      );
       if (input.tipe !== previous.tipe) {
         const usage = await transaction.calonMurid.count({
           where: { kategoriId: input.id },

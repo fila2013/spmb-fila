@@ -22,7 +22,13 @@ function Notice({ state }: { state: MasterDataActionState }) {
   );
 }
 
-export function PaymentModeForm({ mode }: { mode: ModePembayaranPendaftaran }) {
+export function PaymentModeForm({
+  mode,
+  holdDurationMinutes,
+}: {
+  mode: ModePembayaranPendaftaran;
+  holdDurationMinutes: number;
+}) {
   const [state, action, pending] = useActionState(
     updatePaymentModeAction,
     initialMasterDataActionState,
@@ -41,6 +47,22 @@ export function PaymentModeForm({ mode }: { mode: ModePembayaranPendaftaran }) {
           </label>
         ))}
       </fieldset>
+      <label className="text-sm font-semibold text-slate-800">
+        Durasi hold kuota pembayaran (menit)
+        <input
+          name="holdDurationMinutes"
+          type="number"
+          min={5}
+          max={10080}
+          step={1}
+          required
+          defaultValue={holdDurationMinutes}
+          className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal"
+        />
+        <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
+          Default 1440 menit (24 jam). Rentang 5 menit sampai 7 hari.
+        </span>
+      </label>
       <Notice state={state} />
       <button disabled={pending} className="rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60">{pending ? "Menyimpan…" : "Simpan mode pembayaran"}</button>
     </form>

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import {
+  StatusHoldKuota,
   StatusKeseluruhan,
   UserRole,
 } from "@/generated/prisma/enums";
@@ -139,6 +140,14 @@ export async function deleteParticipant(
           hasilAssessment: { select: { status: true } },
           pengumuman: { select: { statusAkhir: true } },
           statusGrupWa: { select: { status: true } },
+          holdKuotaPendaftaran: {
+            select: {
+              status: true,
+              jalurId: true,
+              kategoriId: true,
+              expiresAt: true,
+            },
+          },
         },
       });
       if (!participant) {
@@ -150,8 +159,14 @@ export async function deleteParticipant(
       }
       assertDeletionConfirmed(participant.namaAnak, input.confirmation);
 
-      await lockRoute(transaction, participant.jalurId);
-      await lockCategory(transaction, participant.kategoriId);
+      await lockRoute(
+        transaction,
+        participant.holdKuotaPendaftaran?.jalurId ?? participant.jalurId,
+      );
+      await lockCategory(
+        transaction,
+        participant.holdKuotaPendaftaran?.kategoriId ?? participant.kategoriId,
+      );
 
       const payments = await transaction.pembayaran.findMany({
         where: { calonMuridId: participant.id },
@@ -187,6 +202,7 @@ export async function deleteParticipant(
               assessmentStatus: participant.hasilAssessment?.status ?? null,
               announcementStatus: participant.pengumuman?.statusAkhir ?? null,
               whatsappStatus: participant.statusGrupWa?.status ?? null,
+              quotaHold: participant.holdKuotaPendaftaran,
               formResponseCount,
               payments,
               createdAt: participant.createdAt,
@@ -202,15 +218,29 @@ export async function deleteParticipant(
         },
       });
 
-      await decrementRoute(transaction, participant.jalurId);
-      await decrementCategory(transaction, participant.kategoriId);
+      const verifiedHold =
+        participant.holdKuotaPendaftaran?.status ===
+        StatusHoldKuota.VERIFIED;
+      if (verifiedHold) {
+        await decrementRoute(
+          transaction,
+          participant.holdKuotaPendaftaran?.jalurId ?? null,
+        );
+        await decrementCategory(
+          transaction,
+          participant.holdKuotaPendaftaran?.kategoriId ?? null,
+        );
+      }
       await transaction.calonMurid.delete({ where: { id: participant.id } });
 
       let fallbackReprocessed = 0;
-      if (participant.jalurId) {
+      const releasedRouteId = verifiedHold
+        ? participant.holdKuotaPendaftaran?.jalurId
+        : null;
+      if (releasedRouteId) {
         const waitingCount = await transaction.calonMurid.count({
           where: {
-            menungguFallbackJalurId: participant.jalurId,
+            menungguFallbackJalurId: releasedRouteId,
             statusKeseluruhan:
               StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,
           },
@@ -218,7 +248,7 @@ export async function deleteParticipant(
         if (waitingCount > 0) {
           const result = await reprocessFallbackQueueInTransaction(
             transaction,
-            participant.jalurId,
+            releasedRouteId,
             actorId,
             "AUTO_REPROCESS",
           );

@@ -9,6 +9,8 @@ import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
 import { availabilityLabel } from "@/lib/calon-murid/rules";
 import { getOwnedCalonMurid, listSelectableKategori } from "@/lib/calon-murid/service";
+import { getRegistrationQuotaHold } from "@/lib/quota-hold/service";
+import { isActivePendingHold, remainingQuota } from "@/lib/quota-hold/rules";
 
 export const metadata: Metadata = { title: "Pilih kategori pendaftar" };
 
@@ -16,7 +18,13 @@ function rupiah(value: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 }
 
-export default async function SelectCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SelectCategoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ hold?: string }>;
+}) {
   const user = await requireWaliPage();
   const { id } = await params;
   let child;
@@ -27,8 +35,23 @@ export default async function SelectCategoryPage({ params }: { params: Promise<{
     throw error;
   }
 
-  if (child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR) redirect(`/anak/${child.id}/pembayaran-pendaftaran`);
-  if (child.statusKeseluruhan !== StatusKeseluruhan.PILIH_JALUR || !child.jalurId) redirect("/dashboard");
+  const hold = await getRegistrationQuotaHold(child.id);
+  if (
+    child.statusKeseluruhan ===
+      StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR &&
+    isActivePendingHold(hold)
+  ) {
+    redirect(`/anak/${child.id}/pembayaran-pendaftaran`);
+  }
+  if (
+    (child.statusKeseluruhan !== StatusKeseluruhan.PILIH_JALUR &&
+      child.statusKeseluruhan !==
+        StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR) ||
+    !child.jalurId
+  ) {
+    redirect("/dashboard");
+  }
+  const query = await searchParams;
 
   const categories = (await listSelectableKategori(child.jalurId)).map((category) => ({
     id: category.id,
@@ -36,7 +59,7 @@ export default async function SelectCategoryPage({ params }: { params: Promise<{
     tipe: category.tipe,
     available: category.availability.available,
     availabilityLabel: availabilityLabel(category.availability),
-    quotaLabel: category.kuotaMaks === null ? "Tanpa batas kuota" : `${Math.max(category.kuotaMaks - category.kuotaTerpakai, 0)} kursi tersisa`,
+    quotaLabel: category.kuotaMaks === null ? "Tanpa batas kuota" : `${remainingQuota(category)} kursi tersisa`,
     feeConfigured: Boolean(category.fee),
     feeLabel: category.fee ? rupiah(category.fee.nominal) : null,
   }));
@@ -48,6 +71,11 @@ export default async function SelectCategoryPage({ params }: { params: Promise<{
         <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-700">Langkah 2 dari 2</p>
         <h1 className="mt-2 text-3xl font-bold text-emerald-950">Pilih kategori {child.namaAnak}</h1>
         <p className="mt-3 leading-7 text-slate-600">Jalur <strong>{child.jalur?.nama}</strong>. Nominal ditentukan dari matriks biaya resmi dan tidak dapat diisi manual.</p>
+        {query.hold === "expired" ? (
+          <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            Hold pembayaran sebelumnya telah berakhir. Pilih kategori dan lanjutkan kembali untuk mencoba memperoleh kuota baru.
+          </p>
+        ) : null}
         <div className="mt-7"><SelectCategoryForm childId={child.id} categories={categories} /></div>
       </div>
     </div>

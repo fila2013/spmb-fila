@@ -130,12 +130,7 @@ export function resolvePaymentTransition(
 ) {
   if (!incoming) return current;
   if (current === StatusPembayaran.REJECTED) return current;
-  if (
-    current === StatusPembayaran.VERIFIED &&
-    incoming === StatusPembayaran.PENDING
-  ) {
-    return current;
-  }
+  if (current === StatusPembayaran.VERIFIED) return current;
   return incoming;
 }
 

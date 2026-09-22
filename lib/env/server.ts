@@ -1,6 +1,8 @@
 import "server-only";
 
 import {
+  cronEnvironmentSchema,
+  type CronEnvironment,
   databaseEnvironmentSchema,
   type DatabaseEnvironment,
   midtransEnvironmentSchema,
@@ -15,6 +17,15 @@ let cachedEnvironment: ServerEnvironment | undefined;
 let cachedSupabaseAdminEnvironment: SupabaseAdminEnvironment | undefined;
 let cachedDatabaseEnvironment: DatabaseEnvironment | undefined;
 let cachedMidtransEnvironment: MidtransEnvironment | undefined;
+let cachedCronEnvironment: CronEnvironment | undefined;
+
+export function getCronEnvironment(): CronEnvironment {
+  cachedCronEnvironment ??= cronEnvironmentSchema.parse({
+    CRON_SECRET: process.env.CRON_SECRET,
+  });
+
+  return cachedCronEnvironment;
+}
 
 export function getDatabaseEnvironment(): DatabaseEnvironment {
   cachedDatabaseEnvironment ??= databaseEnvironmentSchema.parse({

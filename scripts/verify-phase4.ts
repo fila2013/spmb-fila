@@ -5,15 +5,24 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 import { PrismaClient } from "../generated/prisma/client";
-import { KategoriTipe, StatusKeseluruhan } from "../generated/prisma/enums";
+import {
+  JenisPembayaran,
+  KategoriTipe,
+  MetodePembayaran,
+  StatusHoldKuota,
+  StatusKeseluruhan,
+  StatusPembayaran,
+} from "../generated/prisma/enums";
+import { CRITICAL_QUOTA_HOLD_MESSAGE } from "../lib/quota-hold/rules";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 const databaseUrl = process.env.DATABASE_URL;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const cronSecret = process.env.CRON_SECRET;
 
-if (!supabaseUrl || !publishableKey || !secretKey || !databaseUrl) {
+if (!supabaseUrl || !publishableKey || !secretKey || !databaseUrl || !cronSecret) {
   throw new Error("Environment integration test Phase 4 belum lengkap.");
 }
 
@@ -31,6 +40,8 @@ const childIds: string[] = [];
 const routeIds: string[] = [];
 const categoryIds: string[] = [];
 const feeIds: string[] = [];
+const paymentIds: string[] = [];
+const holdIds: string[] = [];
 
 async function sessionCookie(accessToken: string, refreshToken: string) {
   const cookies = new Map<string, string>();
@@ -67,7 +78,7 @@ async function api(path: string, cookie: string, init?: RequestInit) {
   });
   let body: unknown;
   try { body = await response.json(); } catch { body = null; }
-  return { response, body: body as { data?: { id?: string } | Array<{ id: string; userId: string }>; error?: unknown } };
+  return { response, body: body as { data?: { id?: string } | Array<{ id: string; userId: string }>; error?: { code?: string; message?: string } } };
 }
 
 async function createDraft(cookie: string, name: string, maliciousUserId?: string) {
@@ -86,7 +97,7 @@ try {
   const [waliA, waliB] = await Promise.all([createWali("a"), createWali("b")]);
 
   const routeRace = await prisma.jalur.create({ data: { nama: `Race Jalur ${marker}`, kuotaMaks: 1 } });
-  const routeCategory = await prisma.jalur.create({ data: { nama: `Kategori Jalur ${marker}`, kuotaMaks: 2 } });
+  const routeCategory = await prisma.jalur.create({ data: { nama: `Kategori Jalur ${marker}`, kuotaMaks: 1 } });
   routeIds.push(routeRace.id, routeCategory.id);
   const category = await prisma.kategoriPendaftar.create({ data: { nama: `Race Kategori ${marker}`, tipe: KategoriTipe.EKSTERNAL, kuotaMaks: 1 } });
   const noFeeCategory = await prisma.kategoriPendaftar.create({ data: { nama: `Tanpa Biaya ${marker}`, tipe: KategoriTipe.EKSTERNAL, kuotaMaks: 1 } });
@@ -101,9 +112,9 @@ try {
     api(`/api/calon-murid/${raceB}/jalur`, waliB.cookie, { method: "PATCH", body: JSON.stringify({ jalurId: routeRace.id }) }),
   ]);
   const routeStatuses = routeResults.map(({ response }) => response.status).sort();
-  if (routeStatuses.join(",") !== "200,409") throw new Error(`Race kuota jalur tidak aman: ${routeStatuses.join(",")}`);
+  if (routeStatuses.join(",") !== "200,200") throw new Error(`Pemilihan jalur memakai kuota sebelum pembayaran: ${routeStatuses.join(",")}`);
   const routeAfter = await prisma.jalur.findUniqueOrThrow({ where: { id: routeRace.id } });
-  if (routeAfter.kuotaTerpakai !== 1) throw new Error("Counter jalur melewati kuota.");
+  if (routeAfter.kuotaTerpakai !== 0) throw new Error("Pemilihan jalur mengubah kuota terpakai sebelum pembayaran verified.");
 
   const categoryA = await createDraft(waliA.cookie, "Anak Kategori A", waliB.profile.id);
   const categoryB = await createDraft(waliA.cookie, "Anak Kategori B");
@@ -118,7 +129,24 @@ try {
   const categoryStatuses = categoryResults.map(({ response }) => response.status).sort();
   if (categoryStatuses.join(",") !== "200,409") throw new Error(`Race kuota kategori tidak aman: ${categoryStatuses.join(",")}`);
   const categoryAfter = await prisma.kategoriPendaftar.findUniqueOrThrow({ where: { id: category.id } });
-  if (categoryAfter.kuotaTerpakai !== 1) throw new Error("Counter kategori melewati kuota.");
+  if (categoryAfter.kuotaTerpakai !== 0) throw new Error("Hold kategori mengubah kuota terpakai sebelum pembayaran verified.");
+
+  const winningCategoryChild = categoryResults[0].response.status === 200 ? categoryA : categoryB;
+  const losingResult = categoryResults[0].response.status === 409 ? categoryResults[0] : categoryResults[1];
+  if (losingResult.body.error?.message !== CRITICAL_QUOTA_HOLD_MESSAGE) {
+    throw new Error("Peserta kedua tidak menerima peringatan hold kuota terakhir yang diwajibkan.");
+  }
+  const activeHold = await prisma.holdKuotaPendaftaran.findUniqueOrThrow({ where: { calonMuridId: winningCategoryChild } });
+  holdIds.push(activeHold.id);
+  if (activeHold.status !== StatusHoldKuota.PENDING_PAYMENT || activeHold.expiresAt <= new Date()) {
+    throw new Error("Hold pembayaran pemenang race tidak aktif.");
+  }
+  const routeAfterHold = await prisma.jalur.findUniqueOrThrow({ where: { id: routeCategory.id } });
+  if (routeAfterHold.kuotaTerpakai !== 0) throw new Error("Hold jalur tercatat sebagai kuota permanen.");
+  const blockedAtRoute = await api(`/api/calon-murid/${raceA}/jalur`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ jalurId: routeCategory.id }) });
+  if (blockedAtRoute.response.status !== 409 || blockedAtRoute.body.error?.message !== CRITICAL_QUOTA_HOLD_MESSAGE) {
+    throw new Error("Hold kuota terakhir tidak memblokir peserta baru pada pilihan jalur.");
+  }
 
   const losingCategoryChild = categoryResults[0].response.status === 409 ? categoryA : categoryB;
   const feeMissing = await api(`/api/calon-murid/${losingCategoryChild}/kategori`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ kategoriId: noFeeCategory.id, subKategoriText: "TK Uji" }) });
@@ -137,10 +165,67 @@ try {
   const completed = await prisma.calonMurid.count({ where: { id: { in: [categoryA, categoryB] }, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR } });
   if (completed !== 1) throw new Error("Transisi status kategori tidak tepat.");
 
+  const cronChild = await prisma.calonMurid.create({
+    data: {
+      userId: waliA.profile.id,
+      namaAnak: `Anak Cron ${marker}`,
+      jalurId: routeRace.id,
+      kategoriId: category.id,
+      subKategoriText: "TK Cron",
+      statusKeseluruhan: StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR,
+    },
+  });
+  childIds.push(cronChild.id);
+  const expiredHold = await prisma.holdKuotaPendaftaran.create({
+    data: {
+      calonMuridId: cronChild.id,
+      jalurId: routeRace.id,
+      kategoriId: category.id,
+      status: StatusHoldKuota.PENDING_PAYMENT,
+      expiresAt: new Date(Date.now() - 60_000),
+    },
+  });
+  holdIds.push(expiredHold.id);
+  const expiredPayment = await prisma.pembayaran.create({
+    data: {
+      calonMuridId: cronChild.id,
+      calonMuridReference: cronChild.id,
+      jenis: JenisPembayaran.PENDAFTARAN,
+      metodePembayaran: MetodePembayaran.MIDTRANS,
+      nominal: fee.nominal,
+      status: StatusPembayaran.PENDING,
+    },
+  });
+  paymentIds.push(expiredPayment.id);
+  const unauthorizedCron = await fetch(`${appUrl}/api/cron/expire-registration-holds`);
+  if (unauthorizedCron.status !== 401) throw new Error("Endpoint cron tidak dilindungi CRON_SECRET.");
+  const cron = await fetch(`${appUrl}/api/cron/expire-registration-holds`, {
+    headers: { authorization: `Bearer ${cronSecret}` },
+  });
+  if (!cron.ok) throw new Error(`Cleanup hold terjadwal gagal: ${cron.status}.`);
+  const [cleanedHold, cleanedPayment, cleanedChild] = await Promise.all([
+    prisma.holdKuotaPendaftaran.findUniqueOrThrow({ where: { id: expiredHold.id } }),
+    prisma.pembayaran.findUniqueOrThrow({ where: { id: expiredPayment.id } }),
+    prisma.calonMurid.findUniqueOrThrow({ where: { id: cronChild.id } }),
+  ]);
+  if (
+    cleanedHold.status !== StatusHoldKuota.EXPIRED ||
+    cleanedPayment.status !== StatusPembayaran.REJECTED ||
+    cleanedChild.statusKeseluruhan !== StatusKeseluruhan.PILIH_JALUR
+  ) {
+    throw new Error("Cleanup terjadwal tidak melepas hold, transaksi, dan tahap peserta secara konsisten.");
+  }
+
   console.log("Phase 4 integration: OK");
 } finally {
+  const auditEntityIds = [...childIds, ...paymentIds, ...holdIds];
+  if (auditEntityIds.length) {
+    await prisma.auditLog.deleteMany({ where: { entityId: { in: auditEntityIds } } });
+  }
+  if (paymentIds.length) {
+    await prisma.pembayaran.deleteMany({ where: { id: { in: paymentIds } } });
+  }
   if (childIds.length) {
-    await prisma.auditLog.deleteMany({ where: { entityId: { in: childIds } } });
     await prisma.calonMurid.deleteMany({ where: { id: { in: childIds } } });
   }
   if (feeIds.length) await prisma.biayaPendaftaran.deleteMany({ where: { id: { in: feeIds } } });

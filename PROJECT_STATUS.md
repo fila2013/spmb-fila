@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 7 September 2026  
+**Tanggal snapshot:** 22 September 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -36,8 +36,8 @@ layanan remote atau sudah beroperasi di production.
 | Fondasi database | Schema dan migration incremental, RLS, constraint kuota/status, trigger sinkronisasi profile Supabase Auth, audit log dan retention pembayaran |
 | Auth | Register/login, konfirmasi email dua langkah, reset password, cookie session, profile aktif, role admin/wali dan ownership |
 | Master data | Jalur/kategori, periode/keaktifan, kuota, matrix biaya Jalur × Kategori |
-| Pendaftaran | Satu akun banyak anak, pemilihan jalur/kategori dan alokasi kuota atomik |
-| Pembayaran pendaftaran | Snap token server-side, webhook signature/merchant/nominal, idempotency dan retry; mode transfer manual, rekening sekolah, preview/penghapusan bukti |
+| Pendaftaran | Satu akun banyak anak; pemilihan jalur tanpa pemakaian kuota permanen; hold jalur/kategori atomik dengan expiry configurable dan proteksi kursi terakhir |
+| Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
 | Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final dan gate payment verified |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, tanggal rilis dan tombol Google Calendar |
 | Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
@@ -49,17 +49,30 @@ layanan remote atau sudah beroperasi di production.
 
 ## In-progress features / pekerjaan aktif
 
-Fresh setup pada checkout baru sudah diselesaikan 7 September 2026. Instalasi
-menemukan bahwa `npm run typecheck` gagal pada checkout tanpa `.next` karena helper
-global `LayoutProps` belum dihasilkan. Script `typecheck` kini menjalankan
-`next typegen` sebelum `tsc --noEmit`, sesuai panduan lokal Next.js 16.
+Regulasi temporary hold kuota diimplementasikan 22 September 2026:
 
-- Fresh `npm ci` dan postinstall Prisma generate berhasil.
-- Lint, typecheck, 29 file / 132 unit test, dan build dengan `.env.example` lulus.
-- `.env.local` staging belum tersedia; migration status, Integration/E2E, Storage,
-  Auth, Midtrans Sandbox, dan layanan remote belum diverifikasi.
-- Validasi Phase 12 Production tetap pekerjaan lanjutan; tidak ada bukti deployment
-  sedang berjalan atau sudah selesai.
+- Migration baru `20260922090000_registration_quota_holds` menambah ledger hold,
+  status `pending_payment/verified/expired/cancelled`, dan durasi default 1440 menit.
+- Counter `kuota_terpakai` sekarang hanya permanen setelah pembayaran pendaftaran
+  `VERIFIED`; hold aktif dihitung terpisah dan hold expired langsung diabaikan.
+- Settlement/capture Midtrans dan upload manual valid mempromosikan hold secara
+  atomik; expire/cancel serta cron melepaskannya. Countdown dan pesan kursi terakhir
+  tersedia di UI, durasi dapat diubah Admin.
+- Vercel Cron harian dan endpoint Bearer `CRON_SECRET` tersedia untuk cleanup.
+  Secret lokal terdeteksi valid pada 22 September 2026; konfigurasi Vercel
+  dinyatakan sudah diisi oleh pemilik project, tetapi belum dapat dibaca dari
+  checkout lokal yang tidak terhubung ke project Vercel CLI.
+- Migration `20260922090000_registration_quota_holds` diterapkan ke database
+  Supabase yang dikonfigurasi di `.env.local` pada 22 September 2026. Pemeriksaan
+  sesudah deploy menunjukkan 16 migration up to date, 3 hold pending, 52 hold
+  verified, nol mismatch counter jalur/kategori, dan kedua constraint baru aktif.
+- Lint, typecheck, 30 file / 140 unit test, Prisma validate, dan build lulus.
+  Smoke endpoint cron lokal juga lulus: request tanpa secret ditolak `401`,
+  sedangkan Bearer secret yang valid menerima `200` dan cleanup sukses.
+  Integration/E2E staging belum dijalankan karena target `.env.local` masih tidak
+  memiliki penanda staging eksplisit sehingga tidak aman menerima fixture.
+- Validasi Phase 12 Production dan deployment aplikasi Vercel tetap pekerjaan
+  lanjutan; penerapan migration database tidak membuktikan build sudah terdeploy.
 
 Jangan menandai fitur sebagai in-progress hanya karena sudah tercantum dalam
 roadmap. Periksa perubahan terbaru di Git dan instruksi pengguna saat melanjutkan.
@@ -68,8 +81,8 @@ roadmap. Periksa perubahan terbaru di Git dan instruksi pengguna saat melanjutka
 
 ### Untuk kesiapan MVP dan production
 
-- Verifikasi migration yang benar-benar diterapkan pada staging, terutama dua
-  migration pilihan kelas final TCP tanggal 5 September 2026.
+- Verifikasi bahwa target Supabase/Vercel yang digunakan memang environment yang
+  dimaksud; migration hold sudah diterapkan pada database dari `.env.local`.
 - Jalankan ulang quality gate staging lengkap, termasuk dynamic payment,
   final-route-choice, admin-deletion dan E2E.
 - Finalisasi pertanyaan Observasi 3–10 bersama panitia; lengkapi kuota/periode,
@@ -90,7 +103,8 @@ tersebut sebelum MVP selesai atau tanpa perubahan scope dari pengguna.
 |---|---|---|
 | Guard Midtrans menerima production saat `VERCEL_ENV` tidak ada | `lib/env/schema.ts` | Potensi salah konfigurasi lokal; selalu gunakan `MIDTRANS_IS_PRODUCTION=false` untuk lokal/staging. Tinjau guard dan tambah regression test dalam task kode tersendiri. |
 | Prisma CLI tidak otomatis membaca `.env.local` | `prisma.config.ts` menggunakan `dotenv/config` | Command migration dapat kehilangan `DIRECT_URL`; muat environment eksplisit sesuai README. Ini perbedaan konfigurasi, bukan bukti database rusak. |
-| Verifier migration belum mencakup dua migration TCP terbaru | `prisma/verify-migration.mjs` | Hasil verifier tidak membuktikan semua migration terpasang; cek `migrate status` dan integration final-route-choice. Verifier membuat schema/fixture sementara lalu rollback. |
+| Verifier migration belum mencakup dua migration TCP tanggal 5 September | `prisma/verify-migration.mjs` | Verifier kini mencakup hold kuota, tetapi belum membuktikan pilihan final; cek `migrate status` dan integration final-route-choice. Verifier membuat schema/fixture sementara lalu rollback. |
+| Target `.env.local` belum dapat dibuktikan staging | Pemeriksaan indikator environment 22 September 2026 | `CRON_SECRET` lokal sudah valid, tetapi Integration/E2E sengaja tidak dijalankan agar fixture tidak berisiko menyentuh production; beri penanda staging eksplisit sebelum gate remote. |
 | Observasi 3–10 masih placeholder pada seed | `prisma/seed.ts` | Konten perlu diselesaikan panitia; jangan mengarang pertanyaan bisnis. Seed ulang juga dapat memperbarui properti field dan flag jalur existing. |
 | Penghapusan Auth dan DB bukan satu transaksi atomik | `lib/admin-deletion/service.ts` | Jika Supabase Auth gagal, akun tetap nonaktif dan penghapusan dapat dicoba ulang. Ini jalur pemulihan yang diimplementasikan, bukan bukti kegagalan yang terjadi di production. |
 | Launcher npm pada komputer audit rusak | `npm --version` gagal menemukan npm CLI global | Masalah instalasi/PATH lokal; tidak otomatis berlaku pada komputer lain. Pastikan npm bekerja sebelum fresh setup. |
@@ -104,17 +118,20 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan berikut dijalankan pada fresh checkout 7 September 2026:
+Pemeriksaan terbaru dijalankan 22 September 2026 untuk perubahan hold kuota:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
-| Vitest | 29 file, 132 test lulus |
-| Next.js production build | Lulus dengan nilai dummy `.env.example`; tidak membuktikan koneksi layanan |
-| Fresh `npm ci` / postinstall generate | Lulus, 653 package dan Prisma Client 7.10.0 |
-| Integration/E2E staging | Belum dijalankan; `.env.local` staging tidak tersedia |
-| Migration remote / deployment / transaksi live | Belum dijalankan atau diverifikasi |
+| Vitest | 30 file, 140 test lulus |
+| Prisma schema validate | Lulus dengan environment contoh |
+| Next.js production build | Lulus dengan `.env.local`; route cron ikut terbangun |
+| Smoke cron lokal | Lulus; unauthorized `401`, authorized `200`, tidak ada hold expired saat pemeriksaan |
+| Fresh `npm ci` / postinstall generate | Hasil audit 7 September tetap lulus, 653 package dan Prisma Client 7.10.0 |
+| Integration/E2E staging | Belum dijalankan; target `.env.local` tidak dapat dibuktikan staging |
+| Migration database terkonfigurasi | Lulus; 16 migration up to date, counter konsisten, constraint hold aktif |
+| Deployment aplikasi / transaksi live | Belum diverifikasi dari checkout lokal |
 
 Launcher npm global lokal masih bermasalah, sehingga setup menggunakan
 `corepack npm@11.12.1`. `npm run check` tanpa `.env.local` mencapai build lalu
@@ -125,15 +142,15 @@ dummy `.env.example` lulus. Hasil ini bukan klaim quality gate Phase 11 staging.
 
 ### Snapshot Git saat pekerjaan dilanjutkan
 
-- HEAD: `450ef65` — `docs: update project handover context`.
+- HEAD: `3a63e57` — `fix: resolve Next.js layoutprops typegen on fresh setup fix`.
 - Commit source terakhir: `22199cd` — `fix: allow released TCP quota queue state`.
 - Commit sebelumnya: `ea9a128` — `feat: add final TCP route choice`.
 - Sebelumnya lagi: `42df40e` — `fix: route password recovery to reset form`.
-- Migration terakhir: `20260905100000_allow_released_tcp_queue`, mengikuti
-  `20260905090000_tcp_final_route_choice`.
-- Working tree berisi perbaikan script `typecheck` di `package.json` dan pembaruan
-  hasil verifikasi pada dokumentasi; perubahan ini belum di-commit/push.
-- Source domain aplikasi, schema dan migration tidak diubah.
+- Migration terbaru `20260922090000_registration_quota_holds` sudah diterapkan
+  ke database yang dikonfigurasi `.env.local`, mengikuti migration pilihan kelas
+  final tanggal 5 September.
+- Working tree berisi implementasi regulasi hold kuota, cron, UI, test integration
+  yang diselaraskan, serta dokumentasi; perubahan ini belum di-commit/push.
 
 Clone/pull di komputer lain hanya membawa perubahan yang sudah dipublikasikan
 ke remote. Pastikan ketiga dokumen dipindahkan melalui commit/push yang disepakati
@@ -145,8 +162,8 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
 
 1. Baca AGENTS, README, dokumen ini dan Final Decisions; periksa `git status`
    serta `git log` agar snapshot tidak menimpa pekerjaan yang lebih baru.
-2. Ikuti README untuk membuat `.env.local` menggunakan credential staging melalui
-   saluran aman. Jangan menampilkan secret di log.
+2. Pastikan `.env.local` benar-benar menunjuk staging melalui penanda/config tim.
+   `CRON_SECRET` sudah terisi; jangan menampilkan nilainya.
 3. Pastikan kedua URL database menunjuk staging yang sama, lalu periksa status:
 
    ```bash
@@ -166,29 +183,30 @@ ke Git; isi credential melalui saluran aman. Tidak perlu memindahkan `node_modul
 
    Suite ini menulis fixture staging dan meminta transaksi Snap Sandbox.
    Guard Sandbox tidak membuktikan URL Supabase adalah staging; cek target juga.
-5. Catat hasil/failure yang benar-benar direproduksi. Prioritaskan final route
-   choice: pilih sekali, lepas kuota TCP, antre Reguler penuh, reprocess FIFO dan
-   gate DU. Lanjutkan perbaikan kode hanya dalam task implementasi yang diotorisasi.
+5. Catat hasil/failure yang benar-benar direproduksi. Prioritaskan race kursi
+   terakhir, promosi Midtrans/manual, expire + retry, endpoint cron, lalu regresi
+   final route choice/FIFO dan gate DU.
 6. Selesaikan konfigurasi panitia dan validasi Phase 12. Perbarui snapshot ini
    dengan tanggal, commit, hasil test dan next task setelah setiap milestone.
 
 ### Konteks singkat yang dapat diberikan ke Codex berikutnya
 
-> Lanjutkan SPMB Fila dari PROJECT_STATUS.md. Fresh setup dan gate lokal sudah
-> dijalankan; script typecheck diperbaiki agar menghasilkan route types Next.js.
-> Berikutnya siapkan `.env.local` staging melalui saluran aman, verifikasi migration,
-> lalu jalankan quality gate staging terutama pilihan kelas final TCP serta FIFO.
-> Jangan menganggap deployment/migration production sudah terverifikasi. Baca Final
-> Decisions dan laporkan temuan aktual sebelum memperluas scope implementasi.
+> Lanjutkan SPMB Fila dari PROJECT_STATUS.md. Regulasi temporary hold kuota sudah
+> diimplementasikan dan gate lokal lulus. Berikutnya buktikan `.env.local` adalah
+> staging, pastikan konfigurasi `CRON_SECRET`, lalu jalankan
+> quality gate staging terutama race hold, webhook/upload, expiry/cron, pilihan
+> final TCP dan FIFO. Jangan menganggap deployment production sudah terverifikasi.
 
 ## Aturan yang tidak boleh hilang saat handoff
 
 - Nominal pendaftaran dari matrix database; upload manual valid maksimal 500 KB
-  langsung verified. DU maksimal 5 MB tetap perlu verifikasi/nominal aktual admin.
+  sebelum expiry langsung verified. DU maksimal 5 MB tetap perlu verifikasi/nominal
+  aktual admin.
 - Final pembayaran Midtrans dari webhook tervalidasi dan idempotent, bukan callback.
 - Session, role, ownership dan gate tahap divalidasi server-side.
-- Kuota, fallback FIFO dan pilihan final harus atomik; Reguler penuh berarti
-  menunggu kuota, bukan langsung tidak diterima.
+- Kuota permanen hanya bertambah saat pembayaran verified; pending menggunakan hold
+  expiry terpisah. Kuota, fallback FIFO dan pilihan final harus atomik; Reguler
+  penuh berarti menunggu kuota, bukan langsung tidak diterima.
 - Auto-delete anak gagal tidak menghapus wali/anak lain; ledger pembayaran tetap.
 - Jangan mengarang requirement, membuka secret atau menjalankan fixture pada
   production. Pending task tidak berarti deployment, migration remote atau

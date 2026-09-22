@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import {
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPengumuman,
 } from "@/generated/prisma/enums";
@@ -11,6 +12,7 @@ import {
   hasQuotaCapacity,
 } from "@/lib/fallback/rules";
 import { prisma } from "@/lib/prisma";
+import { countActiveRouteHoldsInTransaction } from "@/lib/quota-hold/service";
 
 export type Transaction = Prisma.TransactionClient;
 export type FallbackEffect =
@@ -28,8 +30,14 @@ async function lockRoute(transaction: Transaction, id: string) {
 function fallbackAvailability(route: {
   kuotaMaks: number | null;
   kuotaTerpakai: number;
+  kuotaDitahan?: number;
 }) {
-  return { available: hasQuotaCapacity(route) };
+  return {
+    available: hasQuotaCapacity({
+      kuotaMaks: route.kuotaMaks,
+      kuotaTerpakai: route.kuotaTerpakai + (route.kuotaDitahan ?? 0),
+    }),
+  };
 }
 
 async function transferWaitingChild(
@@ -44,6 +52,19 @@ async function transferWaitingChild(
   actorId: string | null,
   source: "ANNOUNCEMENT" | "AUTO_REPROCESS" | "MANUAL_REPROCESS",
 ) {
+  if (child.jalurId && child.jalurId !== targetJalurId) {
+    const released = await transaction.jalur.updateMany({
+      where: { id: child.jalurId, kuotaTerpakai: { gt: 0 } },
+      data: { kuotaTerpakai: { decrement: 1 } },
+    });
+    if (released.count !== 1) {
+      throw new FallbackError(
+        "INTEGRITY_ERROR",
+        "Kuota jalur asal tidak konsisten; pemindahan dibatalkan.",
+        409,
+      );
+    }
+  }
   await transaction.jalur.update({
     where: { id: targetJalurId },
     data: { kuotaTerpakai: { increment: 1 } },
@@ -56,6 +77,10 @@ async function transferWaitingChild(
       menungguFallbackJalurId: null,
       statusKeseluruhan: StatusKeseluruhan.DITERIMA,
     },
+  });
+  await transaction.holdKuotaPendaftaran.updateMany({
+    where: { calonMuridId: child.id, status: StatusHoldKuota.VERIFIED },
+    data: { jalurId: targetJalurId },
   });
   await transaction.pengumuman.update({
     where: { calonMuridId: child.id },
@@ -130,9 +155,14 @@ async function autoDeleteChild(
     );
   }
   assertDeletionConfirmed(child.namaAnak, confirmation);
-  await lockRoute(transaction, child.jalur.id);
+  await lockRoute(
+    transaction,
+    child.holdKuotaPendaftaran?.jalurId ?? child.jalur.id,
+  );
   await transaction.$queryRaw`
-    SELECT id FROM "kategori_pendaftar" WHERE id = ${child.kategoriId}::uuid FOR UPDATE
+    SELECT id FROM "kategori_pendaftar"
+    WHERE id = ${child.holdKuotaPendaftaran?.kategoriId ?? child.kategoriId}::uuid
+    FOR UPDATE
   `;
 
   const payments = await transaction.pembayaran.findMany({
@@ -177,6 +207,7 @@ async function autoDeleteChild(
           statusKeseluruhan: child.statusKeseluruhan,
           assessmentStatus: child.hasilAssessment?.status ?? null,
           announcementStatus: child.pengumuman?.statusAkhir ?? null,
+          quotaHold: child.holdKuotaPendaftaran,
           formResponseCount,
           payments,
         },
@@ -191,20 +222,28 @@ async function autoDeleteChild(
     },
   });
 
-  const routeQuota = await transaction.jalur.updateMany({
-    where: { id: child.jalur.id, kuotaTerpakai: { gt: 0 } },
-    data: { kuotaTerpakai: { decrement: 1 } },
-  });
-  const categoryQuota = await transaction.kategoriPendaftar.updateMany({
-    where: { id: child.kategoriId, kuotaTerpakai: { gt: 0 } },
-    data: { kuotaTerpakai: { decrement: 1 } },
-  });
-  if (routeQuota.count !== 1 || categoryQuota.count !== 1) {
-    throw new FallbackError(
-      "INTEGRITY_ERROR",
-      "Kuota jalur atau kategori tidak konsisten; penghapusan dibatalkan.",
-      409,
-    );
+  if (child.holdKuotaPendaftaran?.status === StatusHoldKuota.VERIFIED) {
+    const routeQuota = await transaction.jalur.updateMany({
+      where: {
+        id: child.holdKuotaPendaftaran.jalurId ?? child.jalur.id,
+        kuotaTerpakai: { gt: 0 },
+      },
+      data: { kuotaTerpakai: { decrement: 1 } },
+    });
+    const categoryQuota = await transaction.kategoriPendaftar.updateMany({
+      where: {
+        id: child.holdKuotaPendaftaran.kategoriId,
+        kuotaTerpakai: { gt: 0 },
+      },
+      data: { kuotaTerpakai: { decrement: 1 } },
+    });
+    if (routeQuota.count !== 1 || categoryQuota.count !== 1) {
+      throw new FallbackError(
+        "INTEGRITY_ERROR",
+        "Kuota jalur atau kategori tidak konsisten; penghapusan dibatalkan.",
+        409,
+      );
+    }
   }
   await transaction.calonMurid.delete({ where: { id: child.id } });
 }
@@ -217,6 +256,14 @@ function deletionCandidate(transaction: Transaction, childId: string) {
       kategori: { select: { id: true, nama: true } },
       hasilAssessment: { select: { status: true } },
       pengumuman: { select: { statusAkhir: true } },
+      holdKuotaPendaftaran: {
+        select: {
+          status: true,
+          jalurId: true,
+          kategoriId: true,
+          expiresAt: true,
+        },
+      },
     },
   });
 }
@@ -244,7 +291,14 @@ export async function handleRejectedDecisionInTransaction(
         409,
       );
     }
-    const availability = fallbackAvailability(target);
+    const activeHolds = await countActiveRouteHoldsInTransaction(
+      transaction,
+      target.id,
+    );
+    const availability = fallbackAvailability({
+      ...target,
+      kuotaDitahan: activeHolds,
+    });
     if (!availability.available) {
       await queueChild(
         transaction,
@@ -313,12 +367,16 @@ export async function reprocessFallbackQueueInTransaction(
   await lockRoute(transaction, jalurId);
   const route = await transaction.jalur.findUnique({ where: { id: jalurId } });
   if (!route) throw new FallbackError("NOT_FOUND", "Jalur tidak ditemukan.", 404);
+  const activeHolds = await countActiveRouteHoldsInTransaction(
+    transaction,
+    jalurId,
+  );
 
   let stoppedReason: "EMPTY" | "FULL" | "CLOSED" = "EMPTY";
   let processed = 0;
   while (hasQuotaCapacity({
     kuotaMaks: route.kuotaMaks,
-    kuotaTerpakai: route.kuotaTerpakai + processed,
+    kuotaTerpakai: route.kuotaTerpakai + activeHolds + processed,
   })) {
     const candidateRows = await transaction.$queryRaw<Array<{ id: string }>>`
         SELECT id
@@ -352,7 +410,7 @@ export async function reprocessFallbackQueueInTransaction(
   }
   if (!hasQuotaCapacity({
     kuotaMaks: route.kuotaMaks,
-    kuotaTerpakai: route.kuotaTerpakai + processed,
+    kuotaTerpakai: route.kuotaTerpakai + activeHolds + processed,
   })) stoppedReason = "FULL";
 
   const remaining = await transaction.calonMurid.count({

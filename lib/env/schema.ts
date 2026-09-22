@@ -73,6 +73,10 @@ export const appEnvironmentSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url(),
 });
 
+export const cronEnvironmentSchema = z.object({
+  CRON_SECRET: z.string().min(16, "CRON_SECRET minimal 16 karakter."),
+});
+
 export const databaseEnvironmentSchema = z.object({
   DATABASE_URL: postgresUrlSchema,
   DIRECT_URL: postgresUrlSchema,
@@ -144,5 +148,6 @@ export type SupabaseAdminEnvironment = z.infer<
 >;
 export type AppEnvironment = z.infer<typeof appEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseEnvironmentSchema>;
+export type CronEnvironment = z.infer<typeof cronEnvironmentSchema>;
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 export type MidtransEnvironment = z.infer<typeof midtransEnvironmentSchema>;

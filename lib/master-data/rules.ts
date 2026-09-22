@@ -3,11 +3,12 @@ import { MasterDataError } from "@/lib/master-data/errors";
 export function assertQuotaCanBeSet(
   quotaMaks: number | null,
   kuotaTerpakai: number,
+  kuotaDitahan = 0,
 ) {
-  if (quotaMaks !== null && quotaMaks < kuotaTerpakai) {
+  if (quotaMaks !== null && quotaMaks < kuotaTerpakai + kuotaDitahan) {
     throw new MasterDataError(
       "QUOTA_BELOW_USAGE",
-      "Kuota maksimum tidak boleh lebih kecil dari kuota terpakai.",
+      "Kuota maksimum tidak boleh lebih kecil dari total kuota terverifikasi dan hold pembayaran aktif.",
       422,
     );
   }
@@ -25,4 +26,3 @@ export function assertFallbackIsNotSelf(
     );
   }
 }
-

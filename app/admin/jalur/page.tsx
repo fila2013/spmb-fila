@@ -34,7 +34,7 @@ export default async function JalurPage() {
           return (
           <article key={item.id} className="rounded-2xl border border-emerald-950/10 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><h2 className="text-xl font-bold text-emerald-950">{item.nama}</h2><p className="mt-1 text-sm text-slate-600">Kuota {item.kuotaTerpakai} / {item.kuotaMaks ?? "tanpa batas"}</p></div>
+              <div><h2 className="text-xl font-bold text-emerald-950">{item.nama}</h2><p className="mt-1 text-sm text-slate-600">Terverifikasi {item.kuotaTerpakai} · Hold aktif {item.kuotaDitahan} · Maksimum {item.kuotaMaks ?? "tanpa batas"}</p></div>
               <span className={`rounded-full px-3 py-1 text-xs font-bold ${item.statusAktif ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{item.statusAktif ? "Aktif" : "Nonaktif"}</span>
             </div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

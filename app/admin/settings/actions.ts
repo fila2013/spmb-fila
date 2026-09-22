@@ -55,7 +55,10 @@ export async function updatePaymentModeAction(
 ): Promise<MasterDataActionState> {
   try {
     const admin = await requireRole(UserRole.ADMIN);
-    const input = paymentModeSchema.parse({ mode: formData.get("mode") });
+    const input = paymentModeSchema.parse({
+      mode: formData.get("mode"),
+      holdDurationMinutes: formData.get("holdDurationMinutes"),
+    });
     await updatePaymentMode(input, admin.userId);
     refreshSettings();
     return { status: "success", message: "Mode pembayaran berhasil diperbarui." };

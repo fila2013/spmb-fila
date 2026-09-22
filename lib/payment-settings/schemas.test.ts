@@ -14,6 +14,27 @@ describe("payment settings schemas", () => {
     expect(paymentModeSchema.safeParse({ mode: "CASH" }).success).toBe(false);
   });
 
+  it("membatasi durasi hold antara 5 menit dan 7 hari", () => {
+    expect(
+      paymentModeSchema.parse({
+        mode: "MIDTRANS",
+        holdDurationMinutes: "1440",
+      }).holdDurationMinutes,
+    ).toBe(1440);
+    expect(
+      paymentModeSchema.safeParse({
+        mode: "MIDTRANS",
+        holdDurationMinutes: 4,
+      }).success,
+    ).toBe(false);
+    expect(
+      paymentModeSchema.safeParse({
+        mode: "MIDTRANS",
+        holdDurationMinutes: 10081,
+      }).success,
+    ).toBe(false);
+  });
+
   it("menormalisasi nomor rekening dan menolak karakter lain", () => {
     expect(createBankAccountSchema.parse({
       namaBank: "BSI",

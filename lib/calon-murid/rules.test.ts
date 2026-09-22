@@ -33,6 +33,15 @@ describe("selectionAvailability", () => {
     expect(selectionAvailability({ ...base, kuotaMaks: 1, kuotaTerpakai: 1 }, "2026-08-29").reason).toBe("FULL");
   });
 
+  it("membedakan kuota terakhir yang sedang di-hold", () => {
+    expect(
+      selectionAvailability(
+        { ...base, kuotaMaks: 1, kuotaTerpakai: 0, kuotaDitahan: 1 },
+        "2026-08-29",
+      ).reason,
+    ).toBe("HELD");
+  });
+
   it("memperlakukan batas periode secara inklusif dan null sebagai tak terbatas", () => {
     expect(selectionAvailability({ ...base, periodeMulai: new Date("2026-08-29"), periodeSelesai: new Date("2026-08-29") }, "2026-08-29").available).toBe(true);
     expect(selectionAvailability({ ...base, kuotaMaks: null, kuotaTerpakai: 999 }, "2026-08-29").available).toBe(true);

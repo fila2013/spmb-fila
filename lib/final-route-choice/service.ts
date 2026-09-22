@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import {
   PilihanJalurFinal,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPengumuman,
 } from "@/generated/prisma/enums";
@@ -12,6 +13,7 @@ import { hasQuotaCapacity } from "@/lib/fallback/rules";
 import type { FinalRouteChoiceInput } from "@/lib/final-route-choice/schemas";
 import { isAnnouncementReleased } from "@/lib/stages/rules";
 import { prisma } from "@/lib/prisma";
+import { countActiveRouteHoldsInTransaction } from "@/lib/quota-hold/service";
 
 type Transaction = Prisma.TransactionClient;
 
@@ -191,7 +193,14 @@ export function chooseFinalRoute(
           404,
         );
       }
-      const targetAvailable = hasQuotaCapacity(target);
+      const activeTargetHolds = await countActiveRouteHoldsInTransaction(
+        transaction,
+        targetRouteId,
+      );
+      const targetAvailable = hasQuotaCapacity({
+        kuotaMaks: target.kuotaMaks,
+        kuotaTerpakai: target.kuotaTerpakai + activeTargetHolds,
+      });
       if (targetAvailable) {
         await transaction.jalur.update({
           where: { id: targetRouteId },
@@ -211,6 +220,13 @@ export function chooseFinalRoute(
           pilihanJalurFinalAt: now,
           statusKeseluruhan: nextStatus,
         },
+      });
+      await transaction.holdKuotaPendaftaran.updateMany({
+        where: {
+          calonMuridId: childId,
+          status: StatusHoldKuota.VERIFIED,
+        },
+        data: { jalurId: targetAvailable ? targetRouteId : null },
       });
       await transaction.auditLog.create({
         data: {

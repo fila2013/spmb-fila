@@ -11,6 +11,7 @@ import {
   JenisPembayaran,
   MetodePembayaran,
   ModePembayaranPendaftaran,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPembayaran,
   UserRole,
@@ -138,6 +139,49 @@ try {
     statusKeseluruhan: StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR,
   } });
   childIds.push(child.id);
+  await prisma.holdKuotaPendaftaran.create({
+    data: {
+      calonMuridId: child.id,
+      jalurId: route.id,
+      kategoriId: category.id,
+      status: StatusHoldKuota.PENDING_PAYMENT,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const expiredManualChild = await prisma.calonMurid.create({ data: {
+    userId: wali.profile.id,
+    namaAnak: `Anak Manual Expired ${marker}`,
+    jalurId: route.id,
+    kategoriId: category.id,
+    subKategoriText: "TK Uji",
+    statusKeseluruhan: StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR,
+    holdKuotaPendaftaran: { create: {
+      jalurId: route.id,
+      kategoriId: category.id,
+      status: StatusHoldKuota.PENDING_PAYMENT,
+      expiresAt: new Date(Date.now() - 60_000),
+    } },
+  } });
+  childIds.push(expiredManualChild.id);
+  const expiredProof = new FormData();
+  expiredProof.set("bukti", validPng());
+  const expiredUpload = await api(`/api/calon-murid/${expiredManualChild.id}/pembayaran/manual`, { method: "POST", body: expiredProof }, wali.cookie);
+  const expiredError = expiredUpload.body?.error as { code?: string } | undefined;
+  const [expiredPaymentCount, routeBeforeValidUpload, categoryBeforeValidUpload] = await Promise.all([
+    prisma.pembayaran.count({ where: { calonMuridReference: expiredManualChild.id } }),
+    prisma.jalur.findUniqueOrThrow({ where: { id: route.id } }),
+    prisma.kategoriPendaftar.findUniqueOrThrow({ where: { id: category.id } }),
+  ]);
+  if (
+    expiredUpload.response.status !== 409 ||
+    expiredError?.code !== "HOLD_EXPIRED" ||
+    expiredPaymentCount !== 0 ||
+    routeBeforeValidUpload.kuotaTerpakai !== 0 ||
+    categoryBeforeValidUpload.kuotaTerpakai !== 0
+  ) {
+    throw new Error("Upload manual setelah expiry tidak ditolak secara atomik.");
+  }
 
   const midtransDisabled = await api(`/api/calon-murid/${child.id}/pembayaran/midtrans/create`, { method: "POST" }, wali.cookie);
   if (midtransDisabled.response.status !== 409) throw new Error("Midtrans tidak digate saat mode manual.");
@@ -161,13 +205,25 @@ try {
   proof.set("bukti", validPng());
   const uploaded = await api(`/api/calon-murid/${child.id}/pembayaran/manual`, { method: "POST", body: proof }, wali.cookie);
   if (uploaded.response.status !== 201) throw new Error(`Upload manual gagal: ${uploaded.response.status}`);
-  const [payment, enrolled] = await Promise.all([
+  const [payment, enrolled, verifiedHold, routeAfterUpload, categoryAfterUpload] = await Promise.all([
     prisma.pembayaran.findFirstOrThrow({ where: { calonMuridReference: child.id, jenis: "PENDAFTARAN" } }),
     prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id } }),
+    prisma.holdKuotaPendaftaran.findUniqueOrThrow({ where: { calonMuridId: child.id } }),
+    prisma.jalur.findUniqueOrThrow({ where: { id: route.id } }),
+    prisma.kategoriPendaftar.findUniqueOrThrow({ where: { id: category.id } }),
   ]);
   if (payment.fileBuktiUrl) proofPaths.push(payment.fileBuktiUrl);
-  if (payment.status !== StatusPembayaran.VERIFIED || payment.metodePembayaran !== MetodePembayaran.MANUAL_TRANSFER || payment.nominal !== fee.nominal || !payment.verifiedAt || enrolled.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT) {
-    throw new Error("Transisi atomik manual ke VERIFIED/ENROLLMENT tidak sesuai.");
+  if (
+    payment.status !== StatusPembayaran.VERIFIED ||
+    payment.metodePembayaran !== MetodePembayaran.MANUAL_TRANSFER ||
+    payment.nominal !== fee.nominal ||
+    !payment.verifiedAt ||
+    enrolled.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT ||
+    verifiedHold.status !== StatusHoldKuota.VERIFIED ||
+    routeAfterUpload.kuotaTerpakai !== 1 ||
+    categoryAfterUpload.kuotaTerpakai !== 1
+  ) {
+    throw new Error("Upload manual tidak mempromosikan pembayaran, hold, kuota, dan enrollment secara atomik.");
   }
   const downloaded = await api(`/api/admin/pembayaran/${payment.id}/bukti`, {}, admin.cookie);
   if (!downloaded.response.ok || !downloaded.response.headers.get("content-disposition")?.includes("attachment")) {
@@ -236,8 +292,10 @@ try {
   });
   if (proofPaths.length) await adminClient.storage.from(paymentBucket).remove(proofPaths);
   const payments = childIds.length ? await prisma.pembayaran.findMany({ where: { calonMuridReference: { in: childIds } }, select: { id: true } }) : [];
+  const holds = childIds.length ? await prisma.holdKuotaPendaftaran.findMany({ where: { calonMuridId: { in: childIds } }, select: { id: true } }) : [];
   if (profileIds.length) await prisma.auditLog.deleteMany({ where: { actorId: { in: profileIds } } });
-  if (payments.length) await prisma.auditLog.deleteMany({ where: { entityId: { in: payments.map(({ id }) => id) } } });
+  const auditedEntityIds = [...payments.map(({ id }) => id), ...holds.map(({ id }) => id)];
+  if (auditedEntityIds.length) await prisma.auditLog.deleteMany({ where: { entityId: { in: auditedEntityIds } } });
   if (payments.length) await prisma.pembayaran.deleteMany({ where: { id: { in: payments.map(({ id }) => id) } } });
   if (childIds.length) await prisma.calonMurid.deleteMany({ where: { id: { in: childIds } } });
   if (feeId) await prisma.biayaPendaftaran.deleteMany({ where: { id: feeId } });

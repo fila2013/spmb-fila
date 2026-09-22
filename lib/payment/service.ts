@@ -29,6 +29,16 @@ import {
 import type { MidtransNotification } from "@/lib/payment/schemas";
 import { REGISTRATION_PAYMENT_SETTING_ID } from "@/lib/payment-settings/service";
 import { prisma } from "@/lib/prisma";
+import {
+  releaseRegistrationQuotaHoldInTransaction,
+  requireActiveRegistrationHoldInTransaction,
+  verifyRegistrationQuotaHoldInTransaction,
+} from "@/lib/quota-hold/service";
+import {
+  isActivePendingHold,
+  MIN_HOLD_DURATION_MINUTES,
+  remainingHoldMinutes,
+} from "@/lib/quota-hold/rules";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Transaction = Prisma.TransactionClient;
@@ -172,6 +182,18 @@ export async function createRegistrationSnapPayment(
           409,
         );
       }
+      const hold = await requireActiveRegistrationHoldInTransaction(
+        transaction,
+        child.id,
+      );
+      const expiryDurationMinutes = remainingHoldMinutes(hold.expiresAt);
+      if (expiryDurationMinutes < MIN_HOLD_DURATION_MINUTES) {
+        throw new PaymentError(
+          "HOLD_EXPIRED",
+          "Sisa waktu pembayaran kurang dari 5 menit. Silakan kembali memilih jalur dan kategori untuk membuat hold baru.",
+          409,
+        );
+      }
 
       const pending = await transaction.pembayaran.findFirst({
         where: {
@@ -215,6 +237,10 @@ export async function createRegistrationSnapPayment(
         email: user.email,
         routeName: child.jalur.nama,
         categoryName: child.kategori.nama,
+        expiryDurationMinutes,
+        expiryStartsAt: new Date(
+          hold.expiresAt.getTime() - expiryDurationMinutes * 60_000,
+        ),
         finishUrl: new URL(
           paymentReturnUrl(child.id, "success"),
           appEnvironment.NEXT_PUBLIC_APP_URL,
@@ -275,14 +301,7 @@ export async function getRegistrationPaymentPageData(
       409,
     );
   }
-  if (child.statusKeseluruhan === StatusKeseluruhan.PILIH_JALUR) {
-    throw new PaymentError(
-      "INVALID_STAGE",
-      "Calon murid belum berada pada tahap pembayaran pendaftaran.",
-      409,
-    );
-  }
-  const [payment, setting, bankAccounts] = await Promise.all([
+  const [payment, setting, bankAccounts, hold] = await Promise.all([
     preferredRegistrationPayment(child.id),
     prisma.pengaturanPembayaran.findUnique({
       where: { id: REGISTRATION_PAYMENT_SETTING_ID },
@@ -291,6 +310,9 @@ export async function getRegistrationPaymentPageData(
     prisma.rekeningBank.findMany({
       orderBy: [{ createdAt: "asc" }, { namaBank: "asc" }],
       select: { id: true, namaBank: true, nomorRekening: true, atasNama: true },
+    }),
+    prisma.holdKuotaPendaftaran.findUnique({
+      where: { calonMuridId: child.id },
     }),
   ]);
   const mode = setting?.mode ?? ModePembayaranPendaftaran.MIDTRANS;
@@ -309,7 +331,15 @@ export async function getRegistrationPaymentPageData(
         409,
       );
     }
-    return { child, payment, nominal: payment.nominal, mode, bankAccounts };
+    return {
+      child,
+      payment,
+      nominal: payment.nominal,
+      mode,
+      bankAccounts,
+      hold,
+      holdActive: isActivePendingHold(hold),
+    };
   }
 
   const fee = await prisma.biayaPendaftaran.findFirst({
@@ -326,7 +356,15 @@ export async function getRegistrationPaymentPageData(
       422,
     );
   }
-  return { child, payment: null, nominal: fee.nominal, mode, bankAccounts };
+  return {
+    child,
+    payment: null,
+    nominal: fee.nominal,
+    mode,
+    bankAccounts,
+    hold,
+    holdActive: isActivePendingHold(hold),
+  };
 }
 
 export async function uploadManualRegistrationProof(
@@ -432,6 +470,12 @@ export async function uploadManualRegistrationProof(
             verifiedAt,
           },
         });
+        await verifyRegistrationQuotaHoldInTransaction(
+          transaction,
+          childId,
+          payment.id,
+          userId,
+        );
         const advanced = await transaction.calonMurid.updateMany({
           where: {
             id: childId,
@@ -651,6 +695,24 @@ export async function processMidtransNotification(
   }
 
   return prisma.$transaction(async (transaction) => {
+    const snapshot = await transaction.pembayaran.findUnique({
+      where: { midtransOrderId: notification.order_id },
+      select: { calonMuridId: true },
+    });
+    if (!snapshot) {
+      throw new PaymentError(
+        "NOT_FOUND",
+        "Order pembayaran tidak ditemukan.",
+        404,
+      );
+    }
+    if (snapshot.calonMuridId) {
+      await transaction.$queryRaw`
+        SELECT id FROM "calon_murid"
+        WHERE id = ${snapshot.calonMuridId}::uuid
+        FOR UPDATE
+      `;
+    }
     await transaction.$queryRaw`
       SELECT id FROM "pembayaran"
       WHERE "midtrans_order_id" = ${notification.order_id}
@@ -689,10 +751,19 @@ export async function processMidtransNotification(
         (notification.payment_type ?? previous.midtransPaymentType);
     if (duplicate) {
       let enrollmentAdvanced = false;
+      let quotaHoldConfirmed = false;
+      let quotaHoldReleased = false;
       if (
         nextStatus === StatusPembayaran.VERIFIED &&
         previous.calonMuridId
       ) {
+        await verifyRegistrationQuotaHoldInTransaction(
+          transaction,
+          previous.calonMuridId,
+          previous.id,
+          null,
+        );
+        quotaHoldConfirmed = true;
         const updated = await transaction.calonMurid.updateMany({
           where: {
             id: previous.calonMuridId,
@@ -702,6 +773,19 @@ export async function processMidtransNotification(
           data: { statusKeseluruhan: StatusKeseluruhan.ENROLLMENT },
         });
         enrollmentAdvanced = updated.count === 1;
+      } else if (
+        nextStatus === StatusPembayaran.REJECTED &&
+        previous.calonMuridId
+      ) {
+        const released = await releaseRegistrationQuotaHoldInTransaction(
+          transaction,
+          previous.calonMuridId,
+          notification.transaction_status.toLowerCase() === "expire"
+            ? "EXPIRED"
+            : "CANCELLED",
+          previous.id,
+        );
+        quotaHoldReleased = Boolean(released);
       }
       if (enrollmentAdvanced) {
         await transaction.auditLog.create({
@@ -714,6 +798,8 @@ export async function processMidtransNotification(
               orderId: notification.order_id,
               paymentStatus: previous.status,
               enrollmentAdvanced,
+              quotaHoldConfirmed,
+              quotaHoldReleased,
             },
           },
         });
@@ -724,6 +810,35 @@ export async function processMidtransNotification(
         ignored: !incomingStatus,
         enrollmentAdvanced,
       };
+    }
+
+    let quotaHoldConfirmed = false;
+    let quotaHoldReleased = false;
+    if (
+      nextStatus === StatusPembayaran.VERIFIED &&
+      previous.calonMuridId
+    ) {
+      await verifyRegistrationQuotaHoldInTransaction(
+        transaction,
+        previous.calonMuridId,
+        previous.id,
+        null,
+      );
+      quotaHoldConfirmed = true;
+    } else if (
+      nextStatus === StatusPembayaran.REJECTED &&
+      previous.status === StatusPembayaran.PENDING &&
+      previous.calonMuridId
+    ) {
+      const released = await releaseRegistrationQuotaHoldInTransaction(
+        transaction,
+        previous.calonMuridId,
+        notification.transaction_status.toLowerCase() === "expire"
+          ? "EXPIRED"
+          : "CANCELLED",
+        previous.id,
+      );
+      quotaHoldReleased = Boolean(released);
     }
 
     const payment = await transaction.pembayaran.update({
@@ -775,6 +890,8 @@ export async function processMidtransNotification(
           before: previous.status,
           after: payment.status,
           enrollmentAdvanced,
+          quotaHoldConfirmed,
+          quotaHoldReleased,
           ignored: !incomingStatus,
         },
       },

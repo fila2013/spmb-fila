@@ -3,6 +3,10 @@ import {
   SubKategoriAlumni,
 } from "@/generated/prisma/enums";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
+import {
+  CRITICAL_QUOTA_HOLD_MESSAGE,
+  quotaBlockingReason,
+} from "@/lib/quota-hold/rules";
 
 type AvailabilityInput = {
   statusAktif: boolean;
@@ -10,11 +14,12 @@ type AvailabilityInput = {
   periodeSelesai: Date | null;
   kuotaMaks: number | null;
   kuotaTerpakai: number;
+  kuotaDitahan?: number;
 };
 
 export type Availability = {
   available: boolean;
-  reason: "INACTIVE" | "NOT_STARTED" | "ENDED" | "FULL" | null;
+  reason: "INACTIVE" | "NOT_STARTED" | "ENDED" | "FULL" | "HELD" | null;
 };
 
 export function jakartaDate(now = new Date()) {
@@ -41,9 +46,8 @@ export function selectionAvailability(
   if (item.periodeSelesai && dateOnly(item.periodeSelesai) < today) {
     return { available: false, reason: "ENDED" };
   }
-  if (item.kuotaMaks !== null && item.kuotaTerpakai >= item.kuotaMaks) {
-    return { available: false, reason: "FULL" };
-  }
+  const quotaReason = quotaBlockingReason(item);
+  if (quotaReason) return { available: false, reason: quotaReason };
   return { available: true, reason: null };
 }
 
@@ -54,7 +58,14 @@ export function assertSelectionAvailable(item: AvailabilityInput) {
   if (availability.reason === "FULL") {
     throw new CalonMuridError(
       "QUOTA_FULL",
-      "Kuota pilihan ini sudah penuh.",
+      "Kuota sudah penuh. Silakan menunggu admin menambah kuota atau pilih opsi lain yang tersedia.",
+      409,
+    );
+  }
+  if (availability.reason === "HELD") {
+    throw new CalonMuridError(
+      "QUOTA_HELD",
+      CRITICAL_QUOTA_HOLD_MESSAGE,
       409,
     );
   }
@@ -103,7 +114,9 @@ export function availabilityLabel(availability: Availability) {
     case "ENDED":
       return "Pendaftaran ditutup";
     case "FULL":
-      return "Kuota penuh";
+      return "Kuota penuh. Silakan menunggu admin menambah kuota.";
+    case "HELD":
+      return CRITICAL_QUOTA_HOLD_MESSAGE;
     default:
       return "Tersedia";
   }

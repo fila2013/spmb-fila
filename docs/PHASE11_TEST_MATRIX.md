@@ -10,9 +10,10 @@ menggunakan Midtrans Sandbox (`MIDTRANS_IS_PRODUCTION=false`).
 |---|---|---|---|
 | Session, role, ownership, inactive/error contract | `lib/auth/*.test.ts`, `proxy.test.ts` | Phase 3, 4, 6, 7, 9, 10 | Anonim ditolak; wali ditolak dari admin |
 | Satu akun banyak anak dan isolasi antar-wali | Authorization rules | Phase 4, 8 | Dashboard wali menampilkan dua anak |
-| Kuota jalur/kategori tidak bocor | Calon murid/master-data rules | Phase 4 (request paralel) | — |
+| Pemilihan jalur tidak memakai kuota; hold jalur/kategori tidak bocor dan kursi terakhir hanya dipegang satu peserta | Calon murid/master-data/quota-hold rules | Phase 4 (request paralel dan pesan critical hold) | — |
+| Hold expired/cancel dilepas, cron terautentikasi merapikan transaksi dan tahap peserta | Quota-hold rules | Phase 4 (endpoint cron) dan Phase 5 (webhook expire + retry) | — |
 | Matrix biaya, mode dinamis, upload dan retention bukti | Master-data/payment rules | Phase 4, 5, dan dynamic payment | — |
-| Signature, status, sanitasi, idempotency webhook | Payment rules | Phase 5 | — |
+| Signature, status, sanitasi, idempotency webhook dan promosi hold tepat satu kali | Payment/quota-hold rules | Phase 5 | — |
 | Gate enrollment setelah payment verified | Enrollment rules/schema | Phase 5 dan 6 | — |
 | Assessment dan release announcement | Stage rules/schema | Phase 7 | — |
 | TCP → Reguler dan FIFO | Fallback rules | Phase 8 | — |

@@ -231,7 +231,14 @@ CREATE INDEX idx_form_response_calon_murid ON form_response(calon_murid_id);
 
 ## 4. Logika Kuota (Kritis — harus atomik)
 
-Kuota harus dicegah dari race condition saat banyak wali murid submit hampir bersamaan mendekati kuota habis. Gunakan transaksi DB dengan row lock:
+> Pembaruan regulasi 22 September 2026: `kuota_terpakai` hanya memuat alokasi
+> dengan pembayaran pendaftaran `verified`. Pemilihan jalur/kategori membuat
+> temporary hold terpisah; contoh lama yang langsung increment saat pemilihan
+> tidak lagi berlaku.
+
+Kuota harus dicegah dari race condition saat banyak wali murid menuju pembayaran
+hampir bersamaan. Gunakan transaksi DB dengan row lock pada peserta, hold, jalur,
+dan kategori:
 
 ```sql
 BEGIN;
@@ -241,18 +248,27 @@ FROM jalur
 WHERE id = :jalur_id
 FOR UPDATE;  -- row lock
 
--- di aplikasi: cek IF kuota_maks IS NOT NULL AND kuota_terpakai >= kuota_maks → REJECT
+SELECT COUNT(*) AS hold_aktif
+FROM hold_kuota_pendaftaran
+WHERE jalur_id = :jalur_id
+  AND status = 'pending_payment'
+  AND expires_at > now();
 
-UPDATE jalur
-SET kuota_terpakai = kuota_terpakai + 1
-WHERE id = :jalur_id;
+-- tolak bila kuota_terpakai + hold_aktif >= kuota_maks
+-- upsert satu hold per calon murid, default expires_at = now() + 24 jam
 
--- ulangi pola yang sama untuk kategori_pendaftar
+INSERT INTO hold_kuota_pendaftaran (...)
+VALUES (..., 'pending_payment', :expires_at);
 
 COMMIT;
 ```
 
-Endpoint pemilihan jalur/kategori **wajib** membungkus insert `calon_murid` dan update kuota dalam satu transaksi yang sama.
+Saat webhook sukses atau upload bukti manual valid, transaksi lain mengunci row
+yang sama, memastikan hold belum expired, menaikkan `kuota_terpakai` jalur dan
+kategori, lalu mengubah hold menjadi `verified`. Webhook duplikat melihat hold
+sudah verified sehingga tidak boleh menambah counter lagi. Expire/cancel mengubah
+hold menjadi `expired/cancelled` tanpa decrement counter karena hold belum pernah
+menjadi kuota permanen.
 
 ## 5. Aturan Bisnis Otomatis: Biaya per Jalur×Kategori, Auto-Transfer TCP→Reguler, & Auto-Delete Data Calon Murid
 
@@ -432,6 +448,8 @@ Wali Murid          Next.js API (server)         Midtrans           Supabase DB
     │                       │                        │                   │
     │  klik "Bayar"         │                        │                   │
     ├──────────────────────►│                        │                   │
+    │                       │  lock + buat hold pending_payment          │
+    │                       ├────────────────────────────────────────────►│
     │                       │  POST /snap/transactions                   │
     │                       │  (server_key, order_id, gross_amount, ...) │
     │                       ├───────────────────────►│                   │
@@ -452,8 +470,15 @@ Wali Murid          Next.js API (server)         Midtrans           Supabase DB
 ```
 
 Poin penting:
+- Hold kuota dibuat saat jalur dan kategori dikonfirmasi untuk menuju pembayaran.
+  Durasi default 1×24 jam, dapat dikonfigurasi Admin, dan countdown ditampilkan
+  pada halaman pembayaran.
 - **Snap token dibuat di server** (memakai `MIDTRANS_SERVER_KEY`), lalu dikirim ke browser untuk memicu popup `snap.pay(token)` di frontend.
+- Request Snap mengirim expiry halaman dan metode pembayaran berdasarkan sisa
+  hold, dimulai dari waktu token dibuat.
 - **Status final pembayaran ditentukan oleh webhook** (`Payment Notification`) dari Midtrans, **bukan** dari redirect URL di browser — redirect hanya untuk UX (tampilkan "sedang diproses"), karena browser bisa saja ditutup pengguna sebelum status final.
+- Settlement/capture mempromosikan hold dan counter secara atomik. Deny/cancel/
+  expire melepas hold dan mengembalikan peserta ke tahap pilih jalur/kategori.
 - Frontend boleh melakukan polling `GET /api/calon-murid/:id/pembayaran` setelah popup ditutup, untuk menampilkan status terbaru tanpa menunggu refresh manual.
 
 ### 6.2 Endpoint Baru
@@ -463,8 +488,13 @@ Poin penting:
 | POST | `/api/calon-murid/:id/pembayaran/midtrans/create` | Server membuat transaksi Snap ke Midtrans, simpan `midtrans_order_id` & `snap_token`, kembalikan `snap_token` ke frontend |
 | POST | `/api/webhooks/midtrans` | **Endpoint publik** (tanpa auth session, diverifikasi via signature key) — menerima notifikasi status dari Midtrans, update tabel `pembayaran` |
 | GET | `/api/calon-murid/:id/pembayaran` | *(sudah ada)* — dipakai frontend untuk polling status setelah popup Snap ditutup |
+| GET | `/api/cron/expire-registration-holds` | Endpoint terjadwal dengan Bearer `CRON_SECRET`; expire hold dan transaksi pending yang melewati batas waktu |
 
 ### 6.3 Contoh Kode — Membuat Transaksi Snap (Server)
+
+> Snippet berikut adalah ilustrasi historis, bukan source runtime. Implementasi
+> aktual memakai Prisma service, matrix biaya, hold aktif, dan expiry dinamis di
+> `lib/payment/service.ts` serta `lib/payment/midtrans.ts`.
 
 ```ts
 // app/api/calon-murid/[id]/pembayaran/midtrans/create/route.ts
@@ -537,6 +567,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 ### 6.4 Contoh Kode — Webhook Handler (Notification)
 
+> Source aktual memproses pembayaran, promosi/pelepasan hold, counter kuota, dan
+> transisi peserta dalam satu transaksi database. Snippet ringkas berikut tidak
+> boleh disalin tanpa transaksi tersebut.
+
 ```ts
 // app/api/webhooks/midtrans/route.ts
 import crypto from "crypto";
@@ -590,8 +624,14 @@ export async function POST(req: Request) {
 
 ### 6.5 Perubahan pada Flow yang Sudah Ada
 
-- Halaman `/anak/:id/pembayaran-pendaftaran` sekarang menampilkan **dua opsi**: "Bayar via Midtrans" (utama, tombol besar) dan fallback opsional "Upload bukti manual" jika ingin tetap disediakan (opsional — bisa dihilangkan sepenuhnya jika Midtrans sudah dianggap cukup andal).
-- Status pembayaran yang berasal dari Midtrans **tidak perlu verifikasi admin** (`verified_by` akan NULL, `verified_at` terisi otomatis dari webhook) — dashboard admin (§7.7 Verifikasi Pembayaran) harus membedakan tampilan "Terverifikasi otomatis (Midtrans)" vs "Diverifikasi manual oleh [nama admin]".
+- Halaman `/anak/:id/pembayaran-pendaftaran` menampilkan mode aktif yang dipilih
+  Admin: Midtrans **atau** transfer manual, bukan kedua mode sekaligus.
+- Pembayaran pendaftaran tidak memiliki verifikasi Admin. Midtrans menjadi
+  `verified` dari webhook; transfer manual langsung menjadi `verified` setelah
+  bukti JPG/PNG/PDF maksimal 500 KB berhasil diunggah sebelum hold berakhir.
+- Scheduled cleanup dijalankan dari `vercel.json`. Ketersediaan tetap mengabaikan
+  hold lewat waktu secara real-time, sehingga frekuensi cron hanya menentukan
+  kapan status ledger/audit dirapikan, bukan kapan kursi kembali dapat dipilih.
 - Pembayaran **DU tetap 100% manual** seperti desain sebelumnya — tidak ada perubahan di modul itu.
 
 ## 7. API Endpoints (REST)

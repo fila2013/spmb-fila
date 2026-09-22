@@ -8,6 +8,7 @@ import type {
   UpdateBankAccountInput,
 } from "@/lib/payment-settings/schemas";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_HOLD_DURATION_MINUTES } from "@/lib/quota-hold/rules";
 
 export const REGISTRATION_PAYMENT_SETTING_ID = "pendaftaran";
 
@@ -41,11 +42,19 @@ export function listBankAccounts() {
 }
 
 export async function getPaymentSettingsData() {
-  const [mode, bankAccounts] = await Promise.all([
-    getRegistrationPaymentMode(),
+  const [setting, bankAccounts] = await Promise.all([
+    prisma.pengaturanPembayaran.findUnique({
+      where: { id: REGISTRATION_PAYMENT_SETTING_ID },
+      select: { mode: true, holdDurationMinutes: true },
+    }),
     listBankAccounts(),
   ]);
-  return { mode, bankAccounts };
+  return {
+    mode: setting?.mode ?? ModePembayaranPendaftaran.MIDTRANS,
+    holdDurationMinutes:
+      setting?.holdDurationMinutes ?? DEFAULT_HOLD_DURATION_MINUTES,
+    bankAccounts,
+  };
 }
 
 export async function updatePaymentMode(
@@ -71,12 +80,21 @@ export async function updatePaymentMode(
     const previous = await transaction.pengaturanPembayaran.findUnique({
       where: { id: REGISTRATION_PAYMENT_SETTING_ID },
     });
+    const holdDurationMinutes =
+      input.holdDurationMinutes ??
+      previous?.holdDurationMinutes ??
+      DEFAULT_HOLD_DURATION_MINUTES;
     const setting = await transaction.pengaturanPembayaran.upsert({
       where: { id: REGISTRATION_PAYMENT_SETTING_ID },
-      update: { mode: input.mode, updatedById: actorId },
+      update: {
+        mode: input.mode,
+        holdDurationMinutes,
+        updatedById: actorId,
+      },
       create: {
         id: REGISTRATION_PAYMENT_SETTING_ID,
         mode: input.mode,
+        holdDurationMinutes,
         updatedById: actorId,
       },
     });
@@ -88,8 +106,15 @@ export async function updatePaymentMode(
         entityId: null,
         detail: {
           settingId: REGISTRATION_PAYMENT_SETTING_ID,
-          before: previous?.mode ?? ModePembayaranPendaftaran.MIDTRANS,
-          after: setting.mode,
+          before: {
+            mode: previous?.mode ?? ModePembayaranPendaftaran.MIDTRANS,
+            holdDurationMinutes:
+              previous?.holdDurationMinutes ?? DEFAULT_HOLD_DURATION_MINUTES,
+          },
+          after: {
+            mode: setting.mode,
+            holdDurationMinutes: setting.holdDurationMinutes,
+          },
         },
       },
     });

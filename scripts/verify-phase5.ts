@@ -9,6 +9,7 @@ import { PrismaClient } from "../generated/prisma/client";
 import {
   KategoriTipe,
   ModePembayaranPendaftaran,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPembayaran,
 } from "../generated/prisma/enums";
@@ -126,9 +127,9 @@ try {
     });
   }
   const [wali, otherWali] = await Promise.all([createWali("owner"), createWali("other")]);
-  const route = await prisma.jalur.create({ data: { nama: `Bayar ${marker}`, kuotaMaks: 5, kuotaTerpakai: 2 } });
+  const route = await prisma.jalur.create({ data: { nama: `Bayar ${marker}`, kuotaMaks: 5 } });
   routeId = route.id;
-  const category = await prisma.kategoriPendaftar.create({ data: { nama: `Bayar ${marker}`, tipe: KategoriTipe.EKSTERNAL, kuotaMaks: 5, kuotaTerpakai: 2 } });
+  const category = await prisma.kategoriPendaftar.create({ data: { nama: `Bayar ${marker}`, tipe: KategoriTipe.EKSTERNAL, kuotaMaks: 5 } });
   categoryId = category.id;
   const fee = await prisma.biayaPendaftaran.create({ data: { jalurId: route.id, kategoriId: category.id, nominal: 10_000 } });
   feeId = fee.id;
@@ -148,6 +149,15 @@ try {
   );
   childIds.push(...children.map(({ id }) => id));
   const [primary, retryChild] = children;
+  await prisma.holdKuotaPendaftaran.createMany({
+    data: children.map((child) => ({
+      calonMuridId: child.id,
+      jalurId: route.id,
+      kategoriId: category.id,
+      status: StatusHoldKuota.PENDING_PAYMENT,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    })),
+  });
 
   const created = await createPayment(primary.id, wali.cookie);
   if (created.response.status !== 201) throw new Error(`Create Snap Sandbox gagal: ${created.response.status}`);
@@ -192,18 +202,35 @@ try {
   const settlement = signedNotification({ orderId: createdData.orderId, amount: fee.nominal, transactionStatus: "settlement", statusCode: "200", transactionId });
   const settlementResult = await api("/api/webhooks/midtrans", { method: "POST", body: JSON.stringify(settlement) });
   if (settlementResult.response.status !== 200) throw new Error("Webhook settlement gagal.");
-  const [verifiedPayment, enrolledChild] = await Promise.all([
+  const [verifiedPayment, enrolledChild, verifiedHold, routeAfterSettlement, categoryAfterSettlement] = await Promise.all([
     prisma.pembayaran.findUniqueOrThrow({ where: { id: payment.id } }),
     prisma.calonMurid.findUniqueOrThrow({ where: { id: primary.id } }),
+    prisma.holdKuotaPendaftaran.findUniqueOrThrow({ where: { calonMuridId: primary.id } }),
+    prisma.jalur.findUniqueOrThrow({ where: { id: route.id } }),
+    prisma.kategoriPendaftar.findUniqueOrThrow({ where: { id: category.id } }),
   ]);
-  if (verifiedPayment.status !== StatusPembayaran.VERIFIED || !verifiedPayment.verifiedAt || enrolledChild.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT) {
-    throw new Error("Payment state transition atau enrollment gate gagal.");
+  if (
+    verifiedPayment.status !== StatusPembayaran.VERIFIED ||
+    !verifiedPayment.verifiedAt ||
+    enrolledChild.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT ||
+    verifiedHold.status !== StatusHoldKuota.VERIFIED ||
+    routeAfterSettlement.kuotaTerpakai !== 1 ||
+    categoryAfterSettlement.kuotaTerpakai !== 1
+  ) {
+    throw new Error("Payment, hold kuota, atau enrollment tidak dipromosikan atomik saat settlement.");
   }
   const settlementAuditBeforeDuplicate = await prisma.auditLog.count({ where: { entityId: payment.id } });
   const settlementDuplicate = await api("/api/webhooks/midtrans", { method: "POST", body: JSON.stringify(settlement) });
   const settlementAuditAfterDuplicate = await prisma.auditLog.count({ where: { entityId: payment.id } });
   if (settlementDuplicate.response.status !== 200 || settlementDuplicate.body.duplicate !== true || settlementAuditAfterDuplicate !== settlementAuditBeforeDuplicate) {
     throw new Error("Webhook settlement duplicate belum idempotent.");
+  }
+  const [routeAfterDuplicate, categoryAfterDuplicate] = await Promise.all([
+    prisma.jalur.findUniqueOrThrow({ where: { id: route.id } }),
+    prisma.kategoriPendaftar.findUniqueOrThrow({ where: { id: category.id } }),
+  ]);
+  if (routeAfterDuplicate.kuotaTerpakai !== 1 || categoryAfterDuplicate.kuotaTerpakai !== 1) {
+    throw new Error("Webhook settlement duplikat menambah kuota lebih dari sekali.");
   }
   const statusResult = await api(`/api/calon-murid/${primary.id}/pembayaran`, undefined, wali.cookie);
   if (statusResult.response.status !== 200 || (statusResult.body.data as { status?: string })?.status !== StatusPembayaran.VERIFIED) {
@@ -216,6 +243,25 @@ try {
   const expired = signedNotification({ orderId: retryFirstData.orderId, amount: fee.nominal, transactionStatus: "expire", statusCode: "407", transactionId: randomUUID() });
   const expiredResult = await api("/api/webhooks/midtrans", { method: "POST", body: JSON.stringify(expired) });
   if (expiredResult.response.status !== 200) throw new Error("Webhook expire gagal.");
+  const [releasedHold, releasedChild, rejectedAttempt] = await Promise.all([
+    prisma.holdKuotaPendaftaran.findUniqueOrThrow({ where: { calonMuridId: retryChild.id } }),
+    prisma.calonMurid.findUniqueOrThrow({ where: { id: retryChild.id } }),
+    prisma.pembayaran.findUniqueOrThrow({ where: { midtransOrderId: retryFirstData.orderId } }),
+  ]);
+  if (
+    releasedHold.status !== StatusHoldKuota.EXPIRED ||
+    releasedChild.statusKeseluruhan !== StatusKeseluruhan.PILIH_JALUR ||
+    rejectedAttempt.status !== StatusPembayaran.REJECTED
+  ) {
+    throw new Error("Webhook expire tidak melepas hold dan mengembalikan peserta ke pilihan jalur.");
+  }
+  const reselection = await api(`/api/calon-murid/${retryChild.id}/kategori`, {
+    method: "PATCH",
+    body: JSON.stringify({ kategoriId: category.id, subKategoriText: "TK Sandbox" }),
+  }, wali.cookie);
+  if (reselection.response.status !== 200) {
+    throw new Error(`Peserta tidak dapat mengambil hold baru setelah expire: ${reselection.response.status}.`);
+  }
   const retrySecond = await createPayment(retryChild.id, wali.cookie);
   const retrySecondData = retrySecond.body.data as { orderId?: string };
   if (retrySecond.response.status !== 201 || !retrySecondData.orderId || retrySecondData.orderId === retryFirstData.orderId) {
@@ -239,7 +285,10 @@ try {
   const payments = childIds.length
     ? await prisma.pembayaran.findMany({ where: { calonMuridReference: { in: childIds } }, select: { id: true } })
     : [];
-  const auditEntityIds = [...childIds, ...payments.map(({ id }) => id)];
+  const holds = childIds.length
+    ? await prisma.holdKuotaPendaftaran.findMany({ where: { calonMuridId: { in: childIds } }, select: { id: true } })
+    : [];
+  const auditEntityIds = [...childIds, ...payments.map(({ id }) => id), ...holds.map(({ id }) => id)];
   if (auditEntityIds.length) await prisma.auditLog.deleteMany({ where: { entityId: { in: auditEntityIds } } });
   if (payments.length) await prisma.pembayaran.deleteMany({ where: { id: { in: payments.map(({ id }) => id) } } });
   if (childIds.length) await prisma.calonMurid.deleteMany({ where: { id: { in: childIds } } });

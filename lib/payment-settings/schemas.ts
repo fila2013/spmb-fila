@@ -10,6 +10,12 @@ const accountNumberSchema = z.string().trim().transform(
 
 export const paymentModeSchema = z.object({
   mode: z.enum(ModePembayaranPendaftaran),
+  holdDurationMinutes: z.coerce
+    .number()
+    .int("Durasi hold harus berupa menit bulat.")
+    .min(5, "Durasi hold minimal 5 menit.")
+    .max(10080, "Durasi hold maksimal 7 hari.")
+    .optional(),
 });
 
 export const createBankAccountSchema = z.object({

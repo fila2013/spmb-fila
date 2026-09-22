@@ -10,6 +10,7 @@ import {
   JenisPembayaran,
   KategoriTipe,
   MetodePembayaran,
+  StatusHoldKuota,
   StatusKeseluruhan,
   StatusPembayaran,
   UserRole,
@@ -157,6 +158,16 @@ try {
     },
   });
   entityIds.push(child.id, guardian.profileId);
+  await prisma.holdKuotaPendaftaran.create({
+    data: {
+      calonMuridId: child.id,
+      jalurId: route.id,
+      kategoriId: category.id,
+      status: StatusHoldKuota.VERIFIED,
+      expiresAt: new Date(),
+      verifiedAt: new Date(),
+    },
+  });
   const payment = await prisma.pembayaran.create({
     data: {
       calonMuridId: child.id,

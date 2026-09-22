@@ -22,7 +22,10 @@ export default async function PaymentSettingsPage() {
           <div><h2 className="text-lg font-bold text-emerald-950">Mode pembayaran aktif</h2><p className="mt-1 text-sm text-slate-600">Perubahan berlaku untuk transaksi pendaftaran baru.</p></div>
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${settings.mode === ModePembayaranPendaftaran.MIDTRANS ? "bg-sky-100 text-sky-900" : "bg-amber-100 text-amber-900"}`}>{settings.mode === ModePembayaranPendaftaran.MIDTRANS ? "MIDTRANS" : "MANUAL"}</span>
         </div>
-        <PaymentModeForm mode={settings.mode} />
+        <PaymentModeForm
+          mode={settings.mode}
+          holdDurationMinutes={settings.holdDurationMinutes}
+        />
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">Mode manual memverifikasi pembayaran berdasarkan keberhasilan upload bukti, tanpa pemeriksaan nominal mutasi oleh admin. Bukti tetap tersedia pada detail peserta untuk audit.</p>
       </section>
 

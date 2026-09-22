@@ -14,7 +14,16 @@ export type SnapTransactionInput = {
   routeName: string;
   categoryName: string;
   finishUrl: string;
+  expiryDurationMinutes: number;
+  expiryStartsAt: Date;
 };
+
+function jakartaTimestamp(now = new Date()) {
+  return `${new Date(now.getTime() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ")} +0700`;
+}
 
 export async function createMidtransSnapTransaction(
   input: SnapTransactionInput,
@@ -61,6 +70,15 @@ export async function createMidtransSnapTransaction(
           email: input.email,
         },
         credit_card: { secure: true },
+        page_expiry: {
+          duration: input.expiryDurationMinutes,
+          unit: "minute",
+        },
+        expiry: {
+          start_time: jakartaTimestamp(input.expiryStartsAt),
+          duration: input.expiryDurationMinutes,
+          unit: "minute",
+        },
         callbacks: { finish: input.finishUrl },
       }),
       cache: "no-store",

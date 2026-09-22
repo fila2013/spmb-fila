@@ -17,6 +17,13 @@ describe("master data business rules", () => {
     );
   });
 
+  it("memperhitungkan hold pembayaran aktif", () => {
+    expect(() => assertQuotaCanBeSet(10, 8, 2)).not.toThrow();
+    expect(() => assertQuotaCanBeSet(9, 8, 2)).toThrowError(
+      expect.objectContaining({ code: "QUOTA_BELOW_USAGE" }),
+    );
+  });
+
   it("mengizinkan kuota tanpa batas", () => {
     expect(() => assertQuotaCanBeSet(null, 500)).not.toThrow();
   });
@@ -27,4 +34,3 @@ describe("master data business rules", () => {
     );
   });
 });
-

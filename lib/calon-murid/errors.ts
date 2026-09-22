@@ -3,6 +3,7 @@ export type CalonMuridErrorCode =
   | "INVALID_STAGE"
   | "CLOSED"
   | "QUOTA_FULL"
+  | "QUOTA_HELD"
   | "FEE_NOT_CONFIGURED"
   | "FINAL_ROUTE_CHOICE_DISABLED"
   | "FINAL_ROUTE_CHOICE_LOCKED"

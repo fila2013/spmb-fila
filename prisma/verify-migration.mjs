@@ -83,6 +83,13 @@ const homeYoutubeVideoMigrationSql = await readFile(
   ),
   "utf8",
 );
+const registrationQuotaHoldMigrationSql = await readFile(
+  new URL(
+    "./migrations/20260922090000_registration_quota_holds/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const validationSchema = `phase1_validation_${process.pid}`;
 const client = new pg.Client({
   connectionString: process.env.DIRECT_URL,
@@ -112,6 +119,7 @@ try {
   await client.query(paymentProofDeletionMigrationSql);
   await client.query(homeContentMigrationSql);
   await client.query(homeYoutubeVideoMigrationSql);
+  await client.query(registrationQuotaHoldMigrationSql);
 
   const contentStages = await client.query(
     "SELECT enumlabel FROM pg_enum WHERE enumtypid = 'tahap_konten'::regtype",
@@ -125,7 +133,7 @@ try {
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
     [validationSchema],
   );
-  assert(tables.rowCount === 15, `Expected 15 tables, found ${tables.rowCount}.`);
+  assert(tables.rowCount === 16, `Expected 16 tables, found ${tables.rowCount}.`);
   assert(
     tables.rows.some(({ table_name }) => table_name === "audit_log"),
     "Tabel audit_log tidak ditemukan.",
@@ -135,15 +143,15 @@ try {
     "SELECT indexname FROM pg_indexes WHERE schemaname = $1",
     [validationSchema],
   );
-  assert(indexes.rowCount >= 46, `Expected at least 46 indexes, found ${indexes.rowCount}.`);
+  assert(indexes.rowCount >= 50, `Expected at least 50 indexes, found ${indexes.rowCount}.`);
 
   const domainConstraints = await client.query(
     "SELECT conname FROM pg_constraint WHERE connamespace = $1::regnamespace AND conname LIKE '%_check'",
     [validationSchema],
   );
   assert(
-    domainConstraints.rowCount === 30,
-    `Expected 30 domain constraints, found ${domainConstraints.rowCount}.`,
+    domainConstraints.rowCount === 32,
+    `Expected 32 domain constraints, found ${domainConstraints.rowCount}.`,
   );
 
   const rlsTables = await client.query(
@@ -151,8 +159,8 @@ try {
     [validationSchema],
   );
   assert(
-    rlsTables.rows[0].count === 15,
-    `Expected RLS on 15 tables, found ${rlsTables.rows[0].count}.`,
+    rlsTables.rows[0].count === 16,
+    `Expected RLS on 16 tables, found ${rlsTables.rows[0].count}.`,
   );
 
   await client.query("SAVEPOINT invalid_quota");
@@ -230,6 +238,33 @@ try {
     "INSERT INTO calon_murid (id, user_id, nama_anak, jalur_id, kategori_id) VALUES ($1, $2, $3, $4, $5)",
     [calonMuridId, userId, "Data sementara", jalurId, kategoriId],
   );
+  await client.query(
+    "INSERT INTO hold_kuota_pendaftaran (calon_murid_id, jalur_id, kategori_id, expires_at) VALUES ($1, $2, $3, now() + interval '24 hours')",
+    [calonMuridId, jalurId, kategoriId],
+  );
+  await client.query("SAVEPOINT invalid_verified_hold");
+  try {
+    await client.query(
+      "UPDATE hold_kuota_pendaftaran SET status = 'verified' WHERE calon_murid_id = $1",
+      [calonMuridId],
+    );
+    throw new Error("Hold verified tanpa timestamp tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint status hold kuota tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_verified_hold");
+  }
+  await client.query("SAVEPOINT invalid_hold_duration");
+  try {
+    await client.query(
+      "UPDATE pengaturan_pembayaran SET hold_duration_minutes = 4 WHERE id = 'pendaftaran'",
+    );
+    throw new Error("Durasi hold di bawah batas minimum tidak ditolak.");
+  } catch (error) {
+    assert(error.code === "23514", "Constraint durasi hold tidak tervalidasi.");
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT invalid_hold_duration");
+  }
   await client.query("SAVEPOINT invalid_registration_nominal");
   try {
     await client.query(
@@ -315,7 +350,7 @@ try {
     await client.query("ROLLBACK TO SAVEPOINT duplicate_active_du");
   }
 
-  console.log("Migration Phase 1–9, pembayaran dinamis, retention, CMS beranda/YouTube, dan constraint tervalidasi.");
+  console.log("Migration Phase 1–9, pembayaran dinamis, hold kuota, retention, CMS beranda/YouTube, dan constraint tervalidasi.");
 } finally {
   await client.query("ROLLBACK");
   await client.end();

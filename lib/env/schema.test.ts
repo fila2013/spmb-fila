@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cronEnvironmentSchema,
   publicEnvironmentSchema,
   serverEnvironmentSchema,
 } from "@/lib/env/schema";
@@ -114,6 +115,19 @@ describe("serverEnvironmentSchema", () => {
         MIDTRANS_NOTIFICATION_URL:
           "http://localhost:3000/api/webhooks/midtrans",
       }),
+    ).toThrow();
+  });
+});
+
+describe("cronEnvironmentSchema", () => {
+  it("mewajibkan secret minimal 16 karakter", () => {
+    expect(
+      cronEnvironmentSchema.parse({
+        CRON_SECRET: "cron-secret-test-aman",
+      }).CRON_SECRET,
+    ).toBe("cron-secret-test-aman");
+    expect(() =>
+      cronEnvironmentSchema.parse({ CRON_SECRET: "terlalu-pendek" }),
     ).toThrow();
   });
 });

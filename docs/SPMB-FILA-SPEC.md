@@ -28,6 +28,8 @@ Jika ada konflik antar dokumen lama dan keputusan terbaru, gunakan keputusan yan
 Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementasi saat ini:
 
 - **Pembayaran pendaftaran memiliki mode dinamis `MIDTRANS` atau `MANUAL`** yang dipilih Admin dari dashboard dan disimpan di database. Integrasi Midtrans tetap dipertahankan. Pada mode manual, nominal tetap berasal dari matrix Jalur × Kategori; setelah bukti JPG/PNG/PDF maksimal 500 KB berhasil disimpan, pembayaran langsung `verified` dan peserta masuk `enrollment` tanpa verifikasi Admin.
+- **Kuota jalur dan kategori baru resmi terpakai saat pembayaran pendaftaran `verified`.** Pemilihan jalur saja tidak mengurangi `kuota_terpakai`. Saat jalur dan kategori dikonfirmasi untuk menuju pembayaran, sistem membuat hold atomik berstatus `pending_payment`; hold ikut mengurangi ketersediaan publik tetapi disimpan terpisah dari counter permanen.
+- **Hold pembayaran memiliki expiry yang dapat dikonfigurasi, default 1×24 jam.** Settlement/capture Midtrans sebelum expiry atau upload bukti manual valid mempromosikan hold menjadi `verified` dan menambah counter permanen tepat satu kali. Deny/cancel/expire atau cleanup terjadwal melepas hold tanpa mengurangi counter permanen.
 - **Rekening sekolah dikelola Admin** dan minimal satu rekening wajib tersedia sebelum mode manual dapat diaktifkan.
 - **Pembayaran DU = manual**, upload bukti + verifikasi admin.
 - **File bukti pembayaran pendaftaran manual dan DU dapat dihapus Admin setelah pemeriksaan selesai.** Penghapusan hanya menghapus object Storage dan mengosongkan `file_bukti_url`; record transaksi, jenis, metode, nominal, status, timestamp, dan audit tetap dipertahankan.
@@ -340,34 +342,53 @@ Asal TK kemudian menjadi sumber auto-fill enrollment.
 
 ## 5.3 Kuota
 
-Semua perubahan kuota yang memengaruhi pendaftaran harus dilakukan secara atomik.
-
-Tidak boleh:
+`kuota_terpakai` pada jalur/kategori hanya menghitung peserta dengan pembayaran
+pendaftaran `verified`. Hold aktif disimpan di `hold_kuota_pendaftaran` dan dihitung
+terpisah saat menentukan ketersediaan:
 
 ```text
-SELECT kuota
-INSERT peserta
-UPDATE kuota
+sisa publik = kuota_maks - kuota_terpakai - hold pending yang belum expired
 ```
 
-tanpa transaction/locking.
+Memilih jalur tidak mengubah counter permanen. Saat peserta mengonfirmasi kategori
+dan lanjut ke pembayaran, backend dalam satu transaksi wajib mengunci peserta,
+jalur, kategori, dan hold; memeriksa kapasitas; lalu membuat satu hold
+`pending_payment`. Expiry default 1×24 jam dan dapat diubah Admin (5 menit–7 hari).
 
-Wajib:
+Jika kursi terakhir sudah di-hold, peserta kedua tidak boleh memperoleh hold dan
+harus melihat pesan persis:
+
+> Mohon maaf, kuota terakhir sedang dalam proses pembayaran oleh pendaftar lain. Silakan tunggu beberapa saat atau coba kembali nanti.
+
+Jika hold pertama menjadi `verified`, peserta kedua tetap di tahap pilih
+jalur/kategori sampai Admin menambah kuota atau pilihan lain tersedia. Jika hold
+pertama expired/cancelled, kapasitas segera dianggap tersedia lagi; cleanup
+terjadwal merapikan status hold, transaksi pending, tahap peserta, dan audit.
+
+Semua perubahan harus atomik. Pembuatan hold mengikuti pola:
 
 ```text
 BEGIN
-  lock row
-  cek kuota
-  insert peserta
-  increment kuota
+  lock peserta + hold + jalur + kategori
+  cek kuota_terpakai + hold aktif < kuota_maks
+  create/update hold pending_payment
 COMMIT
 ```
 
-Pola yang sama berlaku untuk:
-- Jalur.
-- Kategori.
-- Auto-transfer fallback.
-- Reprocessing FIFO.
+Promosi setelah pembayaran mengikuti pola:
+
+```text
+BEGIN
+  lock peserta + hold + jalur + kategori
+  pastikan hold pending dan belum expired
+  increment kuota_terpakai jalur + kategori
+  update hold = verified
+  update pembayaran = verified dan tahap = enrollment
+COMMIT
+```
+
+Pola locking yang setara juga wajib untuk auto-transfer fallback, pilihan jalur
+final, penghapusan yang melepas kuota, dan reprocessing FIFO.
 
 ## 5.4 Matrix Biaya
 
@@ -406,7 +427,9 @@ Backend autentikasi user
  ↓
 Backend validasi calon murid
  ↓
-Backend lookup Jalur + Kategori
+Backend lock Jalur + Kategori dan membuat hold pending_payment
+ ↓
+Timer expiry (default 1×24 jam) dimulai
  ↓
 Backend lookup biaya
  ↓
@@ -426,8 +449,15 @@ Update pembayaran
  ↓
 Jika settlement/capture → verified
  ↓
-Calon murid masuk enrollment
+Hold → verified, kuota permanen +1, calon murid masuk enrollment
 ```
+
+Pada mode manual, upload bukti JPG/PNG/PDF valid maksimal 500 KB sebelum expiry
+langsung menjalankan promosi yang sama; tidak ada verifikasi Admin untuk pembayaran
+pendaftaran. Pada mode Midtrans, expiry halaman dan metode pembayaran diselaraskan
+dengan sisa hold. Webhook deny/cancel/expire melepas hold. Cron terautentikasi
+menjalankan cleanup periodik untuk hold yang melewati `expires_at`; perhitungan
+ketersediaan selalu mengabaikan hold expired meski cron belum berjalan.
 
 Redirect browser bukan sumber status final.
 
@@ -704,6 +734,9 @@ calon_murid
 form_field
 form_response
 pembayaran
+pengaturan_pembayaran
+rekening_bank
+hold_kuota_pendaftaran
 konten_tahap
 hasil_assessment
 pengumuman
@@ -896,6 +929,31 @@ pending
 verified
 rejected
 ```
+
+## 8.8A hold_kuota_pendaftaran
+
+```text
+id
+calon_murid_id (unique)
+jalur_id (nullable setelah kuota jalur dilepas untuk antrean pilihan final)
+kategori_id
+status (pending_payment | verified | expired | cancelled)
+expires_at
+verified_at
+released_at
+created_at
+updated_at
+```
+
+Hold `pending_payment` wajib memiliki jalur serta belum memiliki timestamp
+verifikasi/rilis. Hold `verified` wajib memiliki `verified_at`; hold
+`expired/cancelled` wajib memiliki `released_at`. Hanya hold `verified` yang
+direpresentasikan dalam `kuota_terpakai`.
+
+## 8.8B pengaturan_pembayaran
+
+Selain mode `midtrans/manual`, pengaturan menyimpan `hold_duration_minutes`
+dengan default 1440, minimum 5, dan maksimum 10080 menit.
 
 ## 8.9 konten_tahap
 

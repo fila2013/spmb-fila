@@ -120,20 +120,26 @@ describe("Midtrans webhook rules", () => {
     },
   );
 
-  it("mencegah webhook pending terlambat menurunkan verified", () => {
+  it("menjadikan verified terminal agar kuota permanen tidak terlepas oleh webhook terlambat", () => {
     expect(
       resolvePaymentTransition(
         StatusPembayaran.VERIFIED,
         StatusPembayaran.PENDING,
       ),
     ).toBe(StatusPembayaran.VERIFIED);
-  });
-
-  it("mengizinkan reversal verified menjadi rejected", () => {
     expect(
       resolvePaymentTransition(
         StatusPembayaran.VERIFIED,
         StatusPembayaran.REJECTED,
+      ),
+    ).toBe(StatusPembayaran.VERIFIED);
+  });
+
+  it("menjadikan rejected terminal", () => {
+    expect(
+      resolvePaymentTransition(
+        StatusPembayaran.REJECTED,
+        StatusPembayaran.VERIFIED,
       ),
     ).toBe(StatusPembayaran.REJECTED);
   });
