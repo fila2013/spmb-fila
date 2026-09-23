@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 import { AuthRedirectFallback } from "@/components/auth/auth-redirect-fallback";
@@ -14,7 +15,11 @@ export const metadata: Metadata = {
   description:
     "Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura.",
   icons: {
-    icon: "/brand-mark.svg",
+    icon: {
+      url: "/logo-sdit-fitrah-insani-web-192.webp",
+      type: "image/webp",
+      sizes: "192x192",
+    },
   },
 };
 
@@ -41,12 +46,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 href="/"
                 className="flex items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700"
               >
-                <span
-                  aria-hidden="true"
-                  className="grid size-11 place-items-center rounded-xl bg-emerald-900 text-sm font-bold tracking-wide text-white shadow-sm"
-                >
-                  FI
-                </span>
+                <Image
+                  src="/logo-sdit-fitrah-insani-web-192.webp"
+                  alt="Logo SDIT Fitrah Insani Langkapura"
+                  width={48}
+                  height={48}
+                  priority
+                  className="size-12 shrink-0 object-contain"
+                />
                 <span>
                   <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
                     SPMB FILA
