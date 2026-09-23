@@ -38,7 +38,7 @@ layanan remote atau sudah beroperasi di production.
 | Master data | Jalur/kategori, periode/keaktifan, kuota, matrix biaya Jalur × Kategori |
 | Pendaftaran | Satu akun banyak anak; pemilihan jalur tanpa pemakaian kuota permanen; hold jalur/kategori atomik dengan expiry configurable dan proteksi kursi terakhir |
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
-| Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final dan gate payment verified |
+| Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, dan unduh PDF A4 dari detail peserta admin (Data Pribadi halaman pertama; Observasi mulai halaman kedua) |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, tanggal rilis dan tombol Google Calendar |
 | Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
 | Pilihan kelas final | Fitur opsional per jalur TCP diterima; pilihan sekali sebelum DU, pelepasan kuota TCP dan antrean Reguler bila penuh |

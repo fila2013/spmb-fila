@@ -8,7 +8,8 @@ mendukung Midtrans Snap atau transfer manual, sedangkan DU tetap manual.
 ## Status project
 
 Audit repository **22 September 2026**: implementasi cakupan Phase 0–11 tersedia,
-termasuk multi-anak, kuota/matrix biaya, enrollment, CMS, assessment/pengumuman,
+termasuk multi-anak, kuota/matrix biaya, enrollment dan ekspor PDF A4 peserta,
+CMS, assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
 retention, laporan CSV/XLSX, serta temporary hold kuota pembayaran. Ketersediaan
 kode bukan bukti kesiapan live.
@@ -229,7 +230,7 @@ berada bersama halaman. Supabase merupakan layanan eksternal yang harus aktif.
 | `/admin/jalur`, `/admin/kategori`, `/admin/biaya-pendaftaran` | Master data dan kuota/matrix biaya |
 | `/admin/settings` | Mode pembayaran dan rekening sekolah |
 | `/admin/form-builder`, `/admin/konten/beranda` | Form dan CMS (konten tahap lain berada di `/admin/konten/:tahap`) |
-| `/admin/peserta`, `/admin/wali-murid`, `/admin/laporan` | Operasional, penghapusan dan laporan |
+| `/admin/peserta`, `/admin/wali-murid`, `/admin/laporan` | Operasional peserta (termasuk unduh Data Enrollment PDF A4), penghapusan dan laporan |
 
 Sebelum mencoba pendaftaran, admin perlu mengisi kuota/periode/keaktifan,
 matrix biaya untuk kombinasi jalur-kategori, field dan konten tahap.

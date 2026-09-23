@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Download } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
 import {
@@ -184,7 +185,21 @@ export default async function ParticipantDetailPage({
           )}
         </section>
         <section className="rounded-2xl border border-emerald-950/10 bg-white p-5 lg:col-span-2">
-          <h2 className="text-lg font-bold text-emerald-950">Data enrollment</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-emerald-950">Data enrollment</h2>
+              <p className="mt-1 text-xs text-slate-500">Data Pribadi pada halaman pertama, dilanjutkan Observasi mulai halaman kedua.</p>
+            </div>
+            {participant.formResponses.length > 0 ? (
+              <a
+                href={`/api/admin/peserta/${participant.id}/enrollment-pdf`}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800"
+              >
+                <Download aria-hidden="true" className="size-4" />
+                Unduh PDF A4
+              </a>
+            ) : null}
+          </div>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2">
             {participant.formResponses.map((response) => (
               <div key={response.id} className="rounded-xl bg-slate-50 p-3">
