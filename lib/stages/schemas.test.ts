@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { TahapKonten } from "@/generated/prisma/enums";
-import { announcementInputSchema, deleteStageContentSchema, participantStageTypeParamSchema, stageContentInputSchema, stageTypeParamSchema } from "@/lib/stages/schemas";
+import { StatusKeseluruhan, TahapKonten } from "@/generated/prisma/enums";
+import { announcementInputSchema, deleteStageContentSchema, participantListFilterSchema, participantStageTypeParamSchema, stageContentInputSchema, stageTypeParamSchema } from "@/lib/stages/schemas";
 
 describe("Phase 7 schemas", () => {
   it("menerima slug tahap lowercase", () => {
@@ -32,5 +32,36 @@ describe("Phase 7 schemas", () => {
   it("mensyaratkan keputusan dan tanggal rilis valid", () => {
     expect(announcementInputSchema.safeParse({ statusAkhir: "DITERIMA", tanggalRilis: "2026-09-30" }).success).toBe(true);
     expect(announcementInputSchema.safeParse({ statusAkhir: "DITERIMA", tanggalRilis: "30-09-2026" }).success).toBe(false);
+  });
+
+  it("menormalisasi filter daftar peserta", () => {
+    const jalurId = "10000000-0000-4000-8000-000000000001";
+    const kategoriId = "10000000-0000-4000-8000-000000000002";
+    expect(
+      participantListFilterSchema.parse({
+        q: "  Aisyah  ",
+        jalurId,
+        kategoriId,
+        statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN,
+      }),
+    ).toEqual({
+      q: "Aisyah",
+      jalurId,
+      kategoriId,
+      statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN,
+    });
+    expect(
+      participantListFilterSchema.parse({
+        q: "",
+        jalurId: "",
+        kategoriId: "",
+        statusKeseluruhan: "",
+      }),
+    ).toEqual({});
+    expect(participantListFilterSchema.safeParse({ jalurId: "bukan-uuid" }).success).toBe(false);
+    expect(
+      participantListFilterSchema.safeParse({ statusKeseluruhan: "TAHAP_TIDAK_ADA" })
+        .success,
+    ).toBe(false);
   });
 });

@@ -24,6 +24,7 @@ import {
 import type {
   AnnouncementInput,
   AssessmentInput,
+  ParticipantListFilters,
   StageContentInput,
   UpdateStageContentInput,
 } from "@/lib/stages/schemas";
@@ -324,9 +325,39 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   };
 }
 
-export function listParticipants(query?: string) {
+export function listParticipants(filters: ParticipantListFilters = {}) {
+  const where: Prisma.CalonMuridWhereInput = {
+    AND: [
+      ...(filters.q
+        ? [{ namaAnak: { contains: filters.q, mode: "insensitive" as const } }]
+        : []),
+      ...(filters.jalurId
+        ? [
+            {
+              OR: [
+                { jalurId: filters.jalurId },
+                {
+                  jalurId: null,
+                  menungguFallbackJalurId: filters.jalurId,
+                },
+                {
+                  jalurId: null,
+                  menungguFallbackJalurId: null,
+                  jalurAsalId: filters.jalurId,
+                },
+              ],
+            },
+          ]
+        : []),
+    ],
+    ...(filters.kategoriId ? { kategoriId: filters.kategoriId } : {}),
+    ...(filters.statusKeseluruhan
+      ? { statusKeseluruhan: filters.statusKeseluruhan }
+      : {}),
+  };
+
   return prisma.calonMurid.findMany({
-    where: query ? { OR: [{ namaAnak: { contains: query, mode: "insensitive" } }, { user: { email: { contains: query, mode: "insensitive" } } }] } : undefined,
+    where,
     include: { user: { select: { email: true } }, jalur: { select: { nama: true } }, jalurAsal: { select: { nama: true } }, menungguFallbackJalur: { select: { nama: true } }, kategori: { select: { nama: true } }, hasilAssessment: true, pengumuman: true },
     orderBy: [{ createdAt: "desc" }],
   });

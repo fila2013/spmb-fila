@@ -47,7 +47,7 @@ export default async function Home({
           </p>
 
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-700/20 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900">
-            Jadwal pembukaan portal akan diumumkan oleh panitia SPMB.
+            Penting : Syarat pendaftaran sudah berusia 6 tahun pada tanggal 1 juli 2027.
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/register" className="rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800">Buat akun wali murid</Link>

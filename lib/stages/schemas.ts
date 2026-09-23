@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   StatusAssessment,
+  StatusKeseluruhan,
   StatusPengumuman,
   TahapKonten,
 } from "@/generated/prisma/enums";
@@ -9,6 +10,18 @@ import { youtubeVideoId } from "@/lib/stages/rules";
 
 const uuid = z.uuid("ID tidak valid.");
 const optionalUuid = z.preprocess((value) => value === "" ? null : value, uuid.nullable());
+const optionalFilterUuid = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  uuid.optional(),
+);
+const overallStatuses = Object.values(StatusKeseluruhan) as [
+  StatusKeseluruhan,
+  ...StatusKeseluruhan[],
+];
+const optionalOverallStatus = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.enum(overallStatuses).optional(),
+);
 const optionalDate = z.preprocess(
   (value) => value === "" ? null : value,
   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid.").nullable(),
@@ -26,6 +39,15 @@ const optionalYoutubeVideoId = z.preprocess(
 );
 
 export const stageIdSchema = uuid;
+export const participantListFilterSchema = z.object({
+  q: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().trim().min(1).max(100).optional(),
+  ),
+  jalurId: optionalFilterUuid,
+  kategoriId: optionalFilterUuid,
+  statusKeseluruhan: optionalOverallStatus,
+});
 export const stageTypeSchema = z.enum([
   TahapKonten.HOME,
   TahapKonten.ASSESSMENT,
@@ -89,6 +111,7 @@ export const announcementInputSchema = z.object({
 });
 
 export type StageContentInput = z.infer<typeof stageContentInputSchema>;
+export type ParticipantListFilters = z.infer<typeof participantListFilterSchema>;
 export type UpdateStageContentInput = z.infer<typeof updateStageContentSchema>;
 export type AssessmentInput = z.infer<typeof assessmentInputSchema>;
 export type AnnouncementInput = z.infer<typeof announcementInputSchema>;
