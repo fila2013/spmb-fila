@@ -16,6 +16,7 @@ const validJalur = {
   fallbackJalurId: null,
   hapusDataJikaGagal: false,
   pilihanJalurFinalAktif: false,
+  pilihanJalurFinalTargetId: null,
 };
 
 describe("master data schemas", () => {
@@ -51,7 +52,8 @@ describe("master data schemas", () => {
     ).toBe(true);
   });
 
-  it("memerlukan fallback untuk pilihan jalur final", () => {
+  it("memisahkan fallback gagal dari tujuan pilihan jalur final", () => {
+    const targetId = "b2ad565e-5f24-4bb0-8a1c-f54cb908dd47";
     expect(
       createJalurSchema.safeParse({
         ...validJalur,
@@ -61,8 +63,16 @@ describe("master data schemas", () => {
     expect(
       createJalurSchema.safeParse({
         ...validJalur,
-        fallbackJalurId: "b2ad565e-5f24-4bb0-8a1c-f54cb908dd47",
         pilihanJalurFinalAktif: true,
+        pilihanJalurFinalTargetId: targetId,
+      }).success,
+    ).toBe(true);
+    expect(
+      createJalurSchema.safeParse({
+        ...validJalur,
+        hapusDataJikaGagal: true,
+        pilihanJalurFinalAktif: true,
+        pilihanJalurFinalTargetId: targetId,
       }).success,
     ).toBe(true);
   });

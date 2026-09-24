@@ -45,7 +45,7 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - `MIDTRANS_SERVER_KEY` hanya server-side.
 - Nominal pembayaran pendaftaran berasal dari matrix `Jalur × Kategori`; wali murid tidak pernah mengisi nominal.
 - Auto-transfer TCP → Reguler dan fallback FIFO adalah business rule inti.
-- **Pilihan kelas final untuk peserta TCP yang diterima bersifat opsional per jalur dan dikendalikan Admin.** Jika aktif, semua kategori pada jalur TCP wajib memilih satu kali antara tetap di TCP atau pindah ke Reguler sebelum DU. Pilihan tidak dapat diubah. Memilih Reguler langsung melepaskan kuota TCP; bila Reguler penuh, peserta masuk FIFO Reguler tanpa kembali menahan kuota TCP.
+- **Pilihan kelas final untuk peserta yang diterima bersifat opsional per jalur dan dikendalikan Admin secara independen dari fallback peserta gagal.** Jika aktif, Admin menentukan jalur tujuan pilihan final dan semua kategori pada jalur asal wajib memilih satu kali antara tetap di jalur asal atau pindah ke jalur tujuan sebelum DU. Pilihan tidak dapat diubah. Pindah langsung melepaskan kuota jalur asal; bila tujuan penuh, peserta masuk FIFO tujuan tanpa kembali menahan kuota asal.
 - Auto-delete hanya menghapus data calon murid yang gagal, bukan akun wali murid atau anak lain.
 - Jejak keuangan pembayaran tetap disimpan ketika calon murid dihapus. Relasi aktif `calon_murid_id` menggunakan `ON DELETE SET NULL`, sedangkan UUID referensi non-PII, nominal, metode, status, referensi Midtrans, payload audit yang sudah disanitasi, dan timestamp dipertahankan untuk audit keuangan.
 - MVP hanya memiliki dua role: Wali Murid dan Admin.
@@ -320,6 +320,7 @@ Setiap jalur memiliki:
 - fallback optional.
 - flag auto-delete saat gagal.
 - flag pilihan jalur final setelah diterima.
+- target pilihan jalur final setelah diterima, independen dari fallback gagal.
 
 Jika kuota tercapai, jalur tidak boleh dipilih calon murid baru.
 
@@ -510,7 +511,7 @@ Jika penuh:
 
 ## 5.8 Pilihan Kelas Final TCP yang Diterima
 
-Admin dapat mengaktifkan `pilihan_jalur_final_aktif` pada jalur TCP yang memiliki `fallback_jalur_id = Reguler`. Fitur berlaku untuk seluruh kategori pada jalur tersebut.
+Admin dapat mengaktifkan `pilihan_jalur_final_aktif` dan menentukan `pilihan_jalur_final_target_id` pada suatu jalur. Fitur ini independen dari `fallback_jalur_id` untuk peserta gagal dan berlaku untuk seluruh kategori pada jalur tersebut.
 
 Saat pengumuman `diterima` dirilis:
 
@@ -780,6 +781,7 @@ kuota_terpakai
 fallback_jalur_id
 hapus_data_jika_gagal
 pilihan_jalur_final_aktif
+pilihan_jalur_final_target_id
 created_at
 updated_at
 ```

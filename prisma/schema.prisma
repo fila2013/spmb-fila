@@ -185,30 +185,34 @@ model RekeningBank {
 }
 
 model Jalur {
-  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nama                   String    @unique @db.VarChar(50)
-  statusAktif            Boolean   @default(true) @map("status_aktif")
-  periodeMulai           DateTime? @map("periode_mulai") @db.Date
-  periodeSelesai         DateTime? @map("periode_selesai") @db.Date
-  kuotaMaks              Int?      @map("kuota_maks")
-  kuotaTerpakai          Int       @default(0) @map("kuota_terpakai")
-  fallbackJalurId        String?   @map("fallback_jalur_id") @db.Uuid
-  hapusDataJikaGagal     Boolean   @default(false) @map("hapus_data_jika_gagal")
-  pilihanJalurFinalAktif Boolean   @default(false) @map("pilihan_jalur_final_aktif")
-  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama                      String    @unique @db.VarChar(50)
+  statusAktif               Boolean   @default(true) @map("status_aktif")
+  periodeMulai              DateTime? @map("periode_mulai") @db.Date
+  periodeSelesai            DateTime? @map("periode_selesai") @db.Date
+  kuotaMaks                 Int?      @map("kuota_maks")
+  kuotaTerpakai             Int       @default(0) @map("kuota_terpakai")
+  fallbackJalurId           String?   @map("fallback_jalur_id") @db.Uuid
+  hapusDataJikaGagal        Boolean   @default(false) @map("hapus_data_jika_gagal")
+  pilihanJalurFinalAktif    Boolean   @default(false) @map("pilihan_jalur_final_aktif")
+  pilihanJalurFinalTargetId String?   @map("pilihan_jalur_final_target_id") @db.Uuid
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  fallbackJalur    Jalur?                 @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
-  sumberFallback   Jalur[]                @relation("JalurFallback")
-  biayaPendaftaran BiayaPendaftaran[]
-  calonMuridAktif  CalonMurid[]           @relation("CalonMuridJalur")
-  calonMuridAsal   CalonMurid[]           @relation("CalonMuridJalurAsal")
-  antrianFallback  CalonMurid[]           @relation("CalonMuridMenungguFallback")
-  kontenTahap      KontenTahap[]
-  holdKuota        HoldKuotaPendaftaran[] @relation("HoldKuotaJalur")
+  fallbackJalur           Jalur?                 @relation("JalurFallback", fields: [fallbackJalurId], references: [id], onDelete: SetNull)
+  sumberFallback          Jalur[]                @relation("JalurFallback")
+  pilihanJalurFinalTarget Jalur?                 @relation("JalurPilihanFinalTarget", fields: [pilihanJalurFinalTargetId], references: [id], onDelete: Restrict)
+  sumberPilihanJalurFinal Jalur[]                @relation("JalurPilihanFinalTarget")
+  biayaPendaftaran        BiayaPendaftaran[]
+  calonMuridAktif         CalonMurid[]           @relation("CalonMuridJalur")
+  calonMuridAsal          CalonMurid[]           @relation("CalonMuridJalurAsal")
+  antrianFallback         CalonMurid[]           @relation("CalonMuridMenungguFallback")
+  kontenTahap             KontenTahap[]
+  holdKuota               HoldKuotaPendaftaran[] @relation("HoldKuotaJalur")
 
   @@index([statusAktif, periodeMulai, periodeSelesai])
   @@index([fallbackJalurId])
+  @@index([pilihanJalurFinalTargetId])
   @@map("jalur")
 }
 

@@ -7,7 +7,7 @@ mendukung Midtrans Snap atau transfer manual, sedangkan DU tetap manual.
 
 ## Status project
 
-Audit repository **22 September 2026**: implementasi cakupan Phase 0–11 tersedia,
+Audit repository terakhir diperbarui **24 September 2026**: implementasi cakupan Phase 0–11 tersedia,
 termasuk multi-anak, kuota/matrix biaya, enrollment dan ekspor PDF A4 peserta,
 CMS, assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
@@ -115,8 +115,10 @@ perlu URL-encoding bila mengandung karakter khusus.
 
 Schema: `prisma/schema.prisma`; seluruh SQL incremental ada di `prisma/migrations`.
 Migration mencakup tabel domain, RLS, trigger profile Supabase Auth, retention
-pembayaran dan constraint kuota/status. Migration terakhir:
-`20260922090000_registration_quota_holds`.
+pembayaran dan constraint kuota/status. Migration source terbaru:
+`20260924090000_decouple_final_route_choice`. Migration ini memisahkan jalur
+tujuan pilihan final peserta diterima dari fallback peserta gagal. Migration ini
+diterapkan pada 24 September 2026 ke database yang dikonfigurasi `.env.local`.
 
 **Prisma CLI tidak otomatis membaca `.env.local`.** `prisma.config.ts` memakai
 `dotenv/config`, yang default-nya membaca `.env`. Muat file lokal secara eksplisit
@@ -153,7 +155,8 @@ production yang sudah dikustomisasi.
 `npm run prisma:verify-migration` adalah pengujian constraint/RLS di staging:
 script membuat schema sementara, menerapkan subset migration termasuk temporary
 hold kuota dan memasukkan fixture dalam transaksi lalu rollback. Verifier belum
-mencakup migration pilihan kelas final TCP tanggal 5 September; gunakan integration
+mencakup migration pilihan kelas final TCP tanggal 5 September maupun migration
+pemisahan target pilihan final tanggal 24 September; gunakan integration
 final-route-choice dan `migrate status` untuk pemeriksaan terkait. Ini bukan perintah
 untuk menerapkan migration atau inspeksi read-only production.
 
@@ -356,10 +359,11 @@ tervalidasi oleh audit ini.
   `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
   PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
   jangan menjalankan force-fix tanpa review dependency terpisah.
-- Hasil verifikasi terbaru: fresh `npm ci`, postinstall Prisma generate,
-  **lint, typecheck, 30 file / 140 unit test, Prisma validate dan Next.js build
-  lulus**. Migration hold diterapkan pada 22 September 2026 ke database yang
-  dikonfigurasi `.env.local` dan status Prisma menunjukkan 16 migration up to date.
+- Hasil verifikasi kode terbaru 24 September 2026: **lint, typecheck, 31 file /
+  146 unit test, Prisma validate dan Next.js build lulus**. Migration hold telah
+  diterapkan pada 22 September 2026 ke database yang dikonfigurasi `.env.local`.
+  Migration pemisahan target pilihan final diterapkan pada 24 September 2026 dan
+  Prisma kemudian menunjukkan seluruh 17 migration sudah diterapkan.
   `CRON_SECRET` lokal sudah valid dan smoke cron menghasilkan `401` tanpa secret
   serta `200` dengan Bearer secret yang benar. Integration/E2E belum dijalankan
   karena target database tersebut belum memiliki penanda staging eksplisit.

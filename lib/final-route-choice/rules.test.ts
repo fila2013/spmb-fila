@@ -11,19 +11,19 @@ import {
 } from "@/lib/final-route-choice/rules";
 
 describe("pilihan jalur final TCP", () => {
-  it("meminta pilihan hanya untuk hasil diterima dengan fitur dan fallback aktif", () => {
+  it("meminta pilihan untuk hasil diterima berdasarkan target final, bukan fallback", () => {
     expect(
       releasedStatusAfterAcceptedDecision({
         statusAkhir: StatusPengumuman.DITERIMA,
         finalChoiceEnabled: true,
-        fallbackJalurId: "reguler",
+        finalChoiceTargetId: "reguler",
       }),
     ).toBe(StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR);
     expect(
       releasedStatusAfterAcceptedDecision({
         statusAkhir: StatusPengumuman.DITERIMA,
         finalChoiceEnabled: false,
-        fallbackJalurId: "reguler",
+        finalChoiceTargetId: "reguler",
       }),
     ).toBe(StatusKeseluruhan.DITERIMA);
   });
@@ -33,7 +33,7 @@ describe("pilihan jalur final TCP", () => {
       releasedStatusAfterAcceptedDecision({
         statusAkhir: StatusPengumuman.TIDAK_DITERIMA,
         finalChoiceEnabled: true,
-        fallbackJalurId: "reguler",
+        finalChoiceTargetId: "reguler",
       }),
     ).toBe(StatusKeseluruhan.TIDAK_DITERIMA);
   });
@@ -41,6 +41,9 @@ describe("pilihan jalur final TCP", () => {
   it("memberikan label pilihan yang ramah pengguna", () => {
     expect(finalRouteChoiceLabel(PilihanJalurFinal.TETAP_JALUR_ASAL)).toBe(
       "Tetap di jalur asal",
+    );
+    expect(finalRouteChoiceLabel(PilihanJalurFinal.JALUR_FALLBACK)).toBe(
+      "Pindah ke jalur pilihan final",
     );
     expect(finalRouteChoiceLabel(null)).toBe("Belum memilih");
   });

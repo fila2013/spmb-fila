@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MasterDataError } from "@/lib/master-data/errors";
 import {
   assertFallbackIsNotSelf,
+  assertFinalChoiceTargetIsNotSelf,
   assertQuotaCanBeSet,
 } from "@/lib/master-data/rules";
 
@@ -32,5 +33,11 @@ describe("master data business rules", () => {
     expect(() => assertFallbackIsNotSelf("jalur-1", "jalur-1")).toThrow(
       MasterDataError,
     );
+  });
+
+  it("menolak tujuan pilihan final ke jalur yang sama", () => {
+    expect(() =>
+      assertFinalChoiceTargetIsNotSelf("jalur-1", "jalur-1"),
+    ).toThrow(MasterDataError);
   });
 });

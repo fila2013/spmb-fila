@@ -26,3 +26,16 @@ export function assertFallbackIsNotSelf(
     );
   }
 }
+
+export function assertFinalChoiceTargetIsNotSelf(
+  jalurId: string,
+  targetJalurId: string | null,
+) {
+  if (targetJalurId === jalurId) {
+    throw new MasterDataError(
+      "INVALID_FINAL_ROUTE_TARGET",
+      "Jalur tujuan pilihan final harus berbeda dari jalur asal.",
+      422,
+    );
+  }
+}

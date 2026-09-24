@@ -171,8 +171,8 @@ try {
   ]);
   routeIds.push(regular.id, tcp.id, raceRegular.id, raceTcp.id);
   await Promise.all([
-    prisma.jalur.update({ where: { id: tcp.id }, data: { fallbackJalurId: regular.id, pilihanJalurFinalAktif: true } }),
-    prisma.jalur.update({ where: { id: raceTcp.id }, data: { fallbackJalurId: raceRegular.id, pilihanJalurFinalAktif: true } }),
+    prisma.jalur.update({ where: { id: tcp.id }, data: { pilihanJalurFinalTargetId: regular.id, pilihanJalurFinalAktif: true } }),
+    prisma.jalur.update({ where: { id: raceTcp.id }, data: { pilihanJalurFinalTargetId: raceRegular.id, pilihanJalurFinalAktif: true } }),
   ]);
 
   const releaseChild = await prisma.calonMurid.create({

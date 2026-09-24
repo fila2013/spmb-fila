@@ -3,7 +3,8 @@ export type MasterDataErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "QUOTA_BELOW_USAGE"
-  | "INVALID_FALLBACK";
+  | "INVALID_FALLBACK"
+  | "INVALID_FINAL_ROUTE_TARGET";
 
 export class MasterDataError extends Error {
   constructor(
@@ -15,4 +16,3 @@ export class MasterDataError extends Error {
     this.name = "MasterDataError";
   }
 }
-

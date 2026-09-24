@@ -23,6 +23,7 @@ type JalurValue = {
   fallbackJalurId: string | null;
   hapusDataJikaGagal: boolean;
   pilihanJalurFinalAktif: boolean;
+  pilihanJalurFinalTargetId: string | null;
 };
 
 type KategoriValue = {
@@ -115,12 +116,27 @@ export function JalurForm({
           {choices.filter((choice) => choice.id !== value?.id).map((choice) => <option key={choice.id} value={choice.id}>{choice.nama}</option>)}
         </select>
       </label>
+      <label className="block text-sm font-semibold text-slate-800">
+        Jalur tujuan pilihan final jika diterima
+        <select
+          name="pilihanJalurFinalTargetId"
+          defaultValue={value?.pilihanJalurFinalTargetId ?? ""}
+          aria-invalid={Boolean(
+            state.fieldErrors?.pilihanJalurFinalTargetId,
+          )}
+          className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
+        >
+          <option value="">Tidak ada pilihan jalur final</option>
+          {choices.filter((choice) => choice.id !== value?.id).map((choice) => <option key={choice.id} value={choice.id}>{choice.nama}</option>)}
+        </select>
+        {state.fieldErrors?.pilihanJalurFinalTargetId ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.pilihanJalurFinalTargetId[0]}</span> : null}
+      </label>
       <div className="grid gap-3 rounded-xl bg-slate-50 p-3 text-sm">
         <label className="flex items-center gap-2 font-semibold text-slate-800"><input type="checkbox" name="statusAktif" defaultChecked={value?.statusAktif ?? true} /> Aktifkan jalur</label>
         <label className="flex items-start gap-2 font-semibold text-slate-800"><input className="mt-1" type="checkbox" name="hapusDataJikaGagal" defaultChecked={value?.hapusDataJikaGagal ?? false} /> Hapus data calon murid jika gagal</label>
         <label className="flex items-start gap-2 font-semibold text-slate-800"><input className="mt-1" type="checkbox" name="pilihanJalurFinalAktif" defaultChecked={value?.pilihanJalurFinalAktif ?? false} /> Izinkan peserta diterima memilih jalur final</label>
-        <p className="text-xs leading-5 text-slate-500">Auto-delete tidak dapat diaktifkan bersama jalur fallback. Eksekusinya tetap memerlukan konfirmasi admin pada Phase 8.</p>
-        <p className="text-xs leading-5 text-slate-500">Pilihan jalur final hanya tersedia jika jalur fallback diatur. Peserta yang diterima wajib memilih tetap di jalur ini atau pindah ke fallback sebelum daftar ulang.</p>
+        <p className="text-xs leading-5 text-slate-500">Untuk peserta gagal, pilih salah satu: alihkan melalui jalur fallback atau hapus data setelah konfirmasi admin. Jika fallback tidak dipilih dan auto-delete aktif, peserta gagal tidak dialihkan ke jalur lain.</p>
+        <p className="text-xs leading-5 text-slate-500">Pilihan peserta diterima berdiri sendiri dari fallback. Saat diaktifkan, tentukan jalur tujuan di atas agar wali dapat memilih tetap di jalur ini atau pindah sebelum daftar ulang.</p>
       </div>
       <Notice state={state} />
       <button disabled={pending} className="rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60">{pending ? "Menyimpan…" : value ? "Simpan perubahan" : "Tambah jalur"}</button>

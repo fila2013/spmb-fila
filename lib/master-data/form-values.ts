@@ -19,6 +19,10 @@ export function jalurFormValues(formData: FormData) {
     hapusDataJikaGagal: formData.get("hapusDataJikaGagal") === "on",
     pilihanJalurFinalAktif:
       formData.get("pilihanJalurFinalAktif") === "on",
+    pilihanJalurFinalTargetId: stringValue(
+      formData,
+      "pilihanJalurFinalTargetId",
+    ),
   };
 }
 

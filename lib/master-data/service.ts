@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { Jalur, KategoriPendaftar } from "@/generated/prisma/client";
-import { MasterDataError } from "@/lib/master-data/errors";
+import {
+  MasterDataError,
+  type MasterDataErrorCode,
+} from "@/lib/master-data/errors";
 import { isQuotaCapacityIncreased } from "@/lib/fallback/rules";
 import { reprocessFallbackQueueInTransaction } from "@/lib/fallback/service";
 import type {
@@ -14,6 +17,7 @@ import type {
 } from "@/lib/master-data/schemas";
 import {
   assertFallbackIsNotSelf,
+  assertFinalChoiceTargetIsNotSelf,
   assertQuotaCanBeSet,
 } from "@/lib/master-data/rules";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +43,7 @@ function jalurSnapshot(jalur: Jalur) {
     fallbackJalurId: jalur.fallbackJalurId,
     hapusDataJikaGagal: jalur.hapusDataJikaGagal,
     pilihanJalurFinalAktif: jalur.pilihanJalurFinalAktif,
+    pilihanJalurFinalTargetId: jalur.pilihanJalurFinalTargetId,
   };
 }
 
@@ -66,26 +71,46 @@ function rethrowKnownDatabaseError(error: unknown): never {
   throw error;
 }
 
-async function assertFallbackExists(fallbackJalurId: string | null) {
-  if (!fallbackJalurId) return;
-  const fallback = await prisma.jalur.findUnique({
-    where: { id: fallbackJalurId },
+async function assertReferencedRouteExists(
+  routeId: string | null,
+  input: { code: MasterDataErrorCode; message: string },
+) {
+  if (!routeId) return;
+  const route = await prisma.jalur.findUnique({
+    where: { id: routeId },
     select: { id: true },
   });
-  if (!fallback) {
+  if (!route) {
     throw new MasterDataError(
-      "INVALID_FALLBACK",
-      "Jalur fallback tidak ditemukan.",
+      input.code,
+      input.message,
       422,
     );
   }
+}
+
+function assertFallbackExists(fallbackJalurId: string | null) {
+  return assertReferencedRouteExists(fallbackJalurId, {
+    code: "INVALID_FALLBACK",
+    message: "Jalur fallback tidak ditemukan.",
+  });
+}
+
+function assertFinalChoiceTargetExists(targetJalurId: string | null) {
+  return assertReferencedRouteExists(targetJalurId, {
+    code: "INVALID_FINAL_ROUTE_TARGET",
+    message: "Jalur tujuan pilihan final tidak ditemukan.",
+  });
 }
 
 export async function listJalur() {
   const [routes, holdCounts] = await Promise.all([
     prisma.jalur.findMany({
       orderBy: [{ createdAt: "asc" }, { nama: "asc" }],
-      include: { fallbackJalur: { select: { id: true, nama: true } } },
+      include: {
+        fallbackJalur: { select: { id: true, nama: true } },
+        pilihanJalurFinalTarget: { select: { id: true, nama: true } },
+      },
     }),
     activeRouteHoldCounts(),
   ]);
@@ -96,7 +121,10 @@ export async function listJalur() {
 }
 
 export async function createJalur(input: CreateJalurInput, actorId: string) {
-  await assertFallbackExists(input.fallbackJalurId);
+  await Promise.all([
+    assertFallbackExists(input.fallbackJalurId),
+    assertFinalChoiceTargetExists(input.pilihanJalurFinalTargetId),
+  ]);
 
   try {
     return await prisma.$transaction(async (transaction) => {
@@ -119,7 +147,14 @@ export async function createJalur(input: CreateJalurInput, actorId: string) {
 
 export async function updateJalur(input: UpdateJalurInput, actorId: string) {
   assertFallbackIsNotSelf(input.id, input.fallbackJalurId);
-  await assertFallbackExists(input.fallbackJalurId);
+  assertFinalChoiceTargetIsNotSelf(
+    input.id,
+    input.pilihanJalurFinalTargetId,
+  );
+  await Promise.all([
+    assertFallbackExists(input.fallbackJalurId),
+    assertFinalChoiceTargetExists(input.pilihanJalurFinalTargetId),
+  ]);
 
   try {
     return await prisma.$transaction(async (transaction) => {
@@ -144,7 +179,8 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
       if (
         previous.pilihanJalurFinalAktif &&
         (!input.pilihanJalurFinalAktif ||
-          input.fallbackJalurId !== previous.fallbackJalurId)
+          input.pilihanJalurFinalTargetId !==
+            previous.pilihanJalurFinalTargetId)
       ) {
         const pendingChoices = await transaction.calonMurid.count({
           where: {
@@ -155,7 +191,7 @@ export async function updateJalur(input: UpdateJalurInput, actorId: string) {
         if (pendingChoices > 0) {
           throw new MasterDataError(
             "CONFLICT",
-            "Selesaikan pilihan jalur final peserta yang masih menunggu sebelum menonaktifkan fitur atau mengganti fallback.",
+            "Selesaikan pilihan jalur final peserta yang masih menunggu sebelum menonaktifkan fitur atau mengganti jalur tujuan pilihan final.",
             409,
           );
         }

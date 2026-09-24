@@ -202,7 +202,7 @@ async function getOwnedStageChild(childId: string, userId: string) {
           id: true,
           nama: true,
           pilihanJalurFinalAktif: true,
-          fallbackJalur: { select: { id: true, nama: true } },
+          pilihanJalurFinalTarget: { select: { id: true, nama: true } },
         },
       },
       jalurAsal: { select: { id: true, nama: true } },
@@ -274,7 +274,7 @@ async function synchronizeReleasedAnnouncement(transaction: Transaction, childId
   const nextStatus = releasedStatusAfterAcceptedDecision({
     statusAkhir: announcement.statusAkhir,
     finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
-    fallbackJalurId: child.jalur.fallbackJalurId,
+    finalChoiceTargetId: child.jalur.pilihanJalurFinalTargetId,
   });
   await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
   await transaction.auditLog.create({ data: { action: "RELEASE_ANNOUNCEMENT", entity: "calon_murid", entityId: childId, detail: { statusAkhir: announcement.statusAkhir, tanggalRilis: dateOnly(announcement.tanggalRilis), nextStatus } } });
@@ -299,7 +299,7 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   const choiceTarget =
     current.pilihanJalurFinal === PilihanJalurFinal.JALUR_FALLBACK
       ? current.menungguFallbackJalur ?? current.jalur
-      : current.jalur?.fallbackJalur ?? null;
+      : current.jalur?.pilihanJalurFinalTarget ?? null;
   return {
     child: { id: current.id, namaAnak: current.namaAnak, jalur: current.jalur?.nama ?? null, kategori: current.kategori?.nama ?? null },
     released,
@@ -450,7 +450,7 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
       ? releasedStatusAfterAcceptedDecision({
           statusAkhir: input.statusAkhir,
           finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
-          fallbackJalurId: child.jalur.fallbackJalurId,
+          finalChoiceTargetId: child.jalur.pilihanJalurFinalTargetId,
         })
       : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
     if (released && input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {

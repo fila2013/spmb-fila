@@ -44,6 +44,7 @@ export const createJalurSchema = z
     fallbackJalurId: nullableUuidSchema,
     hapusDataJikaGagal: z.boolean(),
     pilihanJalurFinalAktif: z.boolean(),
+    pilihanJalurFinalTargetId: nullableUuidSchema.default(null),
   })
   .superRefine((value, context) => {
     validatePeriod(value, context);
@@ -54,11 +55,14 @@ export const createJalurSchema = z
         message: "Auto-delete tidak boleh aktif bersamaan dengan fallback.",
       });
     }
-    if (value.pilihanJalurFinalAktif && !value.fallbackJalurId) {
+    if (
+      value.pilihanJalurFinalAktif &&
+      !value.pilihanJalurFinalTargetId
+    ) {
       context.addIssue({
         code: "custom",
-        path: ["pilihanJalurFinalAktif"],
-        message: "Pilihan jalur final memerlukan jalur fallback.",
+        path: ["pilihanJalurFinalTargetId"],
+        message: "Pilih jalur tujuan untuk pilihan final peserta diterima.",
       });
     }
   });

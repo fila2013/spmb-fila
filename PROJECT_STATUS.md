@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 22 September 2026
+**Tanggal snapshot:** 24 September 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -41,13 +41,27 @@ layanan remote atau sudah beroperasi di production.
 | Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, dan unduh PDF A4 dari detail peserta admin (Data Pribadi halaman pertama; Observasi mulai halaman kedua) |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, tanggal rilis dan tombol Google Calendar |
 | Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
-| Pilihan kelas final | Fitur opsional per jalur TCP diterima; pilihan sekali sebelum DU, pelepasan kuota TCP dan antrean Reguler bila penuh |
+| Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
 | Penghapusan | Auto-delete anak gagal dengan konfirmasi/snapshot, penghapusan peserta manual dan akun wali tanpa anak, retention ledger |
 | DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup per peserta, konfirmasi wali sampai selesai |
 | Reporting | Filter peserta, ekspor CSV/XLSX, sanitasi formula dan audit ekspor |
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Refactor pilihan jalur final diimplementasikan pada source 24 September 2026:
+
+- Fallback peserta gagal dan target pilihan final peserta diterima kini memakai
+  konfigurasi terpisah. Toggle pilihan final tidak lagi bergantung pada fallback.
+- Auto-delete peserta gagal dapat digunakan tanpa fallback. Konfirmasi admin dan
+  audit snapshot tetap dipertahankan sebelum penghapusan dijalankan.
+- Migration baru `20260924090000_decouple_final_route_choice` menambah target
+  pilihan final, memigrasikan konfigurasi aktif lama dari fallback, lalu melepas
+  constraint ketergantungan lama. Migration ini diterapkan pada 24 September 2026
+  ke database yang dikonfigurasi `.env.local`; Prisma menunjukkan seluruh 17
+  migration sudah diterapkan.
+- Lint, typecheck, 31 file / 146 unit test, Prisma validate, Prisma generate, dan
+  Next.js production build lulus. Integration/E2E database belum dijalankan.
 
 Regulasi temporary hold kuota diimplementasikan 22 September 2026:
 
@@ -103,7 +117,7 @@ tersebut sebelum MVP selesai atau tanpa perubahan scope dari pengguna.
 |---|---|---|
 | Guard Midtrans menerima production saat `VERCEL_ENV` tidak ada | `lib/env/schema.ts` | Potensi salah konfigurasi lokal; selalu gunakan `MIDTRANS_IS_PRODUCTION=false` untuk lokal/staging. Tinjau guard dan tambah regression test dalam task kode tersendiri. |
 | Prisma CLI tidak otomatis membaca `.env.local` | `prisma.config.ts` menggunakan `dotenv/config` | Command migration dapat kehilangan `DIRECT_URL`; muat environment eksplisit sesuai README. Ini perbedaan konfigurasi, bukan bukti database rusak. |
-| Verifier migration belum mencakup dua migration TCP tanggal 5 September | `prisma/verify-migration.mjs` | Verifier kini mencakup hold kuota, tetapi belum membuktikan pilihan final; cek `migrate status` dan integration final-route-choice. Verifier membuat schema/fixture sementara lalu rollback. |
+| Verifier migration belum mencakup migration pilihan final tanggal 5 dan 24 September | `prisma/verify-migration.mjs` | Verifier kini mencakup hold kuota, tetapi belum membuktikan pilihan final maupun pemisahan targetnya; cek `migrate status` dan integration final-route-choice. Verifier membuat schema/fixture sementara lalu rollback. |
 | Target `.env.local` belum dapat dibuktikan staging | Pemeriksaan indikator environment 22 September 2026 | `CRON_SECRET` lokal sudah valid, tetapi Integration/E2E sengaja tidak dijalankan agar fixture tidak berisiko menyentuh production; beri penanda staging eksplisit sebelum gate remote. |
 | Observasi 3–10 masih placeholder pada seed | `prisma/seed.ts` | Konten perlu diselesaikan panitia; jangan mengarang pertanyaan bisnis. Seed ulang juga dapat memperbarui properti field dan flag jalur existing. |
 | Penghapusan Auth dan DB bukan satu transaksi atomik | `lib/admin-deletion/service.ts` | Jika Supabase Auth gagal, akun tetap nonaktif dan penghapusan dapat dicoba ulang. Ini jalur pemulihan yang diimplementasikan, bukan bukti kegagalan yang terjadi di production. |
@@ -118,19 +132,20 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan terbaru dijalankan 22 September 2026 untuk perubahan hold kuota:
+Pemeriksaan kode terbaru dijalankan 24 September 2026 untuk pemisahan pilihan
+jalur final. Pemeriksaan database/cron pada tabel tetap merupakan hasil 22 September:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
-| Vitest | 30 file, 140 test lulus |
+| Vitest | 31 file, 146 test lulus |
 | Prisma schema validate | Lulus dengan environment contoh |
 | Next.js production build | Lulus dengan `.env.local`; route cron ikut terbangun |
 | Smoke cron lokal | Lulus; unauthorized `401`, authorized `200`, tidak ada hold expired saat pemeriksaan |
 | Fresh `npm ci` / postinstall generate | Hasil audit 7 September tetap lulus, 653 package dan Prisma Client 7.10.0 |
 | Integration/E2E staging | Belum dijalankan; target `.env.local` tidak dapat dibuktikan staging |
-| Migration database terkonfigurasi | Lulus; 16 migration up to date, counter konsisten, constraint hold aktif |
+| Migration database terkonfigurasi | Lulus; migration pilihan final diterapkan 24 September dan seluruh 17 migration up to date. Pemeriksaan counter/constraint hold berasal dari 22 September. |
 | Deployment aplikasi / transaksi live | Belum diverifikasi dari checkout lokal |
 
 Launcher npm global lokal masih bermasalah, sehingga setup menggunakan
@@ -146,11 +161,11 @@ dummy `.env.example` lulus. Hasil ini bukan klaim quality gate Phase 11 staging.
 - Commit source terakhir: `22199cd` — `fix: allow released TCP quota queue state`.
 - Commit sebelumnya: `ea9a128` — `feat: add final TCP route choice`.
 - Sebelumnya lagi: `42df40e` — `fix: route password recovery to reset form`.
-- Migration terbaru `20260922090000_registration_quota_holds` sudah diterapkan
-  ke database yang dikonfigurasi `.env.local`, mengikuti migration pilihan kelas
-  final tanggal 5 September.
-- Working tree berisi implementasi regulasi hold kuota, cron, UI, test integration
-  yang diselaraskan, serta dokumentasi; perubahan ini belum di-commit/push.
+- Migration `20260922090000_registration_quota_holds` sudah diterapkan ke database
+  yang dikonfigurasi `.env.local`. Migration source terbaru
+  `20260924090000_decouple_final_route_choice` diterapkan pada 24 September 2026.
+- Refactor pilihan jalur final mencakup migration, UI, service, test dan
+  dokumentasi yang diselaraskan.
 
 Clone/pull di komputer lain hanya membawa perubahan yang sudah dipublikasikan
 ke remote. Pastikan ketiga dokumen dipindahkan melalui commit/push yang disepakati

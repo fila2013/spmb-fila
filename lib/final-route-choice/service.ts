@@ -104,7 +104,7 @@ export function chooseFinalRoute(
       }
       if (
         !child.jalur.pilihanJalurFinalAktif ||
-        !child.jalur.fallbackJalurId
+        !child.jalur.pilihanJalurFinalTargetId
       ) {
         throw new CalonMuridError(
           "FINAL_ROUTE_CHOICE_DISABLED",
@@ -114,7 +114,7 @@ export function chooseFinalRoute(
       }
 
       const sourceRouteId = child.jalur.id;
-      const targetRouteId = child.jalur.fallbackJalurId;
+      const targetRouteId = child.jalur.pilihanJalurFinalTargetId;
       await lockRoutes(transaction, [sourceRouteId, targetRouteId]);
       child = await transaction.calonMurid.findUnique({
         where: { id: childId },
@@ -126,7 +126,7 @@ export function chooseFinalRoute(
         child.statusKeseluruhan !==
           StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
         child.jalur.id !== sourceRouteId ||
-        child.jalur.fallbackJalurId !== targetRouteId
+        child.jalur.pilihanJalurFinalTargetId !== targetRouteId
       ) {
         throw new CalonMuridError(
           "FINAL_ROUTE_CHOICE_LOCKED",
@@ -189,7 +189,7 @@ export function chooseFinalRoute(
       if (!target) {
         throw new CalonMuridError(
           "NOT_FOUND",
-          "Jalur reguler/fallback tidak ditemukan.",
+          "Jalur tujuan pilihan final tidak ditemukan.",
           404,
         );
       }
