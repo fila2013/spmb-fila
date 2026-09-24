@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createJalurAction,
@@ -10,7 +10,10 @@ import {
   updateKategoriAction,
 } from "@/app/admin/(master-data)/actions";
 import { KategoriTipe } from "@/generated/prisma/enums";
-import { initialMasterDataActionState } from "@/lib/master-data/action-state";
+import {
+  initialMasterDataActionState,
+  latestJalurSelection,
+} from "@/lib/master-data/action-state";
 
 type JalurValue = {
   id: string;
@@ -87,6 +90,75 @@ function Input({
   );
 }
 
+function JalurSelectionFields({
+  choices,
+  currentJalurId,
+  initialFallbackJalurId,
+  initialFinalTargetId,
+  finalTargetError,
+}: {
+  choices: Array<{ id: string; nama: string }>;
+  currentJalurId?: string;
+  initialFallbackJalurId: string;
+  initialFinalTargetId: string;
+  finalTargetError?: string[];
+}) {
+  const [fallbackJalurId, setFallbackJalurId] = useState(
+    initialFallbackJalurId,
+  );
+  const [pilihanJalurFinalTargetId, setPilihanJalurFinalTargetId] = useState(
+    initialFinalTargetId,
+  );
+  const availableChoices = choices.filter(
+    (choice) => choice.id !== currentJalurId,
+  );
+
+  return (
+    <>
+      <label className="block text-sm font-semibold text-slate-800">
+        Jalur fallback jika gagal
+        <select
+          name="fallbackJalurId"
+          value={fallbackJalurId}
+          onChange={(event) => setFallbackJalurId(event.target.value)}
+          className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
+        >
+          <option value="">Tidak ada fallback</option>
+          {availableChoices.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.nama}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-sm font-semibold text-slate-800">
+        Jalur tujuan pilihan final jika diterima
+        <select
+          name="pilihanJalurFinalTargetId"
+          value={pilihanJalurFinalTargetId}
+          onChange={(event) =>
+            setPilihanJalurFinalTargetId(event.target.value)
+          }
+          aria-invalid={Boolean(finalTargetError)}
+          className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
+        >
+          <option value="">Tidak ada pilihan jalur final</option>
+          {availableChoices.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.nama}
+            </option>
+          ))}
+        </select>
+        {finalTargetError ? (
+          <span className="mt-1 block text-xs text-red-700">
+            {finalTargetError[0]}
+          </span>
+        ) : null}
+      </label>
+    </>
+  );
+}
+
 export function JalurForm({
   value,
   choices,
@@ -99,6 +171,14 @@ export function JalurForm({
     action,
     initialMasterDataActionState,
   );
+  const persistedSelection = latestJalurSelection(
+    value,
+    state.savedJalurSelection,
+  );
+  const fallbackJalurId = persistedSelection?.fallbackJalurId ?? "";
+  const pilihanJalurFinalTargetId =
+    persistedSelection?.pilihanJalurFinalTargetId ?? "";
+  const selectionStateKey = `${value?.id ?? "new"}:${fallbackJalurId}:${pilihanJalurFinalTargetId}`;
 
   return (
     <form action={formAction} className="grid gap-4">
@@ -109,28 +189,14 @@ export function JalurForm({
         <Input label="Periode selesai" name="periodeSelesai" type="date" defaultValue={value?.periodeSelesai} error={state.fieldErrors?.periodeSelesai} />
       </div>
       <Input label={`Kuota maksimum${value ? ` (terpakai ${value.kuotaTerpakai})` : ""}`} name="kuotaMaks" type="number" min={0} defaultValue={value?.kuotaMaks ?? undefined} error={state.fieldErrors?.kuotaMaks} />
-      <label className="block text-sm font-semibold text-slate-800">
-        Jalur fallback jika gagal
-        <select name="fallbackJalurId" defaultValue={value?.fallbackJalurId ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">
-          <option value="">Tidak ada fallback</option>
-          {choices.filter((choice) => choice.id !== value?.id).map((choice) => <option key={choice.id} value={choice.id}>{choice.nama}</option>)}
-        </select>
-      </label>
-      <label className="block text-sm font-semibold text-slate-800">
-        Jalur tujuan pilihan final jika diterima
-        <select
-          name="pilihanJalurFinalTargetId"
-          defaultValue={value?.pilihanJalurFinalTargetId ?? ""}
-          aria-invalid={Boolean(
-            state.fieldErrors?.pilihanJalurFinalTargetId,
-          )}
-          className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
-        >
-          <option value="">Tidak ada pilihan jalur final</option>
-          {choices.filter((choice) => choice.id !== value?.id).map((choice) => <option key={choice.id} value={choice.id}>{choice.nama}</option>)}
-        </select>
-        {state.fieldErrors?.pilihanJalurFinalTargetId ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.pilihanJalurFinalTargetId[0]}</span> : null}
-      </label>
+      <JalurSelectionFields
+        key={selectionStateKey}
+        choices={choices}
+        currentJalurId={value?.id}
+        initialFallbackJalurId={fallbackJalurId}
+        initialFinalTargetId={pilihanJalurFinalTargetId}
+        finalTargetError={state.fieldErrors?.pilihanJalurFinalTargetId}
+      />
       <div className="grid gap-3 rounded-xl bg-slate-50 p-3 text-sm">
         <label className="flex items-center gap-2 font-semibold text-slate-800"><input type="checkbox" name="statusAktif" defaultChecked={value?.statusAktif ?? true} /> Aktifkan jalur</label>
         <label className="flex items-start gap-2 font-semibold text-slate-800"><input className="mt-1" type="checkbox" name="hapusDataJikaGagal" defaultChecked={value?.hapusDataJikaGagal ?? false} /> Hapus data calon murid jika gagal</label>

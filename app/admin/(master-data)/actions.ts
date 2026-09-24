@@ -77,9 +77,17 @@ export async function updateJalurAction(
       ...jalurFormValues(formData),
       id: formData.get("id"),
     });
-    await updateJalur(input, admin.userId);
+    const jalur = await updateJalur(input, admin.userId);
     refreshMasterData("/admin/jalur");
-    return { status: "success", message: "Jalur berhasil diperbarui." };
+    return {
+      status: "success",
+      message: "Jalur berhasil diperbarui.",
+      savedJalurSelection: {
+        id: jalur.id,
+        fallbackJalurId: jalur.fallbackJalurId,
+        pilihanJalurFinalTargetId: jalur.pilihanJalurFinalTargetId,
+      },
+    };
   } catch (error) {
     return errorState(error);
   }
@@ -138,4 +146,3 @@ export async function saveBiayaAction(
     return errorState(error);
   }
 }
-
