@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { LoginForm } from "@/components/auth/auth-form";
 
@@ -20,7 +21,7 @@ export default async function LoginPage({
       {params.reset === "success" ? <p className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Password berhasil diperbarui. Silakan masuk kembali.</p> : null}
       {params.auth === "confirmed" ? <p className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Email berhasil dikonfirmasi. Silakan masuk menggunakan akun Anda.</p> : null}
       {authStatus === "invalid" ? <p className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">Tautan autentikasi tidak valid atau telah kedaluwarsa.</p> : null}
-      {authStatus === "otp_expired" ? <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Tautan sudah pernah digunakan atau kedaluwarsa. Jika Anda dapat masuk, akun sudah terkonfirmasi; jika belum, minta tautan baru.</p> : null}
+      {authStatus === "otp_expired" ? <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Tautan sudah pernah digunakan atau kedaluwarsa. Jika Anda dapat masuk, akun sudah terkonfirmasi; jika belum, <Link href="/resend-confirmation" className="font-bold underline">kirim ulang tautan verifikasi</Link>.</p> : null}
       {params.auth === "forbidden" ? <p className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">Akun tidak dapat mengakses halaman tersebut.</p> : null}
       <LoginForm />
     </>

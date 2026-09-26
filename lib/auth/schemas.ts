@@ -30,6 +30,8 @@ export const registerSchema = z
 
 export const forgotPasswordSchema = z.object({ email: emailSchema });
 
+export const resendConfirmationSchema = z.object({ email: emailSchema });
+
 export const resetPasswordSchema = z
   .object({
     password: passwordSchema,

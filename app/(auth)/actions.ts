@@ -10,6 +10,7 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendConfirmationSchema,
   resetPasswordSchema,
 } from "@/lib/auth/schemas";
 import { ensureUserProfile } from "@/lib/auth/profile";
@@ -126,6 +127,7 @@ export async function loginAction(
   const profile = await ensureUserProfile({
     id: data.user.id,
     email: data.user.email,
+    emailVerifiedAt: data.user.email_confirmed_at ?? null,
   });
 
   if (!profile.statusAktif) {
@@ -166,6 +168,48 @@ export async function forgotPasswordAction(
     status: "success",
     message:
       "Jika email terdaftar, tautan reset password telah dikirim. Periksa juga folder spam.",
+  };
+}
+
+export async function resendConfirmationAction(
+  _previousState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const parsed = resendConfirmationSchema.safeParse(values(formData));
+  if (!parsed.success) {
+    return invalidState(parsed.error.flatten().fieldErrors);
+  }
+
+  const supabase = await createClient();
+  const environment = getAppEnvironment();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: parsed.data.email,
+    options: {
+      emailRedirectTo: authConfirmationUrl(environment.NEXT_PUBLIC_APP_URL),
+    },
+  });
+
+  if (error) {
+    console.error("Kirim ulang konfirmasi email gagal.", {
+      code: error.code ?? "unknown",
+      status: error.status,
+    });
+    if (
+      error.code === "over_email_send_rate_limit" ||
+      error.code === "over_request_rate_limit"
+    ) {
+      return {
+        status: "error",
+        message: "Terlalu banyak permintaan. Tunggu beberapa menit lalu coba kembali.",
+      };
+    }
+  }
+
+  return {
+    status: "success",
+    message:
+      "Jika akun terdaftar dan belum diverifikasi, tautan konfirmasi baru telah dikirim. Periksa juga folder spam.",
   };
 }
 

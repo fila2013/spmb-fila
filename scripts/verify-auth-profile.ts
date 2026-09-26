@@ -25,8 +25,10 @@ const prisma = new PrismaClient({
 
 const marker = randomUUID();
 const email = `phase2-${marker}@example.invalid`;
+const pendingEmail = `phase2-pending-${marker}@example.invalid`;
 const password = randomBytes(24).toString("base64url");
 let authUserId: string | undefined;
+let pendingAuthUserId: string | undefined;
 
 try {
   const { data, error } = await supabase.auth.admin.createUser({
@@ -49,7 +51,11 @@ try {
     throw new Error("Trigger tidak membuat profile users.");
   }
 
-  if (profile.role !== UserRole.WALI_MURID || !profile.statusAktif) {
+  if (
+    profile.role !== UserRole.WALI_MURID ||
+    !profile.statusAktif ||
+    !profile.emailVerifiedAt
+  ) {
     throw new Error("Default role/status profile tidak aman.");
   }
 
@@ -65,11 +71,75 @@ try {
   }
   await publicClient.auth.signOut();
 
+  const pendingCreation = await supabase.auth.admin.createUser({
+    email: pendingEmail,
+    password,
+    email_confirm: false,
+  });
+  if (pendingCreation.error || !pendingCreation.data.user) {
+    throw new Error(
+      `Gagal membuat akun pending uji Auth: ${pendingCreation.error?.message ?? "unknown"}`,
+    );
+  }
+  pendingAuthUserId = pendingCreation.data.user.id;
+
+  const pendingProfile = await prisma.user.findUnique({
+    where: { supabaseAuthUserId: pendingAuthUserId },
+  });
+  if (
+    !pendingProfile ||
+    pendingProfile.statusAktif ||
+    pendingProfile.emailVerifiedAt
+  ) {
+    throw new Error("Akun belum terverifikasi tidak dibuat sebagai pending.");
+  }
+
+  const blockedLogin = await publicClient.auth.signInWithPassword({
+    email: pendingEmail,
+    password,
+  });
+  if (!blockedLogin.error || blockedLogin.error.code !== "email_not_confirmed") {
+    throw new Error("Akun pending tidak diblokir sebelum verifikasi email.");
+  }
+
+  const confirmation = await supabase.auth.admin.updateUserById(
+    pendingAuthUserId,
+    { email_confirm: true },
+  );
+  if (confirmation.error) {
+    throw new Error(`Konfirmasi akun uji gagal: ${confirmation.error.message}`);
+  }
+
+  const activatedProfile = await prisma.user.findUnique({
+    where: { supabaseAuthUserId: pendingAuthUserId },
+  });
+  if (!activatedProfile?.statusAktif || !activatedProfile.emailVerifiedAt) {
+    throw new Error("Konfirmasi email tidak mengaktifkan profile pending.");
+  }
+
+  const activatedLogin = await publicClient.auth.signInWithPassword({
+    email: pendingEmail,
+    password,
+  });
+  if (
+    activatedLogin.error ||
+    activatedLogin.data.user?.id !== pendingAuthUserId
+  ) {
+    throw new Error("Login akun setelah konfirmasi email gagal.");
+  }
+  await publicClient.auth.signOut();
+
   console.log("Auth profile integration: OK");
 } finally {
   if (authUserId) {
     await prisma.user.deleteMany({ where: { supabaseAuthUserId: authUserId } });
     await supabase.auth.admin.deleteUser(authUserId);
+  }
+  if (pendingAuthUserId) {
+    await prisma.user.deleteMany({
+      where: { supabaseAuthUserId: pendingAuthUserId },
+    });
+    await supabase.auth.admin.deleteUser(pendingAuthUserId);
   }
 
   await prisma.$disconnect();

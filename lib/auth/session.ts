@@ -41,7 +41,11 @@ export async function getAuthContext(): Promise<AuthContext> {
       );
     }
 
-    profile = await ensureUserProfile({ id: userData.user.id, email });
+    profile = await ensureUserProfile({
+      id: userData.user.id,
+      email,
+      emailVerifiedAt: userData.user.email_confirmed_at ?? null,
+    });
   }
 
   if (!profile.statusAktif) {

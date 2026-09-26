@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  await ensureUserProfile({ id: data.user.id, email: data.user.email });
+  await ensureUserProfile({
+    id: data.user.id,
+    email: data.user.email,
+    emailVerifiedAt: data.user.email_confirmed_at ?? null,
+  });
   const redirectType =
     "redirectType" in data && data.redirectType === "recovery"
       ? data.redirectType

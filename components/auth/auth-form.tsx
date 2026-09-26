@@ -8,6 +8,7 @@ import {
   forgotPasswordAction,
   loginAction,
   registerAction,
+  resendConfirmationAction,
   resetPasswordAction,
 } from "@/app/(auth)/actions";
 import { initialAuthActionState } from "@/lib/auth/action-state";
@@ -122,6 +123,17 @@ export function LoginForm({ portal = "wali" }: { portal?: "wali" | "admin" }) {
           </Link>
         </div>
       ) : null}
+      {portal === "wali" ? (
+        <p className="text-center text-sm text-slate-600">
+          Belum menerima email?{" "}
+          <Link
+            className="font-semibold text-emerald-800 hover:underline"
+            href="/resend-confirmation"
+          >
+            Kirim ulang verifikasi
+          </Link>
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -158,6 +170,41 @@ export function ForgotPasswordForm() {
         {pending ? "Mengirim…" : "Kirim tautan reset"}
       </button>
       <p className="text-center text-sm"><Link href="/login" className="font-semibold text-emerald-800 hover:underline">Kembali ke login</Link></p>
+    </form>
+  );
+}
+
+export function ResendConfirmationForm() {
+  const [state, action, pending] = useActionState(
+    resendConfirmationAction,
+    initialAuthActionState,
+  );
+
+  return (
+    <form action={action} className="space-y-5">
+      <Field
+        label="Email akun"
+        name="email"
+        type="email"
+        autoComplete="email"
+        error={state.fieldErrors?.email}
+      />
+      <Notice state={state} />
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full rounded-xl bg-emerald-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-65"
+      >
+        {pending ? "Mengirim…" : "Kirim ulang tautan verifikasi"}
+      </button>
+      <p className="text-center text-sm">
+        <Link
+          href="/login"
+          className="font-semibold text-emerald-800 hover:underline"
+        >
+          Kembali ke login
+        </Link>
+      </p>
     </form>
   );
 }

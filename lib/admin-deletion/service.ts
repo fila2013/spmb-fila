@@ -21,6 +21,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type Transaction = Prisma.TransactionClient;
 
+export type GuardianStatusFilter =
+  | "active"
+  | "not_active"
+  | "pending"
+  | "inactive"
+  | "all";
+
+export type GuardianStatusCounts = {
+  total: number;
+  active: number;
+  notActive: number;
+  pending: number;
+  inactive: number;
+};
+
 const retainedPaymentSelect = {
   id: true,
   calonMuridReference: true,
@@ -90,29 +105,84 @@ async function decrementCategory(transaction: Transaction, id: string | null) {
   }
 }
 
-export function listGuardians(query?: string) {
-  return prisma.user.findMany({
-    where: {
-      role: UserRole.WALI_MURID,
-      ...(query
-        ? {
-            OR: [
-              { email: { contains: query, mode: "insensitive" as const } },
-              {
-                calonMurid: {
-                  some: {
-                    namaAnak: { contains: query, mode: "insensitive" as const },
-                  },
+function guardianStatusWhere(
+  status: GuardianStatusFilter,
+): Prisma.UserWhereInput {
+  if (status === "active") {
+    return { statusAktif: true, emailVerifiedAt: { not: null } };
+  }
+  if (status === "not_active") {
+    return { statusAktif: false };
+  }
+  if (status === "pending") {
+    return { emailVerifiedAt: null };
+  }
+  if (status === "inactive") {
+    return { statusAktif: false, emailVerifiedAt: { not: null } };
+  }
+  return {};
+}
+
+function guardianSearchWhere(query?: string): Prisma.UserWhereInput {
+  return {
+    role: UserRole.WALI_MURID,
+    ...(query
+      ? {
+          OR: [
+            { email: { contains: query, mode: "insensitive" as const } },
+            {
+              calonMurid: {
+                some: {
+                  namaAnak: { contains: query, mode: "insensitive" as const },
                 },
               },
-            ],
-          }
-        : {}),
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
+export async function getGuardianStatusCounts(
+  query?: string,
+): Promise<GuardianStatusCounts> {
+  const baseWhere = guardianSearchWhere(query);
+  const [total, active, pending, inactive] = await prisma.$transaction([
+    prisma.user.count({ where: baseWhere }),
+    prisma.user.count({
+      where: { ...baseWhere, ...guardianStatusWhere("active") },
+    }),
+    prisma.user.count({
+      where: { ...baseWhere, ...guardianStatusWhere("pending") },
+    }),
+    prisma.user.count({
+      where: { ...baseWhere, ...guardianStatusWhere("inactive") },
+    }),
+  ]);
+
+  return {
+    total,
+    active,
+    notActive: pending + inactive,
+    pending,
+    inactive,
+  };
+}
+
+export function listGuardians(
+  query?: string,
+  status: GuardianStatusFilter = "active",
+) {
+  return prisma.user.findMany({
+    where: {
+      ...guardianSearchWhere(query),
+      ...guardianStatusWhere(status),
     },
     select: {
       id: true,
       email: true,
       statusAktif: true,
+      emailVerifiedAt: true,
       createdAt: true,
       _count: { select: { calonMurid: true } },
       calonMurid: {

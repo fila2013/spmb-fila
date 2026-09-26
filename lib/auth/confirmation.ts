@@ -4,6 +4,7 @@ const AUTH_RETURN_PATHS = new Set([
   "/forgot-password",
   "/login",
   "/register",
+  "/resend-confirmation",
   "/reset-password",
 ]);
 

@@ -46,7 +46,11 @@ export async function confirmEmailAction(formData: FormData) {
     );
   }
 
-  await ensureUserProfile({ id: data.user.id, email: data.user.email });
+  await ensureUserProfile({
+    id: data.user.id,
+    email: data.user.email,
+    emailVerifiedAt: data.user.email_confirmed_at ?? null,
+  });
   if (parsed.data.type === "recovery") {
     redirect(confirmationDestination(parsed.data.type));
   }

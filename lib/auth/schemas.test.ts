@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   forgotPasswordSchema,
   registerSchema,
+  resendConfirmationSchema,
   resetPasswordSchema,
 } from "@/lib/auth/schemas";
 
@@ -41,5 +42,13 @@ describe("auth schemas", () => {
       false,
     );
   });
-});
 
+  it("menormalkan email untuk kirim ulang verifikasi", () => {
+    expect(
+      resendConfirmationSchema.parse({ email: "  Wali@Example.com " }),
+    ).toEqual({ email: "wali@example.com" });
+    expect(
+      resendConfirmationSchema.safeParse({ email: "bukan-email" }).success,
+    ).toBe(false);
+  });
+});

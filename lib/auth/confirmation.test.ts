@@ -53,6 +53,7 @@ describe("auth confirmation destination", () => {
 
   it("hanya menangkap authorization code pada halaman auth publik", () => {
     expect(isAuthReturnPath("/register")).toBe(true);
+    expect(isAuthReturnPath("/resend-confirmation")).toBe(true);
     expect(isAuthReturnPath("/auth/confirm")).toBe(true);
     expect(isAuthReturnPath("/admin/peserta")).toBe(false);
   });

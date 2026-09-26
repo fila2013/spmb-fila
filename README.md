@@ -116,9 +116,10 @@ perlu URL-encoding bila mengandung karakter khusus.
 Schema: `prisma/schema.prisma`; seluruh SQL incremental ada di `prisma/migrations`.
 Migration mencakup tabel domain, RLS, trigger profile Supabase Auth, retention
 pembayaran dan constraint kuota/status. Migration source terbaru:
-`20260924090000_decouple_final_route_choice`. Migration ini memisahkan jalur
-tujuan pilihan final peserta diterima dari fallback peserta gagal. Migration ini
-diterapkan pada 24 September 2026 ke database yang dikonfigurasi `.env.local`.
+`20260926090000_email_verification_status`. Migration ini menyinkronkan waktu
+verifikasi email dari Supabase Auth, membuat profile baru nonaktif sampai email
+terkonfirmasi, dan telah diterapkan pada 26 September 2026 ke database yang
+dikonfigurasi `.env.local`.
 
 **Prisma CLI tidak otomatis membaca `.env.local`.** `prisma.config.ts` memakai
 `dotenv/config`, yang default-nya membaca `.env`. Muat file lokal secara eksplisit
@@ -177,6 +178,10 @@ Script membaca `.env.local` dan membuat **atau memperbarui** konfigurasi bucket:
 
 Aktifkan provider Email dan **Confirm Email** pada Supabase Auth. Aplikasi menolak
 aktivasi signup yang langsung menghasilkan session tanpa konfirmasi.
+Profile aplikasi yang belum terverifikasi disimpan sebagai pending/nonaktif dan
+baru diaktifkan saat `email_confirmed_at` terisi. Pengguna dapat meminta tautan
+baru melalui `/resend-confirmation`; responsnya tidak membocorkan apakah email
+terdaftar.
 Atur Site URL sama dengan `NEXT_PUBLIC_APP_URL` (tanpa `/register` atau path lain),
 dan daftarkan Redirect URLs lokal berikut beserta padanan domain deployment:
 
@@ -359,11 +364,13 @@ tervalidasi oleh audit ini.
   `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
   PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
   jangan menjalankan force-fix tanpa review dependency terpisah.
-- Hasil verifikasi kode terbaru 24 September 2026: **lint, typecheck, 31 file /
-  146 unit test, Prisma validate dan Next.js build lulus**. Migration hold telah
+- Hasil verifikasi kode terbaru 26 September 2026: **lint, typecheck, 32 file /
+  149 unit test, Prisma validate dan Next.js build lulus**. Migration hold telah
   diterapkan pada 22 September 2026 ke database yang dikonfigurasi `.env.local`.
-  Migration pemisahan target pilihan final diterapkan pada 24 September 2026 dan
-  Prisma kemudian menunjukkan seluruh 17 migration sudah diterapkan.
+  Migration pemisahan target pilihan final diterapkan pada 24 September 2026.
+  Migration status verifikasi email diterapkan pada 26 September 2026 dan Prisma
+  menunjukkan seluruh 18 migration sudah diterapkan. Integration Auth pending →
+  confirmed → aktif → login lulus dan fixture dibersihkan.
   `CRON_SECRET` lokal sudah valid dan smoke cron menghasilkan `401` tanpa secret
   serta `200` dengan Bearer secret yang benar. Integration/E2E belum dijalankan
   karena target database tersebut belum memiliki penanda staging eksplisit.

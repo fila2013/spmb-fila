@@ -141,13 +141,14 @@ enum StatusUndanganWa {
 }
 
 model User {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  supabaseAuthUserId String   @unique @map("supabase_auth_user_id") @db.Uuid
-  email              String   @unique @db.VarChar(255)
-  role               UserRole @default(WALI_MURID)
-  statusAktif        Boolean  @default(true) @map("status_aktif")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supabaseAuthUserId String    @unique @map("supabase_auth_user_id") @db.Uuid
+  email              String    @unique @db.VarChar(255)
+  role               UserRole  @default(WALI_MURID)
+  statusAktif        Boolean   @default(false) @map("status_aktif")
+  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   calonMurid                 CalonMurid[]
   pembayaranDiverifikasi     Pembayaran[]           @relation("PembayaranVerifier")
@@ -156,6 +157,7 @@ model User {
   pengaturanPembayaranDiubah PengaturanPembayaran[] @relation("PengaturanPembayaranUpdater")
   auditLogs                  AuditLog[]             @relation("AuditActor")
 
+  @@index([role, emailVerifiedAt, statusAktif])
   @@map("users")
 }
 

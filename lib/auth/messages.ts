@@ -19,7 +19,7 @@ export function signupErrorMessage(code?: string) {
 
 export function loginErrorMessage(code?: string) {
   if (code === "email_not_confirmed") {
-    return "Email belum dikonfirmasi. Buka tautan verifikasi yang dikirim ke email Anda.";
+    return "Email belum dikonfirmasi. Buka tautan verifikasi atau kirim ulang email konfirmasi.";
   }
   return "Email atau password tidak sesuai.";
 }

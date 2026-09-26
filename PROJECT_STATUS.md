@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 24 September 2026
+**Tanggal snapshot:** 26 September 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -34,7 +34,7 @@ layanan remote atau sudah beroperasi di production.
 | Area | Cakupan yang sudah diimplementasikan |
 |---|---|
 | Fondasi database | Schema dan migration incremental, RLS, constraint kuota/status, trigger sinkronisasi profile Supabase Auth, audit log dan retention pembayaran |
-| Auth | Register/login, konfirmasi email dua langkah, reset password, cookie session, profile aktif, role admin/wali dan ownership |
+| Auth | Register/login, konfirmasi email dua langkah, resend verifikasi, profile pending sampai email terkonfirmasi, reset password, cookie session, role admin/wali dan ownership |
 | Master data | Jalur/kategori, periode/keaktifan, kuota, matrix biaya Jalur × Kategori |
 | Pendaftaran | Satu akun banyak anak; pemilihan jalur tanpa pemakaian kuota permanen; hold jalur/kategori atomik dengan expiry configurable dan proteksi kursi terakhir |
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
@@ -48,6 +48,22 @@ layanan remote atau sudah beroperasi di production.
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Sinkronisasi verifikasi email diimplementasikan 26 September 2026:
+
+- Profile baru disimpan nonaktif dengan label `Menunggu Verifikasi Email` sampai
+  `email_confirmed_at` Supabase terisi; constraint database mencegah akun
+  unverified menjadi aktif.
+- Halaman `/resend-confirmation` tersedia dari login untuk meminta tautan baru
+  dengan respons generik yang tidak membocorkan keberadaan akun.
+- Daftar wali admin default hanya menampilkan akun aktif, menampilkan ringkasan
+  jumlah total/aktif/tidak aktif, serta menyediakan filter aktif, tidak aktif,
+  menunggu verifikasi, dinonaktifkan, dan semua status.
+- Migration `20260926090000_email_verification_status` diterapkan ke database
+  `.env.local`. Seluruh 13 akun unverified/0 anak menjadi pending/nonaktif tanpa
+  dihapus; tidak ada profile confirmed yang kehilangan timestamp verifikasi.
+- Integration Auth membuktikan login ditolak sebelum konfirmasi, konfirmasi
+  mengaktifkan profile, login sesudahnya berhasil, dan fixture dibersihkan.
 
 Refactor pilihan jalur final diimplementasikan pada source 24 September 2026:
 
@@ -132,20 +148,20 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan kode terbaru dijalankan 24 September 2026 untuk pemisahan pilihan
-jalur final. Pemeriksaan database/cron pada tabel tetap merupakan hasil 22 September:
+Pemeriksaan kode dan Auth terbaru dijalankan 26 September 2026. Pemeriksaan
+database/cron untuk hold tetap merupakan hasil 22 September:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
-| Vitest | 31 file, 146 test lulus |
+| Vitest | 32 file, 149 test lulus |
 | Prisma schema validate | Lulus dengan environment contoh |
 | Next.js production build | Lulus dengan `.env.local`; route cron ikut terbangun |
 | Smoke cron lokal | Lulus; unauthorized `401`, authorized `200`, tidak ada hold expired saat pemeriksaan |
 | Fresh `npm ci` / postinstall generate | Hasil audit 7 September tetap lulus, 653 package dan Prisma Client 7.10.0 |
-| Integration/E2E staging | Belum dijalankan; target `.env.local` tidak dapat dibuktikan staging |
-| Migration database terkonfigurasi | Lulus; migration pilihan final diterapkan 24 September dan seluruh 17 migration up to date. Pemeriksaan counter/constraint hold berasal dari 22 September. |
+| Integration/E2E staging | Integration Auth terarah lulus dan fixture dibersihkan; suite integration lain/E2E tidak dijalankan ulang |
+| Migration database terkonfigurasi | Lulus; migration verifikasi email diterapkan 26 September dan seluruh 18 migration up to date. Pemeriksaan counter/constraint hold berasal dari 22 September. |
 | Deployment aplikasi / transaksi live | Belum diverifikasi dari checkout lokal |
 
 Launcher npm global lokal masih bermasalah, sehingga setup menggunakan
@@ -157,15 +173,15 @@ dummy `.env.example` lulus. Hasil ini bukan klaim quality gate Phase 11 staging.
 
 ### Snapshot Git saat pekerjaan dilanjutkan
 
-- HEAD: `3a63e57` — `fix: resolve Next.js layoutprops typegen on fresh setup fix`.
-- Commit source terakhir: `22199cd` — `fix: allow released TCP quota queue state`.
-- Commit sebelumnya: `ea9a128` — `feat: add final TCP route choice`.
-- Sebelumnya lagi: `42df40e` — `fix: route password recovery to reset form`.
+- Basis sebelum implementasi verifikasi email: `d2ac738` —
+  `fix: tombol dropdown bug`.
+- Commit sebelumnya: `310bcc8` —
+  `refactor: decouple final route choice from fallback`.
 - Migration `20260922090000_registration_quota_holds` sudah diterapkan ke database
   yang dikonfigurasi `.env.local`. Migration source terbaru
-  `20260924090000_decouple_final_route_choice` diterapkan pada 24 September 2026.
-- Refactor pilihan jalur final mencakup migration, UI, service, test dan
-  dokumentasi yang diselaraskan.
+  `20260926090000_email_verification_status` diterapkan pada 26 September 2026.
+- Snapshot ini mencakup implementasi status verifikasi email, resend, ringkasan
+  dan filter wali admin, test, migration, serta dokumentasi terkait.
 
 Clone/pull di komputer lain hanya membawa perubahan yang sudah dipublikasikan
 ke remote. Pastikan ketiga dokumen dipindahkan melalui commit/push yang disepakati

@@ -709,6 +709,14 @@ Jangan:
 - membuat session system sendiri jika tidak diperlukan.
 
 Tabel aplikasi `users` menyimpan profile/role dan referensi ke identity Supabase.
+Profile baru boleh dibuat saat signup untuk sinkronisasi identity, tetapi wajib
+nonaktif selama `email_confirmed_at` masih kosong. Konfirmasi email pertama kali
+mengaktifkan profile; penonaktifan administratif sesudahnya tidak boleh dibatalkan
+otomatis oleh login berikutnya. Admin harus dapat membedakan status aktif,
+menunggu verifikasi email, dan dinonaktifkan. Daftar wali menampilkan ringkasan
+jumlah total, aktif, dan tidak aktif serta dapat difilter menurut status tersebut.
+Wali dapat meminta ulang tautan konfirmasi dengan respons generik agar keberadaan
+akun tidak bocor.
 
 ## 7.5 Authorization
 
