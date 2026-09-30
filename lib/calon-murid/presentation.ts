@@ -1,5 +1,19 @@
 import { StatusKeseluruhan } from "@/generated/prisma/enums";
 
+const registrationDateFormatter = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+export function formatParticipantRegistrationDate(value: Date) {
+  return `${registrationDateFormatter.format(value)} WIB`;
+}
+
 export const statusPresentation: Record<
   StatusKeseluruhan,
   { label: string; className: string }

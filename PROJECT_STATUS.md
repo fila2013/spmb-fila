@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 26 September 2026
+**Tanggal snapshot:** 30 September 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -38,7 +38,7 @@ layanan remote atau sudah beroperasi di production.
 | Master data | Jalur/kategori, periode/keaktifan, kuota, matrix biaya Jalur × Kategori |
 | Pendaftaran | Satu akun banyak anak; pemilihan jalur tanpa pemakaian kuota permanen; hold jalur/kategori atomik dengan expiry configurable dan proteksi kursi terakhir |
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
-| Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, dan unduh PDF A4 dari detail peserta admin (Data Pribadi halaman pertama; Observasi mulai halaman kedua) |
+| Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, unduh PDF A4, dan QR chat WhatsApp Ayah/Bunda pada detail peserta admin |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, tanggal rilis dan tombol Google Calendar |
 | Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
@@ -48,6 +48,21 @@ layanan remote atau sudah beroperasi di production.
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+QR chat WhatsApp wali diperbarui pada 30 September 2026. Kartu
+No. WA Ayah/Bunda di detail enrollment admin menampilkan QR berisi URL `wa.me`
+dengan nomor `62...` tanpa pemisah dan pesan pembuka berisi nama anak. Pesan
+di-URL-encode; QR hanya tersedia bila nomor dan nama anak valid. Belum ada
+verifikasi scan menggunakan perangkat fisik atau deployment fitur ini.
+Daftar peserta admin juga menampilkan timestamp pembuatan data anak di bawah
+email, diformat dengan zona waktu Asia/Jakarta; tidak ada perubahan database.
+
+Timeout login lokal ditangani 29 September 2026: profil yang sudah sinkron
+dibaca tanpa transaksi, sedangkan pembuatan/perubahan profil memakai upsert SQL
+atomik. Koneksi pooled terbukti dapat dijangkau, namun waktu koneksi awal sekitar
+2,2 detik melewati batas tunggu transaksi interaktif Prisma 2 detik. Bentuk SQL
+upsert diverifikasi dengan `EXPLAIN` tanpa menulis data; login memakai akun
+pengguna belum diuji langsung. Perubahan ini belum diverifikasi di deployment.
 
 Sinkronisasi verifikasi email diimplementasikan 26 September 2026:
 
@@ -148,15 +163,16 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan kode dan Auth terbaru dijalankan 26 September 2026. Pemeriksaan
-database/cron untuk hold tetap merupakan hasil 22 September:
+Pemeriksaan kode terbaru dijalankan 30 September 2026; Auth integration dan
+Prisma validate terakhir dijalankan 26 September. Pemeriksaan database/cron
+untuk hold tetap merupakan hasil 22 September:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
-| Vitest | 32 file, 149 test lulus |
-| Prisma schema validate | Lulus dengan environment contoh |
+| Vitest | 36 file, 164 test lulus |
+| Prisma schema validate | Lulus pada 26 September 2026 |
 | Next.js production build | Lulus dengan `.env.local`; route cron ikut terbangun |
 | Smoke cron lokal | Lulus; unauthorized `401`, authorized `200`, tidak ada hold expired saat pemeriksaan |
 | Fresh `npm ci` / postinstall generate | Hasil audit 7 September tetap lulus, 653 package dan Prisma Client 7.10.0 |

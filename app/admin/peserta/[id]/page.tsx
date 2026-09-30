@@ -9,6 +9,7 @@ import {
   WhatsappInvitationForm,
 } from "@/components/admin/admission-forms";
 import { DeleteParticipantForm } from "@/components/admin/deletion-forms";
+import { GuardianWhatsAppQr } from "@/components/admin/guardian-whatsapp-qr";
 import { PaymentProofDeletion } from "@/components/admin/payment-proof-deletion";
 import {
   AnnouncementResultForm,
@@ -26,6 +27,10 @@ import {
 import { AdmissionError } from "@/lib/admission/errors";
 import { getAdminAdmissionData } from "@/lib/admission/service";
 import { requireRolePage } from "@/lib/auth/navigation";
+import {
+  guardianRoleForPhoneField,
+  guardianWhatsAppUrlFromEnrollment,
+} from "@/lib/enrollment/whatsapp-chat-url";
 import { StageError } from "@/lib/stages/errors";
 import { PaymentError } from "@/lib/payment/errors";
 import { getAdminRegistrationPaymentData } from "@/lib/payment/service";
@@ -101,6 +106,10 @@ export default async function ParticipantDetailPage({
   }
   const du = admission.payment;
   const whatsapp = admission.whatsapp;
+  const guardianWhatsAppUrls = {
+    ayah: guardianWhatsAppUrlFromEnrollment(participant.formResponses, "ayah", participant.namaAnak),
+    bunda: guardianWhatsAppUrlFromEnrollment(participant.formResponses, "bunda", participant.namaAnak),
+  };
   const announcementLocked = Boolean(participant.pilihanJalurFinal) ||
     participant.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
     participant.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
@@ -201,12 +210,19 @@ export default async function ParticipantDetailPage({
             ) : null}
           </div>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-            {participant.formResponses.map((response) => (
-              <div key={response.id} className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{response.field.label}</dt>
-                <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-900">{response.value || "—"}</dd>
-              </div>
-            ))}
+            {participant.formResponses.map((response) => {
+              const role = guardianRoleForPhoneField(response.field);
+              const url = role ? guardianWhatsAppUrls[role] : null;
+              return (
+                <div key={response.id} className="rounded-xl bg-slate-50 p-3">
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{response.field.label}</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-900">
+                    {response.value || "—"}
+                    {url && role ? <GuardianWhatsAppQr url={url} role={role} /> : null}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
           {participant.formResponses.length === 0 ? <p className="mt-3 text-sm text-slate-500">Belum ada jawaban enrollment.</p> : null}
         </section>

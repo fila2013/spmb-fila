@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
 import { requireRolePage } from "@/lib/auth/navigation";
-import { statusPresentation } from "@/lib/calon-murid/presentation";
+import {
+  formatParticipantRegistrationDate,
+  statusPresentation,
+} from "@/lib/calon-murid/presentation";
 import { listJalur, listKategori } from "@/lib/master-data/service";
 import { participantListFilterSchema } from "@/lib/stages/schemas";
 import { listParticipants } from "@/lib/stages/service";
@@ -161,6 +164,12 @@ export default async function ParticipantsPage({
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{item.namaAnak}</p>
                       <p className="text-xs text-slate-500">{item.user.email}</p>
+                      <time
+                        dateTime={item.createdAt.toISOString()}
+                        className="mt-1 block text-xs text-slate-500"
+                      >
+                        Tgl daftar: {formatParticipantRegistrationDate(item.createdAt)}
+                      </time>
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       {item.jalur?.nama ??

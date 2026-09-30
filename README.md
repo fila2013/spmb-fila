@@ -7,9 +7,10 @@ mendukung Midtrans Snap atau transfer manual, sedangkan DU tetap manual.
 
 ## Status project
 
-Audit repository terakhir diperbarui **24 September 2026**: implementasi cakupan Phase 0–11 tersedia,
+Audit repository terakhir diperbarui **30 September 2026**: implementasi cakupan Phase 0–11 tersedia,
 termasuk multi-anak, kuota/matrix biaya, enrollment dan ekspor PDF A4 peserta,
-CMS, assessment/pengumuman,
+QR chat WhatsApp Ayah/Bunda pada detail enrollment admin, tanggal pendaftaran
+pada daftar peserta admin, CMS, assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
 retention, laporan CSV/XLSX, serta temporary hold kuota pembayaran. Ketersediaan
 kode bukan bukti kesiapan live.
@@ -364,8 +365,10 @@ tervalidasi oleh audit ini.
   `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
   PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
   jangan menjalankan force-fix tanpa review dependency terpisah.
-- Hasil verifikasi kode terbaru 26 September 2026: **lint, typecheck, 32 file /
-  149 unit test, Prisma validate dan Next.js build lulus**. Migration hold telah
+- Hasil verifikasi kode terbaru 30 September 2026: **lint, typecheck, 36 file /
+  164 unit test, dan Next.js build lulus**. Sinkronisasi profil saat login tidak
+  lagi memakai transaksi interaktif yang rentan timeout koneksi awal.
+  Prisma validate terakhir lulus pada 26 September 2026. Migration hold telah
   diterapkan pada 22 September 2026 ke database yang dikonfigurasi `.env.local`.
   Migration pemisahan target pilihan final diterapkan pada 24 September 2026.
   Migration status verifikasi email diterapkan pada 26 September 2026 dan Prisma
