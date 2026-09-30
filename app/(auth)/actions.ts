@@ -124,11 +124,28 @@ export async function loginAction(
     };
   }
 
-  const profile = await ensureUserProfile({
-    id: data.user.id,
-    email: data.user.email,
-    emailVerifiedAt: data.user.email_confirmed_at ?? null,
-  });
+  let profile: Awaited<ReturnType<typeof ensureUserProfile>>;
+  try {
+    profile = await ensureUserProfile({
+      id: data.user.id,
+      email: data.user.email,
+      emailVerifiedAt: data.user.email_confirmed_at ?? null,
+    });
+  } catch (profileError) {
+    await supabase.auth.signOut();
+    const code =
+      profileError &&
+      typeof profileError === "object" &&
+      "code" in profileError &&
+      typeof profileError.code === "string"
+        ? profileError.code
+        : "unknown";
+    console.error("Sinkronisasi profil saat login gagal.", { code });
+    return {
+      status: "error",
+      message: "Layanan akun sedang tidak tersedia. Silakan coba masuk kembali beberapa saat lagi.",
+    };
+  }
 
   if (!profile.statusAktif) {
     await supabase.auth.signOut();

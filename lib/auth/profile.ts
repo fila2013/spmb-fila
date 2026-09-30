@@ -14,34 +14,45 @@ export async function ensureUserProfile(identity: AuthIdentity) {
     ? new Date(identity.emailVerifiedAt)
     : null;
 
-  return prisma.$transaction(async (transaction) => {
-    const existing = await transaction.user.findUnique({
-      where: { supabaseAuthUserId: identity.id },
-    });
+  const existing = await prisma.user.findUnique({
+    where: { supabaseAuthUserId: identity.id },
+  });
 
-    if (!existing) {
-      return transaction.user.create({
-        data: {
-          supabaseAuthUserId: identity.id,
-          email: normalizedEmail,
-          emailVerifiedAt,
-          statusAktif: emailVerifiedAt !== null,
-        },
-      });
-    }
+  if (
+    existing &&
+    existing.email === normalizedEmail &&
+    existing.emailVerifiedAt?.getTime() === emailVerifiedAt?.getTime()
+  ) {
+    return existing;
+  }
 
-    return transaction.user.update({
-      where: { id: existing.id },
-      data: {
-        email: normalizedEmail,
-        emailVerifiedAt,
-        statusAktif:
-          emailVerifiedAt === null
-            ? false
-            : existing.emailVerifiedAt === null
-              ? true
-              : existing.statusAktif,
-      },
-    });
+  // A single upsert keeps first-confirmation activation atomic while preserving
+  // an administrator's later deactivation, without starting an interactive
+  // transaction on the login path.
+  await prisma.$executeRaw`
+    INSERT INTO public.users (
+      supabase_auth_user_id, email, role, status_aktif, email_verified_at
+    )
+    VALUES (
+      ${identity.id}::uuid,
+      ${normalizedEmail},
+      'wali_murid'::public.user_role,
+      ${emailVerifiedAt !== null},
+      ${emailVerifiedAt}::timestamptz
+    )
+    ON CONFLICT (supabase_auth_user_id)
+    DO UPDATE SET
+      email = EXCLUDED.email,
+      email_verified_at = EXCLUDED.email_verified_at,
+      status_aktif = CASE
+        WHEN EXCLUDED.email_verified_at IS NULL THEN false
+        WHEN public.users.email_verified_at IS NULL THEN true
+        ELSE public.users.status_aktif
+      END,
+      updated_at = now()
+  `;
+
+  return prisma.user.findUniqueOrThrow({
+    where: { supabaseAuthUserId: identity.id },
   });
 }
