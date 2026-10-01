@@ -7,10 +7,11 @@ mendukung Midtrans Snap atau transfer manual, sedangkan DU tetap manual.
 
 ## Status project
 
-Audit repository terakhir diperbarui **30 September 2026**: implementasi cakupan Phase 0–11 tersedia,
+Audit repository terakhir diperbarui **1 Oktober 2026**: implementasi cakupan Phase 0–11 tersedia,
 termasuk multi-anak, kuota/matrix biaya, enrollment dan ekspor PDF A4 peserta,
 QR chat WhatsApp Ayah/Bunda pada detail enrollment admin, tanggal pendaftaran
-pada daftar peserta admin, CMS, assessment/pengumuman,
+pada daftar peserta admin, CMS dengan rentang urutan peserta untuk empat tahap,
+assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
 retention, laporan CSV/XLSX, serta temporary hold kuota pembayaran. Ketersediaan
 kode bukan bukti kesiapan live.
@@ -365,14 +366,15 @@ tervalidasi oleh audit ini.
   `mysql2@3.15.3`, dependency transitif Prisma CLI. Runtime aplikasi memakai
   PostgreSQL/`pg`; saran otomatis npm adalah downgrade major Prisma 6, sehingga
   jangan menjalankan force-fix tanpa review dependency terpisah.
-- Hasil verifikasi kode terbaru 30 September 2026: **lint, typecheck, 36 file /
-  164 unit test, dan Next.js build lulus**. Sinkronisasi profil saat login tidak
+- Hasil verifikasi kode terbaru 1 Oktober 2026: **lint, typecheck, 37 file /
+  171 unit test, Prisma validate, dan Next.js build lulus**. Sinkronisasi profil saat login tidak
   lagi memakai transaksi interaktif yang rentan timeout koneksi awal.
-  Prisma validate terakhir lulus pada 26 September 2026. Migration hold telah
-  diterapkan pada 22 September 2026 ke database yang dikonfigurasi `.env.local`.
+  Migration hold telah diterapkan pada 22 September 2026 ke database yang dikonfigurasi `.env.local`.
   Migration pemisahan target pilihan final diterapkan pada 24 September 2026.
-  Migration status verifikasi email diterapkan pada 26 September 2026 dan Prisma
-  menunjukkan seluruh 18 migration sudah diterapkan. Integration Auth pending →
+  Migration status verifikasi email diterapkan pada 26 September 2026.
+  Migration rentang urutan peserta diterapkan pada 1 Oktober 2026; Prisma
+  menunjukkan seluruh 19 migration sudah diterapkan. Enam blok konten existing
+  tetap ada dan seluruh batas baru bernilai `NULL`. Integration Auth pending →
   confirmed → aktif → login lulus dan fixture dibersihkan.
   `CRON_SECRET` lokal sudah valid dan smoke cron menghasilkan `401` tanpa secret
   serta `200` dengan Bearer secret yang benar. Integration/E2E belum dijalankan

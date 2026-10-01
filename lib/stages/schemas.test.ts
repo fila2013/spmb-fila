@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { StatusKeseluruhan, TahapKonten } from "@/generated/prisma/enums";
-import { announcementInputSchema, deleteStageContentSchema, participantListFilterSchema, participantStageTypeParamSchema, stageContentInputSchema, stageTypeParamSchema } from "@/lib/stages/schemas";
+import { announcementInputSchema, deleteStageContentSchema, participantListFilterSchema, participantStageTypeParamSchema, stageContentInputSchema, stageTypeParamSchema, updateStageContentSchema } from "@/lib/stages/schemas";
 
 describe("Phase 7 schemas", () => {
   it("menerima slug tahap lowercase", () => {
@@ -20,7 +20,20 @@ describe("Phase 7 schemas", () => {
 
   it("menormalisasi scope dan tanggal konten kosong", () => {
     const value = stageContentInputSchema.parse({ tahap: "ASSESSMENT", judul: "Jadwal", tanggal: "", isiTeks: " Info ", gambarUrl: null, urutanLayout: "0", statusAktif: true, jalurId: "", kategoriId: "" });
-    expect(value).toMatchObject({ tanggal: null, isiTeks: "Info", jalurId: null, kategoriId: null, urutanLayout: 0 });
+    expect(value).toMatchObject({ tanggal: null, isiTeks: "Info", jalurId: null, kategoriId: null, urutanLayout: 0, minParticipantOrder: null, maxParticipantOrder: null });
+  });
+
+  it("menerima rentang opsional, menolak batas terbalik, dan menjaga beranda global", () => {
+    const base = { tahap: "ASSESSMENT", judul: "Jadwal", tanggal: "", isiTeks: "", gambarUrl: null, urutanLayout: "0", statusAktif: true, jalurId: "", kategoriId: "" };
+    expect(stageContentInputSchema.parse({ ...base, minParticipantOrder: "1", maxParticipantOrder: "50" }))
+      .toMatchObject({ minParticipantOrder: 1, maxParticipantOrder: 50 });
+    expect(stageContentInputSchema.parse({ ...base, minParticipantOrder: "", maxParticipantOrder: "50" }))
+      .toMatchObject({ minParticipantOrder: null, maxParticipantOrder: 50 });
+    expect(stageContentInputSchema.safeParse({ ...base, minParticipantOrder: "0" }).success).toBe(false);
+    expect(stageContentInputSchema.safeParse({ ...base, minParticipantOrder: "1.5" }).success).toBe(false);
+    expect(stageContentInputSchema.safeParse({ ...base, minParticipantOrder: "51", maxParticipantOrder: "50" }).success).toBe(false);
+    expect(stageContentInputSchema.safeParse({ ...base, tahap: "HOME", minParticipantOrder: "1" }).success).toBe(false);
+    expect(updateStageContentSchema.safeParse({ ...base, id: "10000000-0000-4000-8000-000000000001", minParticipantOrder: "51", maxParticipantOrder: "50" }).success).toBe(false);
   });
 
   it("menormalisasi link YouTube menjadi video ID", () => {

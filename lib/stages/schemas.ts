@@ -37,6 +37,10 @@ const optionalYoutubeVideoId = z.preprocess(
   },
   z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Link YouTube tidak valid.").nullable(),
 );
+const optionalParticipantOrder = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.number().int("Urutan peserta harus bilangan bulat.").min(1, "Urutan peserta minimal 1.").max(2_147_483_647, "Urutan peserta terlalu besar.").nullable(),
+);
 
 export const stageIdSchema = uuid;
 export const participantListFilterSchema = z.object({
@@ -78,12 +82,22 @@ export const stageContentInputSchema = z.object({
   gambarUrl: optionalText(2_000).default(null),
   youtubeVideoId: optionalYoutubeVideoId.default(null),
   urutanLayout: z.coerce.number().int().min(0).max(10_000),
+  minParticipantOrder: optionalParticipantOrder,
+  maxParticipantOrder: optionalParticipantOrder,
   statusAktif: z.boolean(),
   jalurId: optionalUuid,
   kategoriId: optionalUuid,
-});
+}).refine(
+  ({ minParticipantOrder, maxParticipantOrder }) =>
+    minParticipantOrder === null || maxParticipantOrder === null || minParticipantOrder <= maxParticipantOrder,
+  { path: ["maxParticipantOrder"], message: "Maksimal urutan peserta tidak boleh lebih kecil dari minimal." },
+).refine(
+  ({ tahap, minParticipantOrder, maxParticipantOrder }) =>
+    tahap !== TahapKonten.HOME || (minParticipantOrder === null && maxParticipantOrder === null),
+  { path: ["minParticipantOrder"], message: "Rentang urutan peserta tidak berlaku untuk konten beranda." },
+);
 
-export const updateStageContentSchema = stageContentInputSchema.extend({ id: uuid });
+export const updateStageContentSchema = stageContentInputSchema.safeExtend({ id: uuid });
 export const deleteStageContentSchema = z.object({
   id: uuid,
   confirmation: z.literal("HAPUS"),

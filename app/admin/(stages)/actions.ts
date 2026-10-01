@@ -50,6 +50,8 @@ function contentValues(formData: FormData, gambarUrl: string | null) {
     gambarUrl,
     youtubeVideoId: formData.get("youtubeVideoId"),
     urutanLayout: formData.get("urutanLayout"),
+    minParticipantOrder: formData.get("minParticipantOrder"),
+    maxParticipantOrder: formData.get("maxParticipantOrder"),
     statusAktif: formData.get("statusAktif") === "on",
     jalurId: formData.get("jalurId"),
     kategoriId: formData.get("kategoriId"),

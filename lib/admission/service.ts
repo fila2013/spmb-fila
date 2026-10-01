@@ -24,6 +24,7 @@ import type {
 import { whatsappInvitationSchema } from "@/lib/admission/schemas";
 import { assertOwnership } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
+import { contentVisibleToParticipant } from "@/lib/stages/participant-order";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function bucketName() {
@@ -133,6 +134,7 @@ export async function getAdmissionFeePageData(childId: string, userId: string) {
       orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }],
     }),
   ]);
+  const visibleContent = await contentVisibleToParticipant(content, child);
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null },
     mayUpload: admissionFeeUploadStatuses.includes(child.statusKeseluruhan) && payment?.status !== StatusPembayaran.PENDING && payment?.status !== StatusPembayaran.VERIFIED,
@@ -146,7 +148,7 @@ export async function getAdmissionFeePageData(childId: string, userId: string) {
       proofUrl: await signedProofUrl(payment.fileBuktiUrl),
       proofKind: proofKind(payment.fileBuktiUrl),
     } : null,
-    content: content.map(publicContent),
+    content: visibleContent.map(publicContent),
   };
 }
 
@@ -357,13 +359,14 @@ export async function getJoinWaPageData(childId: string, userId: string) {
     }),
   ]);
   if (!payment) throw new AdmissionError("PAYMENT_REQUIRED", "Pembayaran DU belum terverifikasi.", 403);
+  const visibleContent = await contentVisibleToParticipant(content, child);
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null },
     status: child.statusGrupWa?.status ?? StatusUndanganWa.MENUNGGU,
     hasInviteLink: Boolean(child.statusGrupWa?.linkUndangan),
     linkOpenedAt: child.statusGrupWa?.linkDibukaAt ?? null,
     confirmedAt: child.statusGrupWa?.dikonfirmasiWaliAt ?? null,
-    content: content.map(publicContent),
+    content: visibleContent.map(publicContent),
   };
 }
 

@@ -15,6 +15,7 @@ import { releasedStatusAfterAcceptedDecision } from "@/lib/final-route-choice/ru
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { StageError } from "@/lib/stages/errors";
+import { contentVisibleToParticipant } from "@/lib/stages/participant-order";
 import {
   dateOnly,
   isAnnouncementReleased,
@@ -45,6 +46,8 @@ function contentSnapshot(content: KontenTahap) {
     gambarUrl: content.gambarUrl,
     youtubeVideoId: content.youtubeVideoId,
     urutanLayout: content.urutanLayout,
+    minParticipantOrder: content.minParticipantOrder,
+    maxParticipantOrder: content.maxParticipantOrder,
     statusAktif: content.statusAktif,
     jalurId: content.jalurId,
     kategoriId: content.kategoriId,
@@ -61,11 +64,12 @@ function contentData(input: StageContentInput) {
 function assertContentScope(input: StageContentInput) {
   if (
     input.tahap === TahapKonten.HOME &&
-    (input.jalurId !== null || input.kategoriId !== null)
+    (input.jalurId !== null || input.kategoriId !== null ||
+      input.minParticipantOrder !== null || input.maxParticipantOrder !== null)
   ) {
     throw new StageError(
       "INVALID_HOME_SCOPE",
-      "Konten beranda harus ditampilkan untuk semua jalur dan kategori.",
+      "Konten beranda harus ditampilkan untuk semua jalur, kategori, dan urutan peserta.",
       422,
     );
   }
@@ -250,10 +254,11 @@ export async function getAssessmentForWali(childId: string, userId: string) {
   const child = await getOwnedStageChild(childId, userId);
   if (!mayViewAssessment(child.statusKeseluruhan)) throw new StageError("STAGE_FORBIDDEN", "Tahap assessment belum dapat diakses.", 403);
   const content = await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ASSESSMENT, child), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] });
+  const visibleContent = await contentVisibleToParticipant(content, child);
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null, statusKeseluruhan: child.statusKeseluruhan },
     assessment: { status: child.hasilAssessment?.status ?? StatusAssessment.BELUM },
-    content: content.map(publicContent),
+    content: visibleContent.map(publicContent),
   };
 }
 
@@ -292,6 +297,7 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   const waitingQuota = current.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
   const released = Boolean(announcement?.statusAkhir && isAnnouncementReleased(announcement.tanggalRilis));
   const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
+  const visibleContent = await contentVisibleToParticipant(content, current);
   const choiceRequired =
     current.statusKeseluruhan ===
     StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR;
@@ -321,7 +327,7 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
               : null,
           }
         : null,
-    content: content.map(publicContent),
+    content: visibleContent.map(publicContent),
   };
 }
 

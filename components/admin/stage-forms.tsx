@@ -19,7 +19,7 @@ function Notice({ state }: { state: StageActionState }) {
   return <p aria-live="polite" className={`rounded-xl border px-3 py-2 text-sm ${state.status === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-800"}`}>{state.message}</p>;
 }
 
-type ContentValue = { id: string; judul: string; tanggal: string; isiTeks: string; gambarUrl: string; youtubeVideoId: string; urutanLayout: number; statusAktif: boolean; jalurId: string; kategoriId: string };
+type ContentValue = { id: string; judul: string; tanggal: string; isiTeks: string; gambarUrl: string; youtubeVideoId: string; urutanLayout: number; minParticipantOrder: number | null; maxParticipantOrder: number | null; statusAktif: boolean; jalurId: string; kategoriId: string };
 
 export function StageContentForm({ tahap, value, jalur, kategori, globalOnly = false }: { tahap: TahapKonten; value?: ContentValue; jalur: Array<{ id: string; nama: string }>; kategori: Array<{ id: string; nama: string }>; globalOnly?: boolean }) {
   const [state, action, pending] = useActionState(value ? updateStageContentAction : createStageContentAction, initialStageActionState);
@@ -32,6 +32,11 @@ export function StageContentForm({ tahap, value, jalur, kategori, globalOnly = f
         <label className="text-sm font-semibold text-slate-800">Tanggal/periode<input name="tanggal" type="date" defaultValue={value?.tanggal} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label>
         <label className="text-sm font-semibold text-slate-800">Urutan blok<input name="urutanLayout" type="number" min={0} required defaultValue={value?.urutanLayout ?? 0} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label>
       </div>
+      {!globalOnly ? <div className="grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-800">Minimal Urutan Peserta<input name="minParticipantOrder" type="number" min={1} max={2147483647} step={1} defaultValue={value?.minParticipantOrder ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" />{state.fieldErrors?.minParticipantOrder ? <span className="text-xs text-red-700">{state.fieldErrors.minParticipantOrder[0]}</span> : null}</label>
+        <label className="text-sm font-semibold text-slate-800">Maksimal Urutan Peserta<input name="maxParticipantOrder" type="number" min={1} max={2147483647} step={1} defaultValue={value?.maxParticipantOrder ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" />{state.fieldErrors?.maxParticipantOrder ? <span className="text-xs text-red-700">{state.fieldErrors.maxParticipantOrder[0]}</span> : null}</label>
+        <p className="text-xs font-normal leading-5 text-slate-500 sm:col-span-2">Nomor peserta dihitung per jalur dan kategori berdasarkan waktu pendaftaran. Kosong berarti tanpa batas pada sisi tersebut; berbeda dari urutan tampil blok.</p>
+      </div> : null}
       <label className="text-sm font-semibold text-slate-800">Isi informasi<textarea name="isiTeks" maxLength={10000} rows={5} defaultValue={value?.isiTeks} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label>
       <label className="text-sm font-semibold text-slate-800">Gambar (JPG, PNG, WebP; maks. 5 MB)<input name="gambar" type="file" accept="image/jpeg,image/png,image/webp" className="mt-1.5 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal" /></label>
       {value?.gambarUrl ? <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50"><img src={value.gambarUrl} alt={`Pratinjau ${value.judul}`} className="max-h-56 w-full object-cover" /><p className="px-3 py-2 text-xs text-slate-500">Gambar saat ini tetap digunakan bila tidak memilih file baru.</p></div> : null}

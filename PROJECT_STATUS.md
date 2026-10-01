@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 30 September 2026
+**Tanggal snapshot:** 1 Oktober 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -39,7 +39,7 @@ layanan remote atau sudah beroperasi di production.
 | Pendaftaran | Satu akun banyak anak; pemilihan jalur tanpa pemakaian kuota permanen; hold jalur/kategori atomik dengan expiry configurable dan proteksi kursi terakhir |
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
 | Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, unduh PDF A4, dan QR chat WhatsApp Ayah/Bunda pada detail peserta admin |
-| CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, tanggal rilis dan tombol Google Calendar |
+| CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, rentang urutan peserta per jalur/kategori untuk empat tahap wali, tanggal rilis dan tombol Google Calendar |
 | Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
 | Penghapusan | Auto-delete anak gagal dengan konfirmasi/snapshot, penghapusan peserta manual dan akun wali tanpa anak, retention ledger |
@@ -48,6 +48,15 @@ layanan remote atau sudah beroperasi di production.
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Rentang urutan peserta untuk konten Assessment, Announcement, Daftar Ulang,
+dan Join WhatsApp diimplementasikan 1 Oktober 2026. Batas kosong tetap tanpa
+batas; urutan dihitung dari peserta yang masih ada per jalur/kategori berdasarkan
+`created_at ASC, id ASC`, sehingga penghapusan/perpindahan jalur dapat menggeser
+nomor berikutnya. Migration nullable `20261001090000_stage_content_participant_order_range`
+diterapkan ke database `.env.local`: Prisma menunjukkan 19 migration up to date,
+jumlah blok existing tetap 6 dan seluruh batas barunya `NULL`. Verifikasi
+deployment aplikasi tetap terpisah dari hasil migrasi ini.
 
 QR chat WhatsApp wali diperbarui pada 30 September 2026. Kartu
 No. WA Ayah/Bunda di detail enrollment admin menampilkan QR berisi URL `wa.me`
@@ -163,21 +172,21 @@ batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
 
-Pemeriksaan kode terbaru dijalankan 30 September 2026; Auth integration dan
-Prisma validate terakhir dijalankan 26 September. Pemeriksaan database/cron
+Pemeriksaan kode dan migration terbaru dijalankan 1 Oktober 2026; Auth
+integration terakhir dijalankan 26 September. Pemeriksaan database/cron
 untuk hold tetap merupakan hasil 22 September:
 
 | Pemeriksaan | Hasil |
 |---|---|
 | ESLint melalui CLI dependency | Lulus |
 | TypeScript `--noEmit` | Lulus |
-| Vitest | 36 file, 164 test lulus |
-| Prisma schema validate | Lulus pada 26 September 2026 |
+| Vitest | 37 file, 171 test lulus |
+| Prisma schema validate | Lulus pada 1 Oktober 2026 |
 | Next.js production build | Lulus dengan `.env.local`; route cron ikut terbangun |
 | Smoke cron lokal | Lulus; unauthorized `401`, authorized `200`, tidak ada hold expired saat pemeriksaan |
 | Fresh `npm ci` / postinstall generate | Hasil audit 7 September tetap lulus, 653 package dan Prisma Client 7.10.0 |
 | Integration/E2E staging | Integration Auth terarah lulus dan fixture dibersihkan; suite integration lain/E2E tidak dijalankan ulang |
-| Migration database terkonfigurasi | Lulus; migration verifikasi email diterapkan 26 September dan seluruh 18 migration up to date. Pemeriksaan counter/constraint hold berasal dari 22 September. |
+| Migration database terkonfigurasi | Lulus; migration rentang urutan peserta diterapkan 1 Oktober dan seluruh 19 migration up to date. Enam blok lama tetap ada dan batasnya `NULL`. Pemeriksaan counter/constraint hold berasal dari 22 September. |
 | Deployment aplikasi / transaksi live | Belum diverifikasi dari checkout lokal |
 
 Launcher npm global lokal masih bermasalah, sehingga setup menggunakan
