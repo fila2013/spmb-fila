@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
-import { UserRole } from "@/generated/prisma/enums";
+import { StatusAssessment, StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
 import { requireRole } from "@/lib/auth/session";
 import { FallbackError } from "@/lib/fallback/errors";
 import type { StageActionState } from "@/lib/stages/action-state";
@@ -17,7 +17,7 @@ import {
   stageIdSchema,
   updateStageContentSchema,
 } from "@/lib/stages/schemas";
-import { stageContentSlug } from "@/lib/stages/rules";
+import { dateOnly, stageContentSlug } from "@/lib/stages/rules";
 import {
   createStageContent,
   deleteStageContent,
@@ -106,13 +106,35 @@ export async function deleteStageContentAction(_state: StageActionState, formDat
 
 export async function updateAssessmentAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
   try {
-    const admin = await requireRole(UserRole.ADMIN);
-    const id = stageIdSchema.parse(formData.get("id"));
-    const input = assessmentInputSchema.parse({ status: formData.get("status"), catatan: formData.get("catatan") });
-    await updateAssessment(id, input, admin.userId);
+    const { id } = await saveAssessment(formData);
     revalidatePath(`/admin/peserta/${id}`);
     revalidatePath("/admin/peserta");
     return { status: "success", message: "Hasil assessment berhasil disimpan." };
+  } catch (error) { return errorState(error); }
+}
+
+async function saveAssessment(formData: FormData) {
+  const admin = await requireRole(UserRole.ADMIN);
+  const id = stageIdSchema.parse(formData.get("id"));
+  const input = assessmentInputSchema.parse({ status: formData.get("status"), catatan: formData.get("catatan") });
+  await updateAssessment(id, input, admin.userId);
+  return { id, input };
+}
+
+export async function quickUpdateAssessmentAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
+  try {
+    const { id, input } = await saveAssessment(formData);
+    revalidatePath(`/admin/peserta/${id}`);
+    return {
+      status: "success",
+      message: "Hasil assessment berhasil disimpan.",
+      quickEdit: {
+        nextStatus: input.status === StatusAssessment.BELUM
+          ? StatusKeseluruhan.MENUNGGU_ASESMEN
+          : StatusKeseluruhan.MENUNGGU_PENGUMUMAN,
+        assessment: input,
+      },
+    };
   } catch (error) { return errorState(error); }
 }
 
@@ -120,16 +142,25 @@ export async function updateAnnouncementAction(_state: StageActionState, formDat
   let result: Awaited<ReturnType<typeof updateAnnouncement>>;
   let id: string;
   try {
-    const admin = await requireRole(UserRole.ADMIN);
-    id = stageIdSchema.parse(formData.get("id"));
-    const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis"), deletionConfirmation: formData.get("deletionConfirmation") });
-    result = await updateAnnouncement(id, input, admin.userId);
+    ({ id, result } = await saveAnnouncement(formData));
   } catch (error) { return errorState(error); }
   revalidatePath("/admin/peserta");
   revalidatePath(`/anak/${id}/pengumuman`);
   if (result.deleted) redirect("/admin/peserta?deleted=1");
   revalidatePath(`/admin/peserta/${id}`);
-  const message = result.nextStatus === "MENUNGGU_PILIHAN_JALUR"
+  return { status: "success", message: announcementSuccessMessage(result) };
+}
+
+async function saveAnnouncement(formData: FormData) {
+  const admin = await requireRole(UserRole.ADMIN);
+  const id = stageIdSchema.parse(formData.get("id"));
+  const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis"), deletionConfirmation: formData.get("deletionConfirmation") });
+  const result = await updateAnnouncement(id, input, admin.userId);
+  return { id, result };
+}
+
+function announcementSuccessMessage(result: Awaited<ReturnType<typeof updateAnnouncement>>) {
+  return result.nextStatus === "MENUNGGU_PILIHAN_JALUR"
     ? "Pengumuman dirilis; wali perlu memilih kelas final sebelum daftar ulang."
     : result.effect.type === "TRANSFERRED"
     ? "Peserta otomatis dipindahkan ke jalur fallback dan diterima."
@@ -138,5 +169,26 @@ export async function updateAnnouncementAction(_state: StageActionState, formDat
       : result.released
         ? "Pengumuman disimpan dan sudah dirilis."
         : "Pengumuman disimpan untuk tanggal rilis tersebut.";
-  return { status: "success", message };
+}
+
+export async function quickUpdateAnnouncementAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
+  try {
+    const { id, result } = await saveAnnouncement(formData);
+    revalidatePath(`/anak/${id}/pengumuman`);
+    if (!result.deleted) revalidatePath(`/admin/peserta/${id}`);
+    return {
+      status: "success",
+      message: result.deleted
+        ? "Keputusan disimpan; data pribadi anak dihapus sesuai konfirmasi."
+        : announcementSuccessMessage(result),
+      quickEdit: {
+        nextStatus: result.nextStatus,
+        deleted: result.deleted,
+        announcement: {
+          statusAkhir: result.statusAkhir,
+          tanggalRilis: dateOnly(result.tanggalRilis) ?? "",
+        },
+      },
+    };
+  } catch (error) { return errorState(error); }
 }

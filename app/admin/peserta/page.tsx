@@ -3,13 +3,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
-import { StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
+import { ParticipantQuickEditTable } from "@/components/admin/participant-quick-edit";
+import { StatusAssessment, StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
 import { requireRolePage } from "@/lib/auth/navigation";
-import {
-  formatParticipantRegistrationDate,
-  statusPresentation,
-} from "@/lib/calon-murid/presentation";
+import { statusPresentation } from "@/lib/calon-murid/presentation";
 import { listJalur, listKategori } from "@/lib/master-data/service";
+import type { QuickEditParticipant } from "@/lib/stages/quick-edit";
+import { dateOnly } from "@/lib/stages/rules";
 import { participantListFilterSchema } from "@/lib/stages/schemas";
 import { listParticipants } from "@/lib/stages/service";
 
@@ -66,6 +66,24 @@ export default async function ParticipantsPage({
     listKategori(),
     listParticipants(filters),
   ]);
+  const quickEditParticipants: QuickEditParticipant[] = participants.map((item) => ({
+    id: item.id,
+    namaAnak: item.namaAnak,
+    email: item.user.email,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+    jalurKategori: `${item.jalur?.nama ?? item.menungguFallbackJalur?.nama ?? item.jalurAsal?.nama ?? "—"} / ${item.kategori?.nama ?? "—"}`,
+    statusKeseluruhan: item.statusKeseluruhan,
+    assessmentStatus: item.hasilAssessment?.status ?? StatusAssessment.BELUM,
+    assessmentNote: item.hasilAssessment?.catatan ?? "",
+    announcementStatus: item.pengumuman?.statusAkhir ?? null,
+    releaseDate: dateOnly(item.pengumuman?.tanggalRilis ?? null) ?? "",
+    announcementLocked: Boolean(item.pilihanJalurFinal) ||
+      item.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
+      item.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,
+    requiresDeleteConfirmation: Boolean(item.jalur?.hapusDataJikaGagal && !item.jalur.fallbackJalurId),
+    finalRouteChoiceEnabled: Boolean(item.jalur?.pilihanJalurFinalAktif),
+  }));
 
   return (
     <AdminShell
@@ -140,70 +158,11 @@ export default async function ParticipantsPage({
       </form>
 
       <section className="mt-6 rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
-        <div>
-          <h2 className="text-xl font-bold text-emerald-950">Daftar peserta</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {participants.length} peserta sesuai filter.
-          </p>
-        </div>
-        <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-emerald-950 text-white">
-              <tr>
-                <th className="px-4 py-3">Peserta</th>
-                <th className="px-4 py-3">Jalur / kategori</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {participants.map((item) => {
-                const status = statusPresentation[item.statusKeseluruhan];
-                return (
-                  <tr key={item.id}>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{item.namaAnak}</p>
-                      <p className="text-xs text-slate-500">{item.user.email}</p>
-                      <time
-                        dateTime={item.createdAt.toISOString()}
-                        className="mt-1 block text-xs text-slate-500"
-                      >
-                        Tgl daftar: {formatParticipantRegistrationDate(item.createdAt)}
-                      </time>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {item.jalur?.nama ??
-                        item.menungguFallbackJalur?.nama ??
-                        item.jalurAsal?.nama ??
-                        "—"}{" "}
-                      / {item.kategori?.nama ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}
-                      >
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/peserta/${item.id}`}
-                        className="font-bold text-emerald-800 hover:underline"
-                      >
-                        Kelola
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {participants.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-600">
-              Tidak ada peserta yang cocok dengan filter.
-            </p>
-          ) : null}
-        </div>
+        <ParticipantQuickEditTable
+          key={`${JSON.stringify(filters)}:${quickEditParticipants.map((item) => `${item.id}:${item.updatedAt}`).join("|")}`}
+          initialParticipants={quickEditParticipants}
+          filteredStatus={filters.statusKeseluruhan ?? null}
+        />
       </section>
     </AdminShell>
   );

@@ -364,7 +364,7 @@ export function listParticipants(filters: ParticipantListFilters = {}) {
 
   return prisma.calonMurid.findMany({
     where,
-    include: { user: { select: { email: true } }, jalur: { select: { nama: true } }, jalurAsal: { select: { nama: true } }, menungguFallbackJalur: { select: { nama: true } }, kategori: { select: { nama: true } }, hasilAssessment: true, pengumuman: true },
+    include: { user: { select: { email: true } }, jalur: { select: { nama: true, hapusDataJikaGagal: true, fallbackJalurId: true, pilihanJalurFinalAktif: true } }, jalurAsal: { select: { nama: true } }, menungguFallbackJalur: { select: { nama: true } }, kategori: { select: { nama: true } }, hasilAssessment: true, pengumuman: true },
     orderBy: [{ createdAt: "desc" }],
   });
 }

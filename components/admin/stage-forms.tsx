@@ -2,11 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element -- CMS URLs are runtime-configured Supabase Storage assets. */
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import {
   createStageContentAction,
   deleteStageContentAction,
+  quickUpdateAnnouncementAction,
+  quickUpdateAssessmentAction,
   updateAnnouncementAction,
   updateAssessmentAction,
   updateStageContentAction,
@@ -57,12 +59,51 @@ export function DeleteStageContentForm({ id }: { id: string }) {
   return <form action={action} className="mt-4 grid gap-3 rounded-xl border border-red-200 bg-red-50 p-3"><input type="hidden" name="id" value={id} /><label className="flex items-start gap-2 text-xs leading-5 text-red-950"><input type="checkbox" name="confirmation" value="HAPUS" required className="mt-1" /> Saya memahami blok informasi dan file gambarnya akan dihapus.</label><Notice state={state} /><button type="submit" disabled={pending} className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-bold text-red-800 hover:bg-red-100 disabled:opacity-60">{pending ? "Menghapus…" : "Hapus konten"}</button></form>;
 }
 
-export function AssessmentResultForm({ id, status, catatan }: { id: string; status: StatusAssessment; catatan: string }) {
-  const [state, action, pending] = useActionState(updateAssessmentAction, initialStageActionState);
+export function AssessmentResultForm({ id, status, catatan, quickEdit = false, onSaved }: { id: string; status: StatusAssessment; catatan: string; quickEdit?: boolean; onSaved?: (state: StageActionState) => void }) {
+  const [state, action, pending] = useActionState(quickEdit ? quickUpdateAssessmentAction : updateAssessmentAction, initialStageActionState);
+  useEffect(() => {
+    if (state.status === "success") onSaved?.(state);
+  }, [state, onSaved]);
   return <form action={action} className="grid gap-4"><input type="hidden" name="id" value={id} /><label className="text-sm font-semibold">Status<select name="status" defaultValue={status} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal"><option value={StatusAssessment.BELUM}>Belum dinilai</option><option value={StatusAssessment.HADIR}>Hadir</option><option value={StatusAssessment.TIDAK_HADIR}>Tidak hadir</option></select></label><label className="text-sm font-semibold">Catatan internal<textarea name="catatan" rows={4} maxLength={5000} defaultValue={catatan} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label><Notice state={state} /><button disabled={pending} className="rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{pending ? "Menyimpan…" : "Simpan assessment"}</button></form>;
 }
 
-export function AnnouncementResultForm({ id, statusAkhir, tanggalRilis, childName, requiresDeleteConfirmation, finalRouteChoiceEnabled = false }: { id: string; statusAkhir: StatusPengumuman | null; tanggalRilis: string; childName: string; requiresDeleteConfirmation: boolean; finalRouteChoiceEnabled?: boolean }) {
-  const [state, action, pending] = useActionState(updateAnnouncementAction, initialStageActionState);
-  return <form action={action} className="grid gap-4"><input type="hidden" name="id" value={id} /><label className="text-sm font-semibold">Keputusan<select name="statusAkhir" required defaultValue={statusAkhir ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal"><option value="" disabled>Pilih keputusan</option><option value={StatusPengumuman.DITERIMA}>Diterima</option><option value={StatusPengumuman.TIDAK_DITERIMA}>Tidak diterima</option></select></label><label className="text-sm font-semibold">Tanggal rilis<input name="tanggalRilis" type="date" required defaultValue={tanggalRilis} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label>{requiresDeleteConfirmation ? <label className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-950">Konfirmasi jika memilih “Tidak diterima”<span className="mt-1 block text-xs font-normal leading-5">Data pribadi anak akan dihapus permanen. Akun, anak lain, dan jejak pembayaran tetap disimpan. Ketik <strong>HAPUS {childName}</strong>.</span><input name="deletionConfirmation" autoComplete="off" placeholder={`HAPUS ${childName}`} className="mt-2 w-full rounded-lg border border-red-300 bg-white px-3 py-2 font-normal text-slate-950" /></label> : <input type="hidden" name="deletionConfirmation" value="" />}<p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">Hasil tidak terlihat oleh wali sebelum tanggal rilis. Jika jalur fallback penuh, peserta otomatis masuk antrian FIFO.{finalRouteChoiceEnabled ? " Peserta yang diterima wajib menentukan pilihan kelas final yang dikonfigurasi terpisah sebelum dapat melanjutkan daftar ulang." : ""}</p><Notice state={state} /><button disabled={pending} className={`rounded-xl px-4 py-3 text-sm font-bold text-white disabled:opacity-60 ${requiresDeleteConfirmation ? "bg-red-800 hover:bg-red-700" : "bg-emerald-900 hover:bg-emerald-800"}`}>{pending ? "Menyimpan…" : "Simpan pengumuman"}</button></form>;
+export function AnnouncementResultForm({ id, statusAkhir, tanggalRilis, childName, requiresDeleteConfirmation, finalRouteChoiceEnabled = false, quickEdit = false, onSaved }: { id: string; statusAkhir: StatusPengumuman | null; tanggalRilis: string; childName: string; requiresDeleteConfirmation: boolean; finalRouteChoiceEnabled?: boolean; quickEdit?: boolean; onSaved?: (state: StageActionState) => void }) {
+  const [state, action, pending] = useActionState(quickEdit ? quickUpdateAnnouncementAction : updateAnnouncementAction, initialStageActionState);
+  const [decision, setDecision] = useState<StatusPengumuman | "">(statusAkhir ?? "");
+  useEffect(() => {
+    if (state.status === "success") onSaved?.(state);
+  }, [state, onSaved]);
+  const rejected = decision === StatusPengumuman.TIDAK_DITERIMA;
+  return (
+    <form action={action} className="grid gap-4">
+      <input type="hidden" name="id" value={id} />
+      <label className="text-sm font-semibold">
+        Keputusan
+        <select name="statusAkhir" required value={decision} onChange={(event) => setDecision(event.target.value as StatusPengumuman | "")} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal">
+          <option value="" disabled>Pilih keputusan</option>
+          <option value={StatusPengumuman.DITERIMA}>Diterima</option>
+          <option value={StatusPengumuman.TIDAK_DITERIMA}>Tidak diterima</option>
+        </select>
+      </label>
+      <label className="text-sm font-semibold">
+        Tanggal rilis
+        <input name="tanggalRilis" type="date" required defaultValue={tanggalRilis} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" />
+      </label>
+      {rejected ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-950">
+        <label className="flex items-start gap-2 font-semibold">
+          <input type="checkbox" required className="mt-1" />
+          Saya yakin keputusan “Tidak diterima” untuk {childName} sudah benar.
+        </label>
+        {requiresDeleteConfirmation ? <label className="mt-3 block font-semibold">
+          Konfirmasi penghapusan jika hasil dirilis
+          <span className="mt-1 block text-xs font-normal leading-5">Data pribadi anak akan dihapus permanen setelah keputusan ini dirilis. Akun, anak lain, dan jejak pembayaran tetap disimpan. Ketik <strong>HAPUS {childName}</strong>.</span>
+          <input name="deletionConfirmation" required autoComplete="off" placeholder={`HAPUS ${childName}`} className="mt-2 w-full rounded-lg border border-red-300 bg-white px-3 py-2 font-normal text-slate-950" />
+        </label> : null}
+      </div> : null}
+      {!rejected || !requiresDeleteConfirmation ? <input type="hidden" name="deletionConfirmation" value="" /> : null}
+      <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">Hasil tidak terlihat oleh wali sebelum tanggal rilis. Jika jalur fallback penuh, peserta otomatis masuk antrian FIFO.{finalRouteChoiceEnabled ? " Peserta yang diterima wajib menentukan pilihan kelas final yang dikonfigurasi terpisah sebelum dapat melanjutkan daftar ulang." : ""}</p>
+      <Notice state={state} />
+      <button disabled={pending} className={`rounded-xl px-4 py-3 text-sm font-bold text-white disabled:opacity-60 ${rejected && requiresDeleteConfirmation ? "bg-red-800 hover:bg-red-700" : "bg-emerald-900 hover:bg-emerald-800"}`}>{pending ? "Menyimpan…" : "Simpan pengumuman"}</button>
+    </form>
+  );
 }

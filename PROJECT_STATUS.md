@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 1 Oktober 2026
+**Tanggal snapshot:** 2 Oktober 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -40,7 +40,7 @@ layanan remote atau sudah beroperasi di production.
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
 | Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, unduh PDF A4, dan QR chat WhatsApp Ayah/Bunda pada detail peserta admin |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, rentang urutan peserta per jalur/kategori untuk empat tahap wali, tanggal rilis dan tombol Google Calendar |
-| Hasil seleksi | Input assessment/pengumuman admin, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
+| Hasil seleksi | Input assessment/pengumuman admin di halaman detail dan modal edit cepat dari badge status daftar peserta, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
 | Penghapusan | Auto-delete anak gagal dengan konfirmasi/snapshot, penghapusan peserta manual dan akun wali tanpa anak, retention ledger |
 | DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup per peserta, konfirmasi wali sampai selesai |
@@ -48,6 +48,14 @@ layanan remote atau sudah beroperasi di production.
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Modal edit cepat Assessment/Pengumuman pada `/admin/peserta` ditambahkan
+2 Oktober 2026. Badge status membuka form yang sama dengan halaman detail;
+Server Action tetap memvalidasi admin, tahap, konfirmasi auto-delete, dan
+transisi melalui service existing. Hasil simpan memperbarui baris/filter lokal
+lalu menyegarkan data server tanpa navigasi. Halaman detail tetap tersedia.
+Tidak ada perubahan schema/migration. Lint, typecheck, 38 file/175 unit test,
+dan build lokal lulus; interaksi browser dengan akun admin belum diuji.
 
 Rentang urutan peserta untuk konten Assessment, Announcement, Daftar Ulang,
 dan Join WhatsApp diimplementasikan 1 Oktober 2026. Batas kosong tetap tanpa
