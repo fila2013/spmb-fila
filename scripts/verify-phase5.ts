@@ -139,6 +139,8 @@ try {
         data: {
           userId: wali.profile.id,
           namaAnak: `Anak ${name} ${marker}`,
+          tempatLahir: "Bandar Lampung",
+          tanggalLahir: new Date("2020-01-01T00:00:00.000Z"),
           jalurId: route.id,
           kategoriId: category.id,
           subKategoriText: "TK Sandbox",

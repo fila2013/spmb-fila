@@ -49,6 +49,35 @@ layanan remote atau sudah beroperasi di production.
 
 ## In-progress features / pekerjaan aktif
 
+Pemisahan Tempat/Tanggal lahir dan aturan usia bulanan pada Form Builder serta
+validasi sebelum pembayaran diimplementasikan di source 2 Oktober 2026.
+Migration `20261002090000_enrollment_birth_date_age_rule` mengarsipkan field
+gabungan tanpa menghapus jawaban historis, lalu membuat field Tempat/Tanggal
+lahir. Migration `20261002100000_calon_murid_birth_before_payment` menambah
+kolom nullable pada peserta dan menghubungkan auto-fill kedua field. Keduanya
+diterapkan ke database yang ditunjuk `.env.local`; `migrate status` menunjukkan
+21 migration up to date. Percobaan awal migration kedua gagal karena constraint
+auto-fill lama, seluruh transaksinya rollback; setelah constraint diperluas,
+migration di-resolve sebagai rolled-back dan diterapkan ulang dengan sukses.
+Pemeriksaan read-only pascamigrasi: 79 peserta historis tetap ada, semua kolom
+lahir barunya NULL, dan aturan tanggal aktif adalah minimal 6 tahun per Juli
+2027. Pendaftaran baru meminta tempat/tanggal lahir sejak langkah pertama;
+server memeriksa usia sebelum data anak dibuat, sebelum hold kategori, dan
+sebelum transaksi/unggah bukti pembayaran. Peserta lama yang belum membayar
+dapat melengkapi data lahir di tahap kategori. Enrollment peserta baru
+terisi otomatis dan mengunci data lahir dari pendaftaran awal; peserta lama
+tetap dapat mengisi field baru dengan jawaban gabungan sebagai rujukan.
+Panel "Aturan usia sebelum pembayaran" kini tampil langsung di bagian atas
+Form Builder dan mengubah tiga nilai pada field Tanggal lahir yang sama; tidak
+ada tabel atau migrasi baru. Perhitungan memakai tahun lahir batas
+(`tahun acuan - usia minimal`), lalu membandingkan bulan bila tahun lahir sama.
+Input tanggal pada halaman wali menampilkan ulang pilihan sebagai nama bulan
+Indonesia agar format angka tidak ambigu. Matrix aturan dinamis dan pesan
+penolakan diuji untuk beberapa kombinasi tahun/bulan; 39 file/192 unit test,
+lint, typecheck, dan build lokal lulus. Target database
+tidak dibuktikan sebagai staging; integration/E2E yang menulis fixture dan
+verifikasi deployment aplikasi belum dijalankan.
+
 Modal edit cepat Assessment/Pengumuman pada `/admin/peserta` ditambahkan
 2 Oktober 2026. Badge status membuka form yang sama dengan halaman detail;
 Server Action tetap memvalidasi admin, tahap, konfirmasi auto-delete, dan

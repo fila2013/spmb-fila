@@ -29,7 +29,7 @@ export default async function DataPribadiPage({ params }: { params: Promise<{ id
   return (
     <EnrollmentShell childId={data.child.id} childName={data.child.namaAnak} active="data-pribadi">
       <div className="mb-6"><h2 className="text-2xl font-bold text-emerald-950">Data pribadi anak & orang tua</h2><p className="mt-2 text-sm leading-6 text-slate-600">Field bertanda * wajib lengkap sebelum submit final. Draft dapat disimpan bertahap.</p></div>
-      <EnrollmentForm childId={data.child.id} formType={FormType.DATA_PRIBADI} fields={data.fields} submitted={data.submitted} />
+      <EnrollmentForm childId={data.child.id} formType={FormType.DATA_PRIBADI} fields={data.fields} submitted={data.submitted} legacyResponses={data.legacyResponses} />
     </EnrollmentShell>
   );
 }

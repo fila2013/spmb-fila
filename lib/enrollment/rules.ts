@@ -5,7 +5,31 @@ export type ValidatableField = {
   tipeInput: TipeInput;
   wajib: boolean;
   validasi: string | null;
+  minAgeYears?: number | null;
+  ageReferenceMonth?: number | null;
+  ageReferenceYear?: number | null;
 };
+
+export const indonesianMonthNames = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+] as const;
+
+export function ageRequirementText(field: ValidatableField) {
+  if (field.minAgeYears == null || field.ageReferenceMonth == null || field.ageReferenceYear == null) return null;
+  return `usia minimal ${field.minAgeYears} tahun per ${indonesianMonthNames[field.ageReferenceMonth - 1]} ${field.ageReferenceYear}`;
+}
+
+export function meetsMinimumAgeByMonth(dateOfBirth: string, minimumYears: number, referenceMonth: number, referenceYear: number) {
+  if (!validIsoDate(dateOfBirth) || !Number.isInteger(minimumYears) || minimumYears < 1 ||
+      !Number.isInteger(referenceMonth) || referenceMonth < 1 || referenceMonth > 12 ||
+      !Number.isInteger(referenceYear)) return false;
+  const birthYear = Number(dateOfBirth.slice(0, 4));
+  const birthMonth = Number(dateOfBirth.slice(5, 7));
+  const birthYearCutoff = referenceYear - minimumYears;
+  if (birthYear < birthYearCutoff) return true;
+  return birthYear === birthYearCutoff && birthMonth <= referenceMonth;
+}
 
 export function isIndonesianWhatsApp(value: string) {
   return /^(?:\+62|62|0)8[1-9][0-9]{6,10}$/.test(value);
@@ -46,6 +70,15 @@ export function fieldValueError(
   }
   if (field.tipeInput === TipeInput.DATE && !validIsoDate(value)) {
     return "Masukkan tanggal yang valid.";
+  }
+  if (
+    field.tipeInput === TipeInput.DATE &&
+    field.minAgeYears != null &&
+    field.ageReferenceMonth != null &&
+    field.ageReferenceYear != null &&
+    !meetsMinimumAgeByMonth(value, field.minAgeYears, field.ageReferenceMonth, field.ageReferenceYear)
+  ) {
+    return `Mohon maaf, usia calon murid belum mencapai batas minimal ${field.minAgeYears} tahun per ${indonesianMonthNames[field.ageReferenceMonth - 1]} ${field.ageReferenceYear}.`;
   }
   if (
     field.tipeInput === TipeInput.NUMBER &&

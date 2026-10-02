@@ -11,7 +11,8 @@ import {
   StatusPembayaran,
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
-import { getOwnedCalonMurid } from "@/lib/calon-murid/service";
+import { CalonMuridError } from "@/lib/calon-murid/errors";
+import { assertBirthEligibility, getOwnedCalonMurid } from "@/lib/calon-murid/service";
 import { getAppEnvironment } from "@/lib/env/client";
 import { getMidtransEnvironment } from "@/lib/env/server";
 import { PaymentError } from "@/lib/payment/errors";
@@ -115,6 +116,18 @@ async function lockOwnedChild(
   return child;
 }
 
+async function requireEligibleBirth(transaction: Transaction, child: { tempatLahir: string | null; tanggalLahir: Date | null }) {
+  if (!child.tempatLahir || !child.tanggalLahir) {
+    throw new PaymentError("INVALID_STAGE", "Isi tempat dan tanggal lahir sebelum pembayaran.", 422);
+  }
+  try {
+    await assertBirthEligibility(transaction, child.tanggalLahir.toISOString().slice(0, 10));
+  } catch (error) {
+    if (error instanceof CalonMuridError) throw new PaymentError("INVALID_STAGE", error.message, error.status);
+    throw error;
+  }
+}
+
 async function preferredRegistrationPayment(childId: string) {
   const verified = await prisma.pembayaran.findFirst({
     where: {
@@ -143,6 +156,7 @@ export async function createRegistrationSnapPayment(
   return prisma.$transaction(
     async (transaction) => {
       const child = await lockOwnedChild(transaction, childId, user.userId);
+      await requireEligibleBirth(transaction, child);
       const mode = await lockRegistrationPaymentMode(transaction);
       if (mode !== ModePembayaranPendaftaran.MIDTRANS) {
         throw new PaymentError(
@@ -404,6 +418,7 @@ export async function uploadManualRegistrationProof(
     return await prisma.$transaction(
       async (transaction) => {
         const lockedChild = await lockOwnedChild(transaction, childId, userId);
+        await requireEligibleBirth(transaction, lockedChild);
         const mode = await lockRegistrationPaymentMode(transaction);
         if (mode !== ModePembayaranPendaftaran.MANUAL) {
           throw new PaymentError(

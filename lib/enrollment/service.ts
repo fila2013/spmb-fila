@@ -6,12 +6,14 @@ import {
   JenisPembayaran,
   StatusKeseluruhan,
   StatusPembayaran,
+  TipeInput,
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
 import {
   EnrollmentError,
   EnrollmentValidationError,
 } from "@/lib/enrollment/errors";
+import { visibleEnrollmentFields } from "@/lib/enrollment/field-visibility";
 import {
   normalizeEnrollmentValue,
   validateFieldValues,
@@ -19,6 +21,7 @@ import {
 import type {
   EnrollmentMutationInput,
   FormFieldInput,
+  RegistrationAgeRuleInput,
   UpdateFormFieldInput,
 } from "@/lib/enrollment/schemas";
 import { prisma } from "@/lib/prisma";
@@ -37,10 +40,12 @@ function asalTk(child: {
 
 function autoFillValue(
   source: string | null,
-  context: { email: string; asalTk: string },
+  context: { email: string; asalTk: string; tempatLahir: string; tanggalLahir: string },
 ) {
   if (source === "akun_email") return context.email;
   if (source === "kategori_asal_tk") return context.asalTk;
+  if (source === "tempat_lahir") return context.tempatLahir;
+  if (source === "tanggal_lahir") return context.tanggalLahir;
   return "";
 }
 
@@ -82,9 +87,12 @@ async function getEnrollmentChild(childId: string, userId: string) {
   return child;
 }
 
-export function listFormFields(formType?: FormType) {
+export function listFormFields(formType?: FormType, includeArchived = false) {
   return prisma.formField.findMany({
-    where: formType ? { formType } : undefined,
+    where: {
+      ...(formType ? { formType } : {}),
+      ...(!includeArchived ? { archivedAt: null } : {}),
+    },
     orderBy: [{ formType: "asc" }, { urutan: "asc" }, { createdAt: "asc" }],
   });
 }
@@ -95,6 +103,7 @@ export async function getEnrollmentFormData(
   formType: FormType,
 ) {
   const child = await getEnrollmentChild(childId, userId);
+  const submitted = child.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT;
   const fields = await prisma.formField.findMany({
     where: { formType },
     include: {
@@ -106,30 +115,45 @@ export async function getEnrollmentFormData(
     },
     orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
   });
-  const context = { email: child.user.email, asalTk: asalTk(child) };
+  const context = {
+    email: child.user.email,
+    asalTk: asalTk(child),
+    tempatLahir: child.tempatLahir ?? "",
+    tanggalLahir: child.tanggalLahir?.toISOString().slice(0, 10) ?? "",
+  };
+  const visibleFields = visibleEnrollmentFields(
+    fields,
+    submitted,
+    new Set(fields.filter((field) => field.responses.length > 0).map((field) => field.id)),
+  );
   return {
     child: {
       id: child.id,
       namaAnak: child.namaAnak,
       statusKeseluruhan: child.statusKeseluruhan,
     },
-    submitted:
-      child.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT,
-    fields: fields.map(({ responses, ...field }) => ({
+    submitted,
+    legacyResponses: submitted ? [] : fields
+      .filter((field) => field.archivedAt && field.label === "Tempat, tanggal lahir" && field.responses.length > 0)
+      .map((field) => ({ id: field.id, label: field.label, value: field.responses[0]?.value ?? "" })),
+    fields: visibleFields.map(({ responses, ...field }) => ({
       ...field,
       value:
         responses.length > 0
           ? responses[0]?.value ?? ""
           : autoFillValue(field.autoFillSource, context),
-      autoFilled: responses.length === 0 && Boolean(field.autoFillSource),
+      autoFilled: responses.length === 0 && Boolean(autoFillValue(field.autoFillSource, context)),
+      lockedFromRegistration: (field.autoFillSource === "tempat_lahir" && Boolean(child.tempatLahir)) ||
+        (field.autoFillSource === "tanggal_lahir" && Boolean(child.tanggalLahir)),
     })),
   };
 }
 
 export async function getEnrollmentOverview(childId: string, userId: string) {
   const child = await getEnrollmentChild(childId, userId);
+  const submitted = child.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT;
   const [fields, responses] = await Promise.all([
-    listFormFields(),
+    listFormFields(undefined, submitted),
     prisma.formResponse.findMany({ where: { calonMuridId: child.id } }),
   ]);
   return {
@@ -138,9 +162,8 @@ export async function getEnrollmentOverview(childId: string, userId: string) {
       namaAnak: child.namaAnak,
       statusKeseluruhan: child.statusKeseluruhan,
     },
-    submitted:
-      child.statusKeseluruhan !== StatusKeseluruhan.ENROLLMENT,
-    fields,
+    submitted,
+    fields: visibleEnrollmentFields(fields, submitted, new Set(responses.map((response) => response.fieldId))),
     responses,
   };
 }
@@ -175,6 +198,7 @@ export async function saveEnrollment(
     }
 
     const fields = await transaction.formField.findMany({
+      where: { archivedAt: null },
       orderBy: [{ formType: "asc" }, { urutan: "asc" }],
     });
     const formFields = fields.filter(
@@ -207,6 +231,16 @@ export async function saveEnrollment(
         ];
       }),
     );
+    const lockedErrors: Record<string, string[]> = {};
+    for (const field of formFields) {
+      const expected = field.autoFillSource === "tempat_lahir" ? child.tempatLahir
+        : field.autoFillSource === "tanggal_lahir" ? child.tanggalLahir?.toISOString().slice(0, 10)
+        : null;
+      if (expected && incoming.has(field.id) && incoming.get(field.id) !== expected) {
+        lockedErrors[field.id] = ["Data lahir dari pendaftaran awal tidak dapat diubah di formulir ini. Hubungi admin jika perlu koreksi."];
+      }
+    }
+    if (Object.keys(lockedErrors).length) throw new EnrollmentValidationError(lockedErrors);
     const draftErrors = validateFieldValues(formFields, incoming, false);
     if (Object.keys(draftErrors).length) {
       throw new EnrollmentValidationError(draftErrors);
@@ -285,6 +319,10 @@ function fieldSnapshot(field: FormField) {
     urutan: field.urutan,
     validasi: field.validasi,
     autoFillSource: field.autoFillSource,
+    minAgeYears: field.minAgeYears,
+    ageReferenceMonth: field.ageReferenceMonth,
+    ageReferenceYear: field.ageReferenceYear,
+    archivedAt: field.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -326,6 +364,9 @@ export async function updateFormField(
     if (!previous) {
       throw new EnrollmentError("NOT_FOUND", "Field tidak ditemukan.", 404);
     }
+    if (previous.archivedAt) {
+      throw new EnrollmentError("FIELD_ARCHIVED", "Field arsip tidak dapat diubah.", 409);
+    }
     const responseCount = await transaction.formResponse.count({
       where: { fieldId: previous.id },
     });
@@ -358,11 +399,55 @@ export async function updateFormField(
   });
 }
 
+export async function updateRegistrationAgeRule(
+  input: RegistrationAgeRuleInput,
+  actorId: string,
+) {
+  return prisma.$transaction(async (transaction) => {
+    const previous = await transaction.formField.findUnique({
+      where: { id: input.fieldId },
+    });
+    if (
+      !previous || previous.archivedAt ||
+      previous.formType !== FormType.DATA_PRIBADI ||
+      previous.tipeInput !== TipeInput.DATE ||
+      previous.autoFillSource !== "tanggal_lahir"
+    ) {
+      throw new EnrollmentError(
+        "NOT_FOUND",
+        "Field Tanggal lahir pendaftaran tidak ditemukan. Periksa konfigurasi Form Builder.",
+        404,
+      );
+    }
+    const field = await transaction.formField.update({
+      where: { id: previous.id },
+      data: {
+        minAgeYears: input.minAgeYears,
+        ageReferenceMonth: input.ageReferenceMonth,
+        ageReferenceYear: input.ageReferenceYear,
+      },
+    });
+    await transaction.auditLog.create({
+      data: {
+        actorId,
+        action: "UPDATE_REGISTRATION_AGE_RULE",
+        entity: "form_field",
+        entityId: field.id,
+        detail: { before: fieldSnapshot(previous), after: fieldSnapshot(field) },
+      },
+    });
+    return field;
+  });
+}
+
 export async function deleteFormField(id: string, actorId: string) {
   return prisma.$transaction(async (transaction) => {
     const field = await transaction.formField.findUnique({ where: { id } });
     if (!field) {
       throw new EnrollmentError("NOT_FOUND", "Field tidak ditemukan.", 404);
+    }
+    if (field.archivedAt) {
+      throw new EnrollmentError("FIELD_ARCHIVED", "Field arsip tidak dapat dihapus.", 409);
     }
     const responseCount = await transaction.formResponse.count({
       where: { fieldId: field.id },

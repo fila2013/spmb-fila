@@ -15,7 +15,7 @@ function participant(observationValue: string): EnrollmentPdfParticipant {
     routeName: "Reguler",
     categoryName: "Eksternal/Umum",
     responses: [
-      ...Array.from({ length: 9 }, (_, index) => ({
+      ...Array.from({ length: 10 }, (_, index) => ({
         id: `personal-${index}`,
         label: `Data pribadi ${index + 1}`,
         value: `Jawaban pribadi ${index + 1}`,

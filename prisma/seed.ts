@@ -26,10 +26,14 @@ const dataPribadiFields: Array<{
   tipeInput: TipeInput;
   validasi?: string;
   autoFillSource?: string;
+  minAgeYears?: number;
+  ageReferenceMonth?: number;
+  ageReferenceYear?: number;
 }> = [
   { label: "Nama lengkap", tipeInput: TipeInput.TEXT },
   { label: "Nama panggilan", tipeInput: TipeInput.TEXT },
-  { label: "Tempat, tanggal lahir", tipeInput: TipeInput.TEXT },
+  { label: "Tempat lahir", tipeInput: TipeInput.TEXT, autoFillSource: "tempat_lahir" },
+  { label: "Tanggal lahir", tipeInput: TipeInput.DATE, autoFillSource: "tanggal_lahir", minAgeYears: 6, ageReferenceMonth: 7, ageReferenceYear: 2027 },
   { label: "Nama ayah", tipeInput: TipeInput.TEXT },
   { label: "Nama ibu", tipeInput: TipeInput.TEXT },
   {
@@ -115,19 +119,16 @@ async function main() {
             label: field.label,
           },
         },
-        update: {
-          tipeInput: field.tipeInput,
-          validasi: field.validasi,
-          autoFillSource: field.autoFillSource,
-          wajib: true,
-          urutan: index,
-        },
+        update: {},
         create: {
           formType: FormType.DATA_PRIBADI,
           label: field.label,
           tipeInput: field.tipeInput,
           validasi: field.validasi,
           autoFillSource: field.autoFillSource,
+          minAgeYears: field.minAgeYears,
+          ageReferenceMonth: field.ageReferenceMonth,
+          ageReferenceYear: field.ageReferenceYear,
           wajib: true,
           urutan: index,
         },

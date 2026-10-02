@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AddChildForm } from "@/components/calon-murid/enrollment-forms";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { availabilityLabel } from "@/lib/calon-murid/rules";
-import { listSelectableJalur } from "@/lib/calon-murid/service";
+import { getRegistrationAgeRule, listSelectableJalur } from "@/lib/calon-murid/service";
 import { remainingQuota } from "@/lib/quota-hold/rules";
 
 export const metadata: Metadata = { title: "Tambah calon murid" };
@@ -21,7 +21,8 @@ function quotaLabel(route: {
 
 export default async function AddChildPage() {
   await requireWaliPage();
-  const routes = (await listSelectableJalur()).map((route) => ({
+  const [selectableRoutes, ageRule] = await Promise.all([listSelectableJalur(), getRegistrationAgeRule()]);
+  const routes = selectableRoutes.map((route) => ({
     id: route.id,
     nama: route.nama,
     available: route.availability.available,
@@ -35,8 +36,8 @@ export default async function AddChildPage() {
       <div className="mt-6 rounded-3xl border border-emerald-950/10 bg-white p-6 shadow-sm sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.17em] text-amber-700">Langkah 1 dari 2</p>
         <h1 className="mt-2 text-3xl font-bold text-emerald-950">Tambah anak dan pilih jalur</h1>
-        <p className="mt-3 leading-7 text-slate-600">Kuota belum terpakai saat memilih jalur. Hold sementara (default 24 jam) dibuat setelah jalur dan kategori dikonfirmasi untuk pembayaran.</p>
-        <div className="mt-7"><AddChildForm routes={routes} /></div>
+        <p className="mt-3 leading-7 text-slate-600">Isi data lahir anak sekarang agar usia dapat diperiksa sebelum pembayaran. Kuota belum terpakai saat memilih jalur. Hold sementara (default 24 jam) dibuat setelah jalur dan kategori dikonfirmasi.</p>
+        <div className="mt-7"><AddChildForm routes={routes} ageRule={ageRule} /></div>
       </div>
     </div>
   );

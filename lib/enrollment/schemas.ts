@@ -34,7 +34,7 @@ export const enrollmentMutationSchema = z
 const nullableValidationSchema = z
   .union([z.literal("format_wa_indonesia"), z.null()]);
 const nullableAutoFillSchema = z.union([
-  z.enum(["akun_email", "kategori_asal_tk"]),
+  z.enum(["akun_email", "kategori_asal_tk", "tempat_lahir", "tanggal_lahir"]),
   z.null(),
 ]);
 
@@ -47,8 +47,23 @@ export const formFieldInputSchema = z
     urutan: z.number().int().min(0).max(10_000),
     validasi: nullableValidationSchema,
     autoFillSource: nullableAutoFillSchema,
+    minAgeYears: z.number().int().min(1).max(30).nullable().default(null),
+    ageReferenceMonth: z.number().int().min(1).max(12).nullable().default(null),
+    ageReferenceYear: z.number().int().min(2000).max(2200).nullable().default(null),
   })
   .superRefine((value, context) => {
+    const ageValues = [value.minAgeYears, value.ageReferenceMonth, value.ageReferenceYear];
+    if (ageValues.some((item) => item !== null)) {
+      if (value.tipeInput !== TipeInput.DATE) {
+        context.addIssue({ code: "custom", path: ["minAgeYears"], message: "Validasi usia hanya tersedia untuk tipe Tanggal." });
+      }
+      if (ageValues.some((item) => item === null)) {
+        context.addIssue({ code: "custom", path: ["minAgeYears"], message: "Usia minimal, bulan, dan tahun acuan harus diisi bersama." });
+      }
+    }
+    if (value.autoFillSource === "tanggal_lahir" && ageValues.some((item) => item === null)) {
+      context.addIssue({ code: "custom", path: ["minAgeYears"], message: "Tanggal lahir pendaftaran wajib memiliki aturan usia minimal lengkap." });
+    }
     if (
       value.validasi === "format_wa_indonesia" &&
       value.tipeInput !== TipeInput.TEL
@@ -81,6 +96,13 @@ export const formFieldInputSchema = z
         message: "Auto-fill asal TK hanya tersedia untuk field Text pada Data Pribadi.",
       });
     }
+    if (
+      (value.autoFillSource === "tempat_lahir" || value.autoFillSource === "tanggal_lahir") &&
+      (value.formType !== FormType.DATA_PRIBADI ||
+        value.tipeInput !== (value.autoFillSource === "tanggal_lahir" ? TipeInput.DATE : TipeInput.TEXT))
+    ) {
+      context.addIssue({ code: "custom", path: ["autoFillSource"], message: "Auto-fill data lahir hanya tersedia pada Data Pribadi dengan tipe yang sesuai." });
+    }
   });
 
 export const updateFormFieldSchema = formFieldInputSchema.extend({
@@ -89,8 +111,16 @@ export const updateFormFieldSchema = formFieldInputSchema.extend({
 
 export const formFieldIdSchema = z.uuid();
 
+export const registrationAgeRuleSchema = z.object({
+  fieldId: z.uuid(),
+  minAgeYears: z.number().int().min(1).max(30),
+  ageReferenceMonth: z.number().int().min(1).max(12),
+  ageReferenceYear: z.number().int().min(2000).max(2200),
+});
+
 export type EnrollmentMutationInput = z.infer<
   typeof enrollmentMutationSchema
 >;
 export type FormFieldInput = z.infer<typeof formFieldInputSchema>;
 export type UpdateFormFieldInput = z.infer<typeof updateFormFieldSchema>;
+export type RegistrationAgeRuleInput = z.infer<typeof registrationAgeRuleSchema>;

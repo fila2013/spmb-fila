@@ -133,6 +133,8 @@ try {
   const child = await prisma.calonMurid.create({ data: {
     userId: wali.profile.id,
     namaAnak: `Anak Dinamis ${marker}`,
+    tempatLahir: "Bandar Lampung",
+    tanggalLahir: new Date("2020-01-01T00:00:00.000Z"),
     jalurId: route.id,
     kategoriId: category.id,
     subKategoriText: "TK Uji",
@@ -152,6 +154,8 @@ try {
   const expiredManualChild = await prisma.calonMurid.create({ data: {
     userId: wali.profile.id,
     namaAnak: `Anak Manual Expired ${marker}`,
+    tempatLahir: "Bandar Lampung",
+    tanggalLahir: new Date("2020-01-01T00:00:00.000Z"),
     jalurId: route.id,
     kategoriId: category.id,
     subKategoriText: "TK Uji",

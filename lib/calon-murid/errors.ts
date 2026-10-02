@@ -7,7 +7,10 @@ export type CalonMuridErrorCode =
   | "FEE_NOT_CONFIGURED"
   | "FINAL_ROUTE_CHOICE_DISABLED"
   | "FINAL_ROUTE_CHOICE_LOCKED"
-  | "INTEGRITY_ERROR";
+  | "INTEGRITY_ERROR"
+  | "AGE_NOT_ELIGIBLE"
+  | "BIRTH_DETAILS_REQUIRED"
+  | "BIRTH_RULE_NOT_CONFIGURED";
 
 export class CalonMuridError extends Error {
   constructor(

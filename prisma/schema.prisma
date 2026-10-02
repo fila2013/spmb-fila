@@ -260,6 +260,8 @@ model CalonMurid {
   id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId                  String             @map("user_id") @db.Uuid
   namaAnak                String             @map("nama_anak") @db.VarChar(150)
+  tempatLahir             String?            @map("tempat_lahir") @db.VarChar(150)
+  tanggalLahir            DateTime?          @map("tanggal_lahir") @db.Date
   jalurId                 String?            @map("jalur_id") @db.Uuid
   kategoriId              String?            @map("kategori_id") @db.Uuid
   subKategoriEnum         SubKategoriAlumni? @map("sub_kategori_enum")
@@ -294,16 +296,20 @@ model CalonMurid {
 }
 
 model FormField {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  formType       FormType  @map("form_type")
-  label          String    @db.VarChar(150)
-  tipeInput      TipeInput @map("tipe_input")
-  wajib          Boolean   @default(true)
-  urutan         Int       @default(0)
-  validasi       String?   @db.VarChar(50)
-  autoFillSource String?   @map("auto_fill_source") @db.VarChar(30)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formType          FormType  @map("form_type")
+  label             String    @db.VarChar(150)
+  tipeInput         TipeInput @map("tipe_input")
+  wajib             Boolean   @default(true)
+  urutan            Int       @default(0)
+  validasi          String?   @db.VarChar(50)
+  autoFillSource    String?   @map("auto_fill_source") @db.VarChar(30)
+  minAgeYears       Int?      @map("min_age_years")
+  ageReferenceMonth Int?      @map("age_reference_month")
+  ageReferenceYear  Int?      @map("age_reference_year")
+  archivedAt        DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   responses FormResponse[]
 

@@ -10,12 +10,14 @@ import type { CalonMuridActionState } from "@/lib/calon-murid/action-state";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
 import {
   calonMuridIdSchema,
+  birthDetailsSchema,
   createCalonMuridWithJalurSchema,
   selectKategoriSchema,
 } from "@/lib/calon-murid/schemas";
 import {
   createCalonMuridWithJalur,
   selectKategori,
+  updateBirthDetails,
 } from "@/lib/calon-murid/service";
 
 function actionError(error: unknown): CalonMuridActionState {
@@ -48,6 +50,8 @@ export async function createChildWithRouteAction(
     const user = await requireRole(UserRole.WALI_MURID);
     const input = createCalonMuridWithJalurSchema.parse({
       namaAnak: formData.get("namaAnak"),
+      tempatLahir: formData.get("tempatLahir"),
+      tanggalLahir: formData.get("tanggalLahir"),
       jalurId: formData.get("jalurId"),
     });
     const child = await createCalonMuridWithJalur(input, user.userId);
@@ -79,4 +83,24 @@ export async function selectCategoryAction(
     return actionError(error);
   }
   redirect(`/anak/${childId}/pembayaran-pendaftaran`);
+}
+
+export async function updateBirthDetailsAction(
+  _state: CalonMuridActionState,
+  formData: FormData,
+): Promise<CalonMuridActionState> {
+  let childId: string;
+  try {
+    const user = await requireRole(UserRole.WALI_MURID);
+    childId = calonMuridIdSchema.parse(formData.get("calonMuridId"));
+    const input = birthDetailsSchema.parse({
+      tempatLahir: formData.get("tempatLahir"),
+      tanggalLahir: formData.get("tanggalLahir"),
+    });
+    await updateBirthDetails(childId, input, user.userId);
+    revalidatePath(`/anak/${childId}/kategori`);
+  } catch (error) {
+    return actionError(error);
+  }
+  redirect(`/anak/${childId}/kategori`);
 }

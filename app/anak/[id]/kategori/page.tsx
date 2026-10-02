@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { SelectCategoryForm } from "@/components/calon-murid/enrollment-forms";
-import { StatusKeseluruhan } from "@/generated/prisma/enums";
+import { BirthDetailsForm, SelectCategoryForm } from "@/components/calon-murid/enrollment-forms";
+import { StatusKeseluruhan, TipeInput } from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
 import { availabilityLabel } from "@/lib/calon-murid/rules";
-import { getOwnedCalonMurid, listSelectableKategori } from "@/lib/calon-murid/service";
+import { getOwnedCalonMurid, getRegistrationAgeRule, listSelectableKategori } from "@/lib/calon-murid/service";
+import { fieldValueError } from "@/lib/enrollment/rules";
 import { getRegistrationQuotaHold } from "@/lib/quota-hold/service";
 import { isActivePendingHold, remainingQuota } from "@/lib/quota-hold/rules";
 
@@ -35,11 +36,15 @@ export default async function SelectCategoryPage({
     throw error;
   }
 
-  const hold = await getRegistrationQuotaHold(child.id);
+  const [hold, ageRule] = await Promise.all([getRegistrationQuotaHold(child.id), getRegistrationAgeRule()]);
+  const birthError = child.tanggalLahir
+    ? fieldValueError({ id: "tanggalLahir", tipeInput: TipeInput.DATE, wajib: true, validasi: null, ...(ageRule ?? {}) }, child.tanggalLahir.toISOString().slice(0, 10), true)
+    : "Tanggal lahir wajib diisi.";
+  const requiresBirthUpdate = !ageRule || !child.tempatLahir || Boolean(birthError);
   if (
     child.statusKeseluruhan ===
       StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR &&
-    isActivePendingHold(hold)
+    isActivePendingHold(hold) && !requiresBirthUpdate
   ) {
     redirect(`/anak/${child.id}/pembayaran-pendaftaran`);
   }
@@ -53,7 +58,8 @@ export default async function SelectCategoryPage({
   }
   const query = await searchParams;
 
-  const categories = (await listSelectableKategori(child.jalurId)).map((category) => ({
+  const selectableCategories = await listSelectableKategori(child.jalurId);
+  const categories = selectableCategories.map((category) => ({
     id: category.id,
     nama: category.nama,
     tipe: category.tipe,
@@ -76,7 +82,14 @@ export default async function SelectCategoryPage({
             Hold pembayaran sebelumnya telah berakhir. Pilih kategori dan lanjutkan kembali untuk mencoba memperoleh kuota baru.
           </p>
         ) : null}
-        <div className="mt-7"><SelectCategoryForm childId={child.id} categories={categories} /></div>
+        {requiresBirthUpdate ? (
+          <div className="mt-7"><BirthDetailsForm childId={child.id} tempatLahir={child.tempatLahir} tanggalLahir={child.tanggalLahir?.toISOString().slice(0, 10) ?? null} ageRule={ageRule} /></div>
+        ) : <>
+          <details className="mt-6"><summary className="cursor-pointer text-sm font-semibold text-emerald-800">Lihat atau koreksi tempat dan tanggal lahir sebelum pembayaran</summary>
+            <div className="mt-3"><BirthDetailsForm childId={child.id} tempatLahir={child.tempatLahir} tanggalLahir={child.tanggalLahir?.toISOString().slice(0, 10) ?? null} ageRule={ageRule} /></div>
+          </details>
+          <div className="mt-7"><SelectCategoryForm childId={child.id} categories={categories} /></div>
+        </>}
       </div>
     </div>
   );

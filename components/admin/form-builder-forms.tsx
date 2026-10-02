@@ -1,15 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createFormFieldAction,
   deleteFormFieldAction,
   updateFormFieldAction,
+  updateRegistrationAgeRuleAction,
 } from "@/app/admin/(enrollment)/actions";
 import type { FormField } from "@/generated/prisma/client";
 import { FormType, TipeInput } from "@/generated/prisma/enums";
 import { initialEnrollmentActionState } from "@/lib/enrollment/action-state";
+import { indonesianMonthNames } from "@/lib/enrollment/rules";
 
 function Notice({
   state,
@@ -40,7 +42,66 @@ const inputLabels: Record<TipeInput, string> = {
   [TipeInput.TEL]: "Telepon",
 };
 
+export function RegistrationAgeRulePanel({ value }: { value: FormField | null }) {
+  const [state, formAction, pending] = useActionState(
+    updateRegistrationAgeRuleAction,
+    initialEnrollmentActionState,
+  );
+  const configuredRule = value && value.minAgeYears != null && value.ageReferenceMonth != null && value.ageReferenceYear != null
+    ? { years: value.minAgeYears, month: value.ageReferenceMonth, year: value.ageReferenceYear,
+        cutoffYear: value.ageReferenceYear - value.minAgeYears }
+    : null;
+  return (
+    <section className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 sm:p-6">
+      <h2 className="text-lg font-bold text-emerald-950">Aturan usia sebelum pembayaran</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-700">
+        Atur batas usia untuk Tanggal Lahir calon murid. Nilai ini dibaca langsung dari Form Builder saat pendaftaran, pemilihan kategori, dan pembayaran.
+      </p>
+      <p className="mt-1 text-xs leading-5 text-slate-600">
+        Perubahan berlaku untuk pendaftar baru dan peserta yang belum membayar; pembayaran yang sudah terverifikasi tidak dibatalkan otomatis.
+      </p>
+      {!value ? (
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          Field Tanggal lahir dengan auto-fill dari pendaftaran belum tersedia. Periksa field Data Pribadi di bawah sebelum mengatur usia.
+        </p>
+      ) : (
+        <form key={value.updatedAt.toISOString()} action={formAction} className="mt-5 grid gap-4">
+          <input type="hidden" name="fieldId" value={value.id} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="text-sm font-semibold text-slate-800">Usia Minimal (Tahun)
+              <input name="minAgeYears" type="number" min={1} max={30} required defaultValue={value.minAgeYears ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal" />
+              {state.fieldErrors?.minAgeYears ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.minAgeYears[0]}</span> : null}
+            </label>
+            <label className="text-sm font-semibold text-slate-800">Bulan Acuan Pendaftaran
+              <select name="ageReferenceMonth" required defaultValue={value.ageReferenceMonth ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">
+                <option value="" disabled>Pilih bulan</option>
+                {indonesianMonthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
+              </select>
+              {state.fieldErrors?.ageReferenceMonth ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.ageReferenceMonth[0]}</span> : null}
+            </label>
+            <label className="text-sm font-semibold text-slate-800">Tahun Acuan Pendaftaran
+              <input name="ageReferenceYear" type="number" min={2000} max={2200} required defaultValue={value.ageReferenceYear ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal" />
+              {state.fieldErrors?.ageReferenceYear ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.ageReferenceYear[0]}</span> : null}
+            </label>
+          </div>
+          {configuredRule ? (
+            <p className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-950">
+              Aturan aktif: minimal {configuredRule.years} tahun per {indonesianMonthNames[configuredRule.month - 1]} {configuredRule.year}. Kelahiran sampai {indonesianMonthNames[configuredRule.month - 1]} {configuredRule.cutoffYear} memenuhi batas; mulai bulan berikutnya belum memenuhi.
+            </p>
+          ) : null}
+          <Notice state={state} />
+          <button disabled={pending} className="w-fit rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60">
+            {pending ? "Menyimpan…" : "Simpan aturan usia"}
+          </button>
+        </form>
+      )}
+    </section>
+  );
+}
+
 export function FormFieldForm({ value }: { value?: FormField }) {
+  const [inputKind, setInputKind] = useState<TipeInput>(value?.tipeInput ?? TipeInput.TEXT);
+  const [ageEnabled, setAgeEnabled] = useState(Boolean(value?.minAgeYears));
   const action = value ? updateFormFieldAction : createFormFieldAction;
   const [state, formAction, pending] = useActionState(
     action,
@@ -65,7 +126,8 @@ export function FormFieldForm({ value }: { value?: FormField }) {
           Tipe input
           <select
             name="tipeInput"
-            defaultValue={value?.tipeInput ?? TipeInput.TEXT}
+            value={inputKind}
+            onChange={(event) => setInputKind(event.target.value as TipeInput)}
             className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
           >
             {Object.values(TipeInput).map((type) => (
@@ -100,17 +162,13 @@ export function FormFieldForm({ value }: { value?: FormField }) {
             className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
           />
         </label>
-        <label className="text-sm font-semibold text-slate-800">
-          Validasi
-          <select
-            name="validasi"
-            defaultValue={value?.validasi ?? ""}
-            className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
-          >
+        {inputKind === TipeInput.TEL ? <label className="text-sm font-semibold text-slate-800">
+          Validasi nomor
+          <select name="validasi" defaultValue={value?.validasi ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">
             <option value="">Tidak ada</option>
             <option value="format_wa_indonesia">Nomor WA Indonesia</option>
           </select>
-        </label>
+        </label> : <input type="hidden" name="validasi" value="" />}
         <label className="text-sm font-semibold text-slate-800">
           Auto-fill
           <select
@@ -121,9 +179,34 @@ export function FormFieldForm({ value }: { value?: FormField }) {
             <option value="">Tidak ada</option>
             <option value="akun_email">Email akun</option>
             <option value="kategori_asal_tk">Asal TK dari kategori</option>
+            <option value="tempat_lahir">Tempat lahir dari pendaftaran</option>
+            <option value="tanggal_lahir">Tanggal lahir dari pendaftaran</option>
           </select>
         </label>
       </div>
+      {inputKind === TipeInput.DATE ? <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+        <label className="flex items-center gap-2 text-sm font-semibold text-emerald-950">
+          <input type="checkbox" checked={ageEnabled} onChange={(event) => setAgeEnabled(event.target.checked)} />
+          Aktifkan validasi batas usia minimal
+        </label>
+        {ageEnabled ? <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <label className="text-sm font-semibold text-slate-800">Usia Minimal (Tahun)
+            <input name="minAgeYears" type="number" min={1} max={30} required defaultValue={value?.minAgeYears ?? 6} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal" />
+            {state.fieldErrors?.minAgeYears ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.minAgeYears[0]}</span> : null}
+          </label>
+          <label className="text-sm font-semibold text-slate-800">Bulan Acuan Pendaftaran
+            <select name="ageReferenceMonth" required defaultValue={value?.ageReferenceMonth ?? 7} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">
+              {indonesianMonthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
+            </select>
+            {state.fieldErrors?.ageReferenceMonth ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.ageReferenceMonth[0]}</span> : null}
+          </label>
+          <label className="text-sm font-semibold text-slate-800">Tahun Acuan Pendaftaran
+            <input name="ageReferenceYear" type="number" min={2000} max={2200} required defaultValue={value?.ageReferenceYear ?? 2027} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal" />
+            {state.fieldErrors?.ageReferenceYear ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.ageReferenceYear[0]}</span> : null}
+          </label>
+        </div> : <><input type="hidden" name="minAgeYears" value="" /><input type="hidden" name="ageReferenceMonth" value="" /><input type="hidden" name="ageReferenceYear" value="" /></>}
+        <p className="mt-3 text-xs leading-5 text-slate-600">Perhitungan memakai bulan dan tahun lahir. Lahir pada bulan acuan tetap memenuhi batas; bulan setelahnya belum.</p>
+      </div> : <><input type="hidden" name="minAgeYears" value="" /><input type="hidden" name="ageReferenceMonth" value="" /><input type="hidden" name="ageReferenceYear" value="" /></>}
       <label className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-800">
         <input type="checkbox" name="wajib" defaultChecked={value?.wajib ?? true} />
         Wajib diisi saat submit final

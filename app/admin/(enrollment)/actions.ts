@@ -10,15 +10,21 @@ import { EnrollmentError } from "@/lib/enrollment/errors";
 import {
   formFieldIdSchema,
   formFieldInputSchema,
+  registrationAgeRuleSchema,
   updateFormFieldSchema,
 } from "@/lib/enrollment/schemas";
 import {
   createFormField,
   deleteFormField,
   updateFormField,
+  updateRegistrationAgeRule,
 } from "@/lib/enrollment/service";
 
 function formValues(formData: FormData) {
+  const optionalNumber = (name: string) => {
+    const value = formData.get(name);
+    return value === null || value === "" ? null : Number(value);
+  };
   return {
     formType: formData.get("formType"),
     label: formData.get("label"),
@@ -27,6 +33,9 @@ function formValues(formData: FormData) {
     urutan: Number(formData.get("urutan")),
     validasi: formData.get("validasi") || null,
     autoFillSource: formData.get("autoFillSource") || null,
+    minAgeYears: optionalNumber("minAgeYears"),
+    ageReferenceMonth: optionalNumber("ageReferenceMonth"),
+    ageReferenceYear: optionalNumber("ageReferenceYear"),
   };
 }
 
@@ -95,6 +104,27 @@ export async function deleteFormFieldAction(
     await deleteFormField(id, admin.userId);
     refreshFormBuilder();
     return { status: "success", message: "Field berhasil dihapus." };
+  } catch (error) {
+    return errorState(error);
+  }
+}
+
+export async function updateRegistrationAgeRuleAction(
+  _state: EnrollmentActionState,
+  formData: FormData,
+): Promise<EnrollmentActionState> {
+  try {
+    const admin = await requireRole(UserRole.ADMIN);
+    const input = registrationAgeRuleSchema.parse({
+      fieldId: formData.get("fieldId"),
+      minAgeYears: Number(formData.get("minAgeYears")),
+      ageReferenceMonth: Number(formData.get("ageReferenceMonth")),
+      ageReferenceYear: Number(formData.get("ageReferenceYear")),
+    });
+    await updateRegistrationAgeRule(input, admin.userId);
+    refreshFormBuilder();
+    revalidatePath("/anak/tambah");
+    return { status: "success", message: "Aturan usia pendaftaran berhasil diperbarui." };
   } catch (error) {
     return errorState(error);
   }

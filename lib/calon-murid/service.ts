@@ -2,8 +2,10 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import {
+  FormType,
   StatusHoldKuota,
   StatusKeseluruhan,
+  TipeInput,
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
@@ -15,10 +17,12 @@ import {
 import type {
   CreateCalonMuridInput,
   CreateCalonMuridWithJalurInput,
+  BirthDetailsInput,
   SelectJalurInput,
   SelectKategoriInput,
 } from "@/lib/calon-murid/schemas";
 import { prisma } from "@/lib/prisma";
+import { fieldValueError } from "@/lib/enrollment/rules";
 import {
   activeCategoryHoldCounts,
   activeRouteHoldCounts,
@@ -37,6 +41,8 @@ const detailInclude = {
 
 function childSnapshot(child: {
   namaAnak: string;
+  tempatLahir: string | null;
+  tanggalLahir: Date | null;
   jalurId: string | null;
   kategoriId: string | null;
   subKategoriEnum: string | null;
@@ -45,6 +51,8 @@ function childSnapshot(child: {
 }) {
   return {
     namaAnak: child.namaAnak,
+    tempatLahir: child.tempatLahir,
+    tanggalLahir: child.tanggalLahir?.toISOString().slice(0, 10) ?? null,
     jalurId: child.jalurId,
     kategoriId: child.kategoriId,
     subKategoriEnum: child.subKategoriEnum,
@@ -123,6 +131,43 @@ async function activeFee(
   });
 }
 
+function isoBirthDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+export async function assertBirthEligibility(transaction: Transaction, tanggalLahir: string) {
+  const field = await transaction.formField.findFirst({
+    where: {
+      formType: FormType.DATA_PRIBADI,
+      archivedAt: null,
+      autoFillSource: "tanggal_lahir",
+      tipeInput: TipeInput.DATE,
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  if (!field) {
+    throw new CalonMuridError(
+      "BIRTH_RULE_NOT_CONFIGURED",
+      "Aturan tanggal lahir belum tersedia. Hubungi admin sebelum melanjutkan pendaftaran.",
+      503,
+    );
+  }
+  if (field.minAgeYears == null || field.ageReferenceMonth == null || field.ageReferenceYear == null) {
+    throw new CalonMuridError("BIRTH_RULE_NOT_CONFIGURED", "Aturan usia minimal belum lengkap. Hubungi admin sebelum melanjutkan pendaftaran.", 503);
+  }
+  const error = fieldValueError(field, tanggalLahir, true);
+  if (error) throw new CalonMuridError("AGE_NOT_ELIGIBLE", error, 422);
+}
+
+export async function getRegistrationAgeRule() {
+  const field = await prisma.formField.findFirst({
+    where: { formType: FormType.DATA_PRIBADI, archivedAt: null, autoFillSource: "tanggal_lahir", tipeInput: TipeInput.DATE },
+    select: { minAgeYears: true, ageReferenceMonth: true, ageReferenceYear: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  return field && field.minAgeYears != null && field.ageReferenceMonth != null && field.ageReferenceYear != null ? field : null;
+}
+
 export function listOwnedCalonMurid(userId: string) {
   return prisma.calonMurid.findMany({
     where: { userId },
@@ -152,8 +197,9 @@ export async function createCalonMurid(
   userId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertBirthEligibility(transaction, input.tanggalLahir);
     const child = await transaction.calonMurid.create({
-      data: { userId, namaAnak: input.namaAnak },
+      data: { userId, namaAnak: input.namaAnak, tempatLahir: input.tempatLahir, tanggalLahir: new Date(`${input.tanggalLahir}T00:00:00.000Z`) },
     });
     await transaction.auditLog.create({
       data: {
@@ -173,6 +219,7 @@ export async function createCalonMuridWithJalur(
   userId: string,
 ) {
   return prisma.$transaction(async (transaction) => {
+    await assertBirthEligibility(transaction, input.tanggalLahir);
     await lockRoutes(transaction, [input.jalurId]);
     const route = await transaction.jalur.findUnique({
       where: { id: input.jalurId },
@@ -190,6 +237,8 @@ export async function createCalonMuridWithJalur(
       data: {
         userId,
         namaAnak: input.namaAnak,
+        tempatLahir: input.tempatLahir,
+        tanggalLahir: new Date(`${input.tanggalLahir}T00:00:00.000Z`),
         jalurId: input.jalurId,
       },
     });
@@ -266,6 +315,32 @@ export async function selectJalur(
   });
 }
 
+export async function updateBirthDetails(id: string, input: BirthDetailsInput, userId: string) {
+  return prisma.$transaction(async (transaction) => {
+    const previous = await lockChild(transaction, id, userId);
+    if (previous.statusKeseluruhan !== StatusKeseluruhan.PILIH_JALUR &&
+        previous.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR) {
+      throw new CalonMuridError("INVALID_STAGE", "Data lahir pendaftaran awal tidak dapat diubah setelah pembayaran terverifikasi.", 409);
+    }
+    const verifiedPayment = await transaction.pembayaran.count({
+      where: { calonMuridReference: id, jenis: "PENDAFTARAN", status: "VERIFIED" },
+    });
+    if (verifiedPayment) {
+      throw new CalonMuridError("INVALID_STAGE", "Data lahir tidak dapat diubah setelah pembayaran terverifikasi.", 409);
+    }
+    await assertBirthEligibility(transaction, input.tanggalLahir);
+    const child = await transaction.calonMurid.update({
+      where: { id },
+      data: { tempatLahir: input.tempatLahir, tanggalLahir: new Date(`${input.tanggalLahir}T00:00:00.000Z`) },
+    });
+    await transaction.auditLog.create({
+      data: { actorId: userId, action: "UPDATE_BIRTH_BEFORE_PAYMENT", entity: "calon_murid", entityId: id,
+        detail: { before: childSnapshot(previous), after: childSnapshot(child) } },
+    });
+    return child;
+  });
+}
+
 export async function selectKategori(
   id: string,
   input: SelectKategoriInput,
@@ -274,6 +349,10 @@ export async function selectKategori(
   return prisma.$transaction(async (transaction) => {
     const previous = await lockChild(transaction, id, userId);
     await assertSelectionMutable(transaction, previous);
+    if (!previous.tempatLahir || !previous.tanggalLahir) {
+      throw new CalonMuridError("BIRTH_DETAILS_REQUIRED", "Isi tempat dan tanggal lahir sebelum memilih kategori dan membayar.", 422);
+    }
+    await assertBirthEligibility(transaction, isoBirthDate(previous.tanggalLahir));
     if (!previous.jalurId) {
       throw new CalonMuridError(
         "INVALID_STAGE",
@@ -387,6 +466,10 @@ export async function listSelectableKategori(jalurId: string) {
 
 export async function getPaymentPreparation(id: string, userId: string) {
   const child = await getOwnedCalonMurid(id, userId);
+  if (!child.tempatLahir || !child.tanggalLahir) {
+    throw new CalonMuridError("BIRTH_DETAILS_REQUIRED", "Isi tempat dan tanggal lahir sebelum pembayaran.", 422);
+  }
+  await assertBirthEligibility(prisma, isoBirthDate(child.tanggalLahir));
   if (!child.jalurId || !child.kategoriId || !child.jalur || !child.kategori) {
     throw new CalonMuridError(
       "INVALID_STAGE",

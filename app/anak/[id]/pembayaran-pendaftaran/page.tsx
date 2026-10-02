@@ -9,10 +9,13 @@ import {
   ModePembayaranPendaftaran,
   MetodePembayaran,
   StatusPembayaran,
+  TipeInput,
 } from "@/generated/prisma/enums";
 import { AuthorizationError } from "@/lib/auth/errors";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
+import { getRegistrationAgeRule } from "@/lib/calon-murid/service";
+import { fieldValueError } from "@/lib/enrollment/rules";
 import { getAppEnvironment } from "@/lib/env/client";
 import { getMidtransEnvironment } from "@/lib/env/server";
 import { PaymentError } from "@/lib/payment/errors";
@@ -54,6 +57,14 @@ export default async function PaymentPreparationPage({
   const { child, payment, nominal, mode, bankAccounts, hold, holdActive } = summary;
   if (payment?.status === StatusPembayaran.VERIFIED) {
     redirect(paymentReturnUrl(child.id, "verified"));
+  }
+  const ageRule = await getRegistrationAgeRule();
+  if (!ageRule || !child.tempatLahir || !child.tanggalLahir || fieldValueError(
+    { id: "tanggalLahir", tipeInput: TipeInput.DATE, wajib: true, validasi: null, ...ageRule },
+    child.tanggalLahir.toISOString().slice(0, 10),
+    true,
+  )) {
+    redirect(`/anak/${child.id}/kategori`);
   }
   if (!hold || !holdActive) {
     redirect(`/anak/${child.id}/kategori?hold=expired`);

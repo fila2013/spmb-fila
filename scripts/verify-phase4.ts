@@ -84,7 +84,7 @@ async function api(path: string, cookie: string, init?: RequestInit) {
 async function createDraft(cookie: string, name: string, maliciousUserId?: string) {
   const result = await api("/api/calon-murid", cookie, {
     method: "POST",
-    body: JSON.stringify({ namaAnak: name, userId: maliciousUserId }),
+    body: JSON.stringify({ namaAnak: name, tempatLahir: "Bandar Lampung", tanggalLahir: "2020-01-01", userId: maliciousUserId }),
   });
   if (result.response.status !== 201 || !result.body.data || Array.isArray(result.body.data) || !result.body.data.id) {
     throw new Error(`Gagal membuat draft (${result.response.status}).`);
