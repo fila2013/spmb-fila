@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { logoutAction } from "@/app/(auth)/actions";
+import { AdminLogoutForm } from "@/components/admin/admin-logout-form";
 
 const navigation = [
   { href: "/admin/dashboard", label: "Ringkasan" },
@@ -57,9 +57,7 @@ export function AdminShell({
         </nav>
         <div className="mt-4 border-t border-emerald-950/10 px-3 pt-4">
           <p className="truncate text-xs text-slate-500" title={email}>{email}</p>
-          <form action={logoutAction} className="mt-2">
-            <button className="text-sm font-semibold text-red-700 hover:underline">Keluar</button>
-          </form>
+          <AdminLogoutForm />
         </div>
       </aside>
 

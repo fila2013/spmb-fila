@@ -4,7 +4,9 @@ import { FormType, TipeInput } from "@/generated/prisma/enums";
 import {
   enrollmentMutationSchema,
   formFieldInputSchema,
+  parseFieldOptions,
   registrationAgeRuleSchema,
+  updateFormFieldSchema,
 } from "@/lib/enrollment/schemas";
 
 describe("enrollment schemas", () => {
@@ -46,6 +48,26 @@ describe("enrollment schemas", () => {
       autoFillSource: "akun_email",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("mengizinkan auto-fill nama anak hanya pada Teks Data Pribadi", () => {
+    const base = { formType: FormType.DATA_PRIBADI, label: "Nama lengkap", tipeInput: TipeInput.TEXT,
+      wajib: true, urutan: 0, validasi: null, autoFillSource: "nama_anak" };
+    expect(formFieldInputSchema.safeParse(base).success).toBe(true);
+    expect(formFieldInputSchema.safeParse({ ...base, formType: FormType.OBSERVASI }).success).toBe(false);
+    expect(formFieldInputSchema.safeParse({ ...base, tipeInput: TipeInput.OPTION, options: ["A", "B"] }).success).toBe(false);
+  });
+
+  it("membuat dan mengedit field Pilihan Tunggal dengan opsi yang valid", () => {
+    const base = { formType: FormType.DATA_PRIBADI, label: "Jenis Kelamin", tipeInput: TipeInput.OPTION,
+      wajib: true, urutan: 1, validasi: null, autoFillSource: null,
+      options: parseFieldOptions("Laki-Laki, Perempuan\nLainnya") };
+    expect(base.options).toEqual(["Laki-Laki", "Perempuan", "Lainnya"]);
+    expect(formFieldInputSchema.safeParse(base).success).toBe(true);
+    expect(updateFormFieldSchema.safeParse({ ...base, id: "00000000-0000-4000-8000-000000000001" }).success).toBe(true);
+    expect(formFieldInputSchema.safeParse({ ...base, options: ["Laki-Laki"] }).success).toBe(false);
+    expect(formFieldInputSchema.safeParse({ ...base, options: ["Laki-Laki", "laki-laki"] }).success).toBe(false);
+    expect(formFieldInputSchema.safeParse({ ...base, tipeInput: TipeInput.TEXT }).success).toBe(false);
   });
 
   it("mengizinkan konfigurasi usia lengkap hanya pada tipe Tanggal", () => {

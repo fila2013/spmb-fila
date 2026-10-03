@@ -24,13 +24,15 @@ const prisma = new PrismaClient({
 const dataPribadiFields: Array<{
   label: string;
   tipeInput: TipeInput;
+  options?: string[];
   validasi?: string;
   autoFillSource?: string;
   minAgeYears?: number;
   ageReferenceMonth?: number;
   ageReferenceYear?: number;
 }> = [
-  { label: "Nama lengkap", tipeInput: TipeInput.TEXT },
+  { label: "Nama lengkap", tipeInput: TipeInput.TEXT, autoFillSource: "nama_anak" },
+  { label: "Jenis Kelamin", tipeInput: TipeInput.OPTION, options: ["Laki-Laki", "Perempuan"] },
   { label: "Nama panggilan", tipeInput: TipeInput.TEXT },
   { label: "Tempat lahir", tipeInput: TipeInput.TEXT, autoFillSource: "tempat_lahir" },
   { label: "Tanggal lahir", tipeInput: TipeInput.DATE, autoFillSource: "tanggal_lahir", minAgeYears: 6, ageReferenceMonth: 7, ageReferenceYear: 2027 },
@@ -124,6 +126,7 @@ async function main() {
           formType: FormType.DATA_PRIBADI,
           label: field.label,
           tipeInput: field.tipeInput,
+          options: field.options ?? [],
           validasi: field.validasi,
           autoFillSource: field.autoFillSource,
           minAgeYears: field.minAgeYears,

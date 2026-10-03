@@ -5,6 +5,7 @@ export type ValidatableField = {
   tipeInput: TipeInput;
   wajib: boolean;
   validasi: string | null;
+  options?: readonly string[];
   minAgeYears?: number | null;
   ageReferenceMonth?: number | null;
   ageReferenceYear?: number | null;
@@ -52,6 +53,7 @@ export function fieldValueError(
   field: ValidatableField,
   value: string,
   requireValue: boolean,
+  legacyOptionValue?: string | null,
 ) {
   if (!value) {
     return requireValue && field.wajib ? "Field ini wajib diisi." : null;
@@ -61,6 +63,13 @@ export function fieldValueError(
   }
   if (field.tipeInput === TipeInput.TEXTAREA && value.length > 10_000) {
     return "Jawaban maksimal 10.000 karakter.";
+  }
+  if (
+    field.tipeInput === TipeInput.OPTION &&
+    !field.options?.includes(value) &&
+    value.trim() !== legacyOptionValue?.trim()
+  ) {
+    return "Pilih salah satu opsi yang tersedia.";
   }
   if (
     field.tipeInput === TipeInput.EMAIL &&
@@ -102,6 +111,7 @@ export function validateFieldValues(
   fields: ValidatableField[],
   values: Map<string, string>,
   requireValues: boolean,
+  legacyOptionValues?: ReadonlyMap<string, string>,
 ) {
   const errors: Record<string, string[]> = {};
   for (const field of fields) {
@@ -109,6 +119,7 @@ export function validateFieldValues(
       field,
       values.get(field.id) ?? "",
       requireValues,
+      legacyOptionValues?.get(field.id),
     );
     if (error) errors[field.id] = [error];
   }

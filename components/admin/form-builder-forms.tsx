@@ -40,6 +40,7 @@ const inputLabels: Record<TipeInput, string> = {
   [TipeInput.NUMBER]: "Angka",
   [TipeInput.EMAIL]: "Email",
   [TipeInput.TEL]: "Telepon",
+  [TipeInput.OPTION]: "Pilihan Tunggal (dropdown)",
 };
 
 export function RegistrationAgeRulePanel({ value }: { value: FormField | null }) {
@@ -149,6 +150,19 @@ export function FormFieldForm({ value }: { value?: FormField }) {
           <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.label[0]}</span>
         ) : null}
       </label>
+      {inputKind === TipeInput.OPTION ? <label className="text-sm font-semibold text-slate-800">
+        Daftar opsi pilihan
+        <textarea
+          name="options"
+          required
+          defaultValue={value?.options.join("\n") ?? ""}
+          placeholder={"Laki-Laki\nPerempuan"}
+          rows={4}
+          className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"
+        />
+        <span className="mt-1 block text-xs font-normal text-slate-600">Pisahkan dengan baris baru atau koma. Minimal 2 opsi, maksimal 20.</span>
+        {state.fieldErrors?.options ? <span className="mt-1 block text-xs text-red-700">{state.fieldErrors.options[0]}</span> : null}
+      </label> : null}
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="text-sm font-semibold text-slate-800">
           Urutan
@@ -179,6 +193,7 @@ export function FormFieldForm({ value }: { value?: FormField }) {
             <option value="">Tidak ada</option>
             <option value="akun_email">Email akun</option>
             <option value="kategori_asal_tk">Asal TK dari kategori</option>
+            <option value="nama_anak">Nama lengkap anak dari pendaftaran</option>
             <option value="tempat_lahir">Tempat lahir dari pendaftaran</option>
             <option value="tanggal_lahir">Tanggal lahir dari pendaftaran</option>
           </select>

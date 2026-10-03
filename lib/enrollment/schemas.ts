@@ -34,9 +34,15 @@ export const enrollmentMutationSchema = z
 const nullableValidationSchema = z
   .union([z.literal("format_wa_indonesia"), z.null()]);
 const nullableAutoFillSchema = z.union([
-  z.enum(["akun_email", "kategori_asal_tk", "tempat_lahir", "tanggal_lahir"]),
+  z.enum(["akun_email", "kategori_asal_tk", "tempat_lahir", "tanggal_lahir", "nama_anak"]),
   z.null(),
 ]);
+
+export function parseFieldOptions(value: FormDataEntryValue | null) {
+  return typeof value === "string"
+    ? value.split(/[,\r\n]+/).map((option) => option.trim()).filter(Boolean)
+    : [];
+}
 
 export const formFieldInputSchema = z
   .object({
@@ -46,12 +52,23 @@ export const formFieldInputSchema = z
     wajib: z.boolean(),
     urutan: z.number().int().min(0).max(10_000),
     validasi: nullableValidationSchema,
+    options: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
     autoFillSource: nullableAutoFillSchema,
     minAgeYears: z.number().int().min(1).max(30).nullable().default(null),
     ageReferenceMonth: z.number().int().min(1).max(12).nullable().default(null),
     ageReferenceYear: z.number().int().min(2000).max(2200).nullable().default(null),
   })
   .superRefine((value, context) => {
+    if (value.tipeInput === TipeInput.OPTION) {
+      if (value.options.length < 2) {
+        context.addIssue({ code: "custom", path: ["options"], message: "Masukkan minimal dua pilihan." });
+      }
+      if (new Set(value.options.map((option) => option.toLocaleLowerCase("id-ID"))).size !== value.options.length) {
+        context.addIssue({ code: "custom", path: ["options"], message: "Pilihan tidak boleh duplikat." });
+      }
+    } else if (value.options.length) {
+      context.addIssue({ code: "custom", path: ["options"], message: "Daftar pilihan hanya untuk tipe Pilihan Tunggal." });
+    }
     const ageValues = [value.minAgeYears, value.ageReferenceMonth, value.ageReferenceYear];
     if (ageValues.some((item) => item !== null)) {
       if (value.tipeInput !== TipeInput.DATE) {
@@ -95,6 +112,12 @@ export const formFieldInputSchema = z
         path: ["autoFillSource"],
         message: "Auto-fill asal TK hanya tersedia untuk field Text pada Data Pribadi.",
       });
+    }
+    if (
+      value.autoFillSource === "nama_anak" &&
+      (value.formType !== FormType.DATA_PRIBADI || value.tipeInput !== TipeInput.TEXT)
+    ) {
+      context.addIssue({ code: "custom", path: ["autoFillSource"], message: "Auto-fill nama anak hanya tersedia untuk tipe Teks pada Data Pribadi." });
     }
     if (
       (value.autoFillSource === "tempat_lahir" || value.autoFillSource === "tanggal_lahir") &&

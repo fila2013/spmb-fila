@@ -9,6 +9,7 @@ import {
   TipeInput,
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
+import { initialEnrollmentValue, isUnchangedEnrollmentAnswer, isUnchangedRegistrationValue, registrationAutoFillValue } from "@/lib/enrollment/autofill";
 import {
   EnrollmentError,
   EnrollmentValidationError,
@@ -35,17 +36,6 @@ function asalTk(child: {
   if (child.subKategoriText) return child.subKategoriText;
   if (child.subKategoriEnum === "TKIT_FI_1") return "TKIT Fitrah Insani 1";
   if (child.subKategoriEnum === "TKIT_FI_2") return "TKIT Fitrah Insani 2";
-  return "";
-}
-
-function autoFillValue(
-  source: string | null,
-  context: { email: string; asalTk: string; tempatLahir: string; tanggalLahir: string },
-) {
-  if (source === "akun_email") return context.email;
-  if (source === "kategori_asal_tk") return context.asalTk;
-  if (source === "tempat_lahir") return context.tempatLahir;
-  if (source === "tanggal_lahir") return context.tanggalLahir;
   return "";
 }
 
@@ -118,6 +108,7 @@ export async function getEnrollmentFormData(
   const context = {
     email: child.user.email,
     asalTk: asalTk(child),
+    namaAnak: child.namaAnak,
     tempatLahir: child.tempatLahir ?? "",
     tanggalLahir: child.tanggalLahir?.toISOString().slice(0, 10) ?? "",
   };
@@ -136,16 +127,18 @@ export async function getEnrollmentFormData(
     legacyResponses: submitted ? [] : fields
       .filter((field) => field.archivedAt && field.label === "Tempat, tanggal lahir" && field.responses.length > 0)
       .map((field) => ({ id: field.id, label: field.label, value: field.responses[0]?.value ?? "" })),
-    fields: visibleFields.map(({ responses, ...field }) => ({
-      ...field,
-      value:
-        responses.length > 0
-          ? responses[0]?.value ?? ""
-          : autoFillValue(field.autoFillSource, context),
-      autoFilled: responses.length === 0 && Boolean(autoFillValue(field.autoFillSource, context)),
-      lockedFromRegistration: (field.autoFillSource === "tempat_lahir" && Boolean(child.tempatLahir)) ||
-        (field.autoFillSource === "tanggal_lahir" && Boolean(child.tanggalLahir)),
-    })),
+    fields: visibleFields.map(({ responses, ...field }) => {
+      const savedValue = responses[0]?.value;
+      const fallback = submitted ? "" : registrationAutoFillValue(field.autoFillSource, context);
+      return {
+        ...field,
+        value: initialEnrollmentValue(savedValue, fallback),
+        autoFilled: !savedValue?.trim() && Boolean(fallback),
+        lockedFromRegistration: Boolean(fallback) && ["nama_anak", "tempat_lahir", "tanggal_lahir"].includes(field.autoFillSource ?? ""),
+        legacyOptionValue: field.tipeInput === TipeInput.OPTION && savedValue?.trim() && !field.options.includes(savedValue)
+          ? savedValue : null,
+      };
+    }),
   };
 }
 
@@ -231,17 +224,20 @@ export async function saveEnrollment(
         ];
       }),
     );
+    const existingResponses = await transaction.formResponse.findMany({ where: { calonMuridId: child.id } });
+    const savedValues = new Map(existingResponses.map((response) => [response.fieldId, response.value ?? ""]));
     const lockedErrors: Record<string, string[]> = {};
     for (const field of formFields) {
-      const expected = field.autoFillSource === "tempat_lahir" ? child.tempatLahir
+      const expected = field.autoFillSource === "nama_anak" ? child.namaAnak
+        : field.autoFillSource === "tempat_lahir" ? child.tempatLahir
         : field.autoFillSource === "tanggal_lahir" ? child.tanggalLahir?.toISOString().slice(0, 10)
         : null;
-      if (expected && incoming.has(field.id) && incoming.get(field.id) !== expected) {
-        lockedErrors[field.id] = ["Data lahir dari pendaftaran awal tidak dapat diubah di formulir ini. Hubungi admin jika perlu koreksi."];
+      if (expected && incoming.has(field.id) && !isUnchangedRegistrationValue(incoming.get(field.id) ?? "", expected, savedValues.get(field.id))) {
+        lockedErrors[field.id] = ["Data dari pendaftaran awal tidak dapat diubah di formulir ini. Hubungi admin jika perlu koreksi."];
       }
     }
     if (Object.keys(lockedErrors).length) throw new EnrollmentValidationError(lockedErrors);
-    const draftErrors = validateFieldValues(formFields, incoming, false);
+    const draftErrors = validateFieldValues(formFields, incoming, false, savedValues);
     if (Object.keys(draftErrors).length) {
       throw new EnrollmentValidationError(draftErrors);
     }
@@ -256,20 +252,22 @@ export async function saveEnrollment(
           422,
         );
       }
-      const existing = await transaction.formResponse.findMany({
-        where: { calonMuridId: child.id },
-      });
       finalValues = new Map(
-        existing.map((response) => [response.fieldId, response.value ?? ""]),
+        existingResponses.map((response) => [response.fieldId, response.value ?? ""]),
       );
       for (const [fieldId, value] of incoming) finalValues.set(fieldId, value);
-      const finalErrors = validateFieldValues(fields, finalValues, true);
+      const finalErrors = validateFieldValues(fields, finalValues, true, savedValues);
       if (Object.keys(finalErrors).length) {
         throw new EnrollmentValidationError(finalErrors);
       }
     }
 
     for (const [fieldId, value] of incoming) {
+      const previousValue = savedValues.get(fieldId);
+      if (isUnchangedEnrollmentAnswer(previousValue, value)) {
+        // An unchanged answer must retain its original stored value and timestamp.
+        continue;
+      }
       await transaction.formResponse.upsert({
         where: {
           calonMuridId_fieldId: { calonMuridId: child.id, fieldId },
@@ -318,6 +316,7 @@ function fieldSnapshot(field: FormField) {
     wajib: field.wajib,
     urutan: field.urutan,
     validasi: field.validasi,
+    options: field.options,
     autoFillSource: field.autoFillSource,
     minAgeYears: field.minAgeYears,
     ageReferenceMonth: field.ageReferenceMonth,
@@ -373,7 +372,8 @@ export async function updateFormField(
     if (
       responseCount > 0 &&
       (input.formType !== previous.formType ||
-        input.tipeInput !== previous.tipeInput)
+        (input.tipeInput !== previous.tipeInput &&
+          !(previous.tipeInput === TipeInput.TEXT && input.tipeInput === TipeInput.OPTION)))
     ) {
       throw new EnrollmentError(
         "FIELD_IN_USE",

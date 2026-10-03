@@ -10,6 +10,7 @@ import { EnrollmentError } from "@/lib/enrollment/errors";
 import {
   formFieldIdSchema,
   formFieldInputSchema,
+  parseFieldOptions,
   registrationAgeRuleSchema,
   updateFormFieldSchema,
 } from "@/lib/enrollment/schemas";
@@ -32,6 +33,7 @@ function formValues(formData: FormData) {
     wajib: formData.get("wajib") === "on",
     urutan: Number(formData.get("urutan")),
     validasi: formData.get("validasi") || null,
+    options: parseFieldOptions(formData.get("options")),
     autoFillSource: formData.get("autoFillSource") || null,
     minAgeYears: optionalNumber("minAgeYears"),
     ageReferenceMonth: optionalNumber("ageReferenceMonth"),

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { FilterSessionForm, FilterSessionReset } from "@/components/admin/filter-session-form";
 import {
   StatusAssessment,
   StatusKeseluruhan,
@@ -51,7 +52,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
 
   return <AdminShell activePath="/admin/laporan" title="Laporan peserta" description="Saring rekap operasional peserta, lalu unduh hasil yang sama sebagai Excel atau CSV." email={admin.email}>
     {!parsed.success ? <p className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">Sebagian filter tidak valid dan telah diabaikan.</p> : null}
-    <form className="rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
+    <FilterSessionForm key={JSON.stringify(rawFilters)} page="laporan">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2 xl:col-span-3"><span>Cari peserta</span><input name="q" defaultValue={filters.q ?? ""} placeholder="Nama calon murid atau email wali" className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-900" /></label>
         <FilterSelect name="jalurId" label="Jalur" defaultValue={filters.jalurId}>{jalur.map((item) => <option key={item.id} value={item.id}>{item.nama}</option>)}</FilterSelect>
@@ -64,8 +65,8 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
         <FilterSelect name="statusDu" label="Pembayaran daftar ulang" defaultValue={filters.statusDu}><option value="BELUM_ADA">Belum ada</option>{Object.values(StatusPembayaran).map((status) => <option key={status} value={status}>{paymentLabels[status]}</option>)}</FilterSelect>
         <FilterSelect name="statusWa" label="Grup WhatsApp" defaultValue={filters.statusWa}><option value="BELUM_ADA">Belum ada</option>{Object.values(StatusUndanganWa).map((status) => <option key={status} value={status}>{whatsappLabels[status]}</option>)}</FilterSelect>
       </div>
-      <div className="mt-5 flex flex-wrap gap-3"><button className="rounded-xl bg-emerald-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-800">Terapkan filter</button><a href="/admin/laporan" className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Reset</a></div>
-    </form>
+      <div className="mt-5 flex flex-wrap gap-3"><button className="rounded-xl bg-emerald-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-800">Terapkan filter</button><FilterSessionReset page="laporan" /></div>
+    </FilterSessionForm>
 
     <section className="mt-6 rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-xl font-bold text-emerald-950">Hasil laporan</h2><p className="mt-1 text-sm text-slate-600">{participants.length} peserta sesuai filter{participants.length > 100 ? "; pratinjau menampilkan 100 baris pertama" : ""}.</p></div><div className="flex flex-wrap gap-2"><a href={exportHref(filters, "xlsx")} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-bold text-white">Unduh Excel</a><a href={exportHref(filters, "csv")} className="rounded-xl border border-emerald-800 px-4 py-2.5 text-sm font-bold text-emerald-900">Unduh CSV</a></div></div>

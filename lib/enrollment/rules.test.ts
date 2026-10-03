@@ -58,6 +58,16 @@ describe("enrollment rules", () => {
     expect(Object.keys(errors)).toEqual(["email", "date", "number", "wa"]);
   });
 
+  it("memvalidasi Pilihan Tunggal, termasuk jawaban lama yang belum distandardisasi", () => {
+    const field = { id: "gender", tipeInput: TipeInput.OPTION, wajib: true, validasi: null,
+      options: ["Laki-Laki", "Perempuan"] };
+    expect(fieldValueError(field, "Laki-Laki", true)).toBeNull();
+    expect(fieldValueError(field, "Lainnya", true)).toBe("Pilih salah satu opsi yang tersedia.");
+    expect(fieldValueError(field, "L", true, "L")).toBeNull();
+    expect(validateFieldValues([field], new Map([["gender", "L"]]), true, new Map([["gender", "L"]]))).toEqual({});
+    expect(validateFieldValues([field], new Map([["gender", "X"]]), true, new Map([["gender", "L"]]))).toHaveProperty("gender");
+  });
+
   it("menghitung batas usia berdasarkan bulan acuan, termasuk seluruh tanggal di bulan itu", () => {
     expect(meetsMinimumAgeByMonth("2021-07-31", 6, 7, 2027)).toBe(true);
     expect(meetsMinimumAgeByMonth("2021-08-01", 6, 7, 2027)).toBe(false);

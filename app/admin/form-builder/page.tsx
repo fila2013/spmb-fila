@@ -37,7 +37,7 @@ export default async function FormBuilderPage() {
 
       <section className="mt-7 rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
         <h2 className="text-lg font-bold text-emerald-950">Tambah field</h2>
-        <p className="mt-1 text-sm text-slate-600">Auto-fill email hanya untuk tipe Email; asal TK hanya untuk tipe Teks.</p>
+        <p className="mt-1 text-sm text-slate-600">Auto-fill nama anak, tempat lahir, dan asal TK hanya untuk tipe Teks; tanggal lahir untuk tipe Tanggal; email akun untuk tipe Email.</p>
         <div className="mt-5 max-w-3xl"><FormFieldForm /></div>
       </section>
 
@@ -91,4 +91,5 @@ const inputLabelsForPage = {
   NUMBER: "Angka",
   EMAIL: "Email",
   TEL: "Telepon",
+  OPTION: "Pilihan Tunggal",
 } as const;

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { FilterSessionForm, FilterSessionReset } from "@/components/admin/filter-session-form";
 import { ParticipantQuickEditTable } from "@/components/admin/participant-quick-edit";
 import { StatusAssessment, StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
 import { requireRolePage } from "@/lib/auth/navigation";
@@ -103,7 +103,7 @@ export default async function ParticipantsPage({
         </p>
       ) : null}
 
-      <form className="rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
+      <FilterSessionForm key={JSON.stringify(rawFilters)} page="peserta">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2 xl:col-span-3">
             <span>Cari nama peserta</span>
@@ -148,14 +148,9 @@ export default async function ParticipantsPage({
           <button className="rounded-xl bg-emerald-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-800">
             Terapkan filter
           </button>
-          <Link
-            href="/admin/peserta"
-            className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            Reset
-          </Link>
+          <FilterSessionReset page="peserta" />
         </div>
-      </form>
+      </FilterSessionForm>
 
       <section className="mt-6 rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6">
         <ParticipantQuickEditTable

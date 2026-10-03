@@ -13,11 +13,13 @@ type EnrollmentField = {
   tipeInput: TipeInput;
   wajib: boolean;
   validasi: string | null;
+  options: string[];
   minAgeYears: number | null;
   ageReferenceMonth: number | null;
   ageReferenceYear: number | null;
   autoFilled: boolean;
   lockedFromRegistration: boolean;
+  legacyOptionValue: string | null;
   value: string;
 };
 
@@ -32,7 +34,7 @@ type ApiResponse = {
 };
 
 function inputType(type: TipeInput) {
-  if (type === TipeInput.TEXTAREA) return null;
+  if (type === TipeInput.TEXTAREA || type === TipeInput.OPTION) return null;
   return {
     [TipeInput.TEXT]: "text",
     [TipeInput.DATE]: "date",
@@ -67,7 +69,7 @@ export function EnrollmentForm({
   const [completed, setCompleted] = useState(submitted);
 
   function checkFieldOnBlur(field: EnrollmentField, value: string) {
-    const error = fieldValueError(field, value, false);
+    const error = fieldValueError(field, value, false, field.legacyOptionValue);
     setFieldErrors((current) => {
       const next = { ...current };
       if (error) next[field.id] = [error];
@@ -85,6 +87,7 @@ export function EnrollmentForm({
       fields,
       new Map(fields.map((field) => [field.id, values[field.id] ?? ""])),
       intent === "submit" || Boolean(nextPath),
+      new Map(fields.filter((field) => field.legacyOptionValue).map((field) => [field.id, field.legacyOptionValue ?? ""])),
     );
     if (Object.keys(localErrors).length) {
       setFieldErrors(localErrors);
@@ -158,6 +161,20 @@ export function EnrollmentForm({
               aria-invalid={Boolean(fieldErrors[field.id])}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal text-slate-950 outline-none focus:border-emerald-700 focus:ring-4 focus:ring-emerald-700/10 disabled:bg-slate-100"
             />
+          ) : field.tipeInput === TipeInput.OPTION ? (
+            <select
+              value={values[field.id] ?? ""}
+              onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
+              onBlur={(event) => checkFieldOnBlur(field, event.target.value)}
+              required={field.wajib}
+              disabled={completed || field.lockedFromRegistration}
+              aria-invalid={Boolean(fieldErrors[field.id])}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal text-slate-950 outline-none focus:border-emerald-700 focus:ring-4 focus:ring-emerald-700/10 disabled:bg-slate-100"
+            >
+              <option value="">Pilih salah satu</option>
+              {field.legacyOptionValue ? <option value={field.legacyOptionValue}>{field.legacyOptionValue} (jawaban sebelumnya)</option> : null}
+              {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
           ) : (
             <input
               type={inputType(field.tipeInput) ?? "text"}

@@ -66,6 +66,7 @@ enum TipeInput {
   NUMBER   @map("number")
   EMAIL    @map("email")
   TEL      @map("tel")
+  OPTION   @map("option")
 
   @@map("tipe_input")
 }
@@ -303,6 +304,7 @@ model FormField {
   wajib             Boolean   @default(true)
   urutan            Int       @default(0)
   validasi          String?   @db.VarChar(50)
+  options           String[]  @default([])
   autoFillSource    String?   @map("auto_fill_source") @db.VarChar(30)
   minAgeYears       Int?      @map("min_age_years")
   ageReferenceMonth Int?      @map("age_reference_month")
