@@ -254,7 +254,7 @@ export async function getAssessmentForWali(childId: string, userId: string) {
   const child = await getOwnedStageChild(childId, userId);
   if (!mayViewAssessment(child.statusKeseluruhan)) throw new StageError("STAGE_FORBIDDEN", "Tahap assessment belum dapat diakses.", 403);
   const content = await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ASSESSMENT, child), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] });
-  const visibleContent = await contentVisibleToParticipant(content, child);
+  const visibleContent = await contentVisibleToParticipant(content, child, TahapKonten.ASSESSMENT);
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null, statusKeseluruhan: child.statusKeseluruhan },
     assessment: { status: child.hasilAssessment?.status ?? StatusAssessment.BELUM },
@@ -297,7 +297,7 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   const waitingQuota = current.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
   const released = Boolean(announcement?.statusAkhir && isAnnouncementReleased(announcement.tanggalRilis));
   const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
-  const visibleContent = await contentVisibleToParticipant(content, current);
+  const visibleContent = await contentVisibleToParticipant(content, current, TahapKonten.ANNOUNCEMENT);
   const choiceRequired =
     current.statusKeseluruhan ===
     StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR;

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StatusKeseluruhan, TahapKonten } from "@/generated/prisma/enums";
 
 const count = vi.hoisted(() => vi.fn());
 
@@ -9,6 +10,7 @@ import {
   contentVisibleToParticipant,
   matchesParticipantOrder,
   participantOrderForContent,
+  participantOrderForOperationalStage,
 } from "@/lib/stages/participant-order";
 
 const child = {
@@ -17,6 +19,7 @@ const child = {
   jalurId: "00000000-0000-4000-8000-000000000010",
   kategoriId: "00000000-0000-4000-8000-000000000020",
   menungguFallbackJalurId: null,
+  statusKeseluruhan: StatusKeseluruhan.MENUNGGU_ASESMEN,
 };
 
 describe("rentang urutan peserta untuk konten tahap", () => {
@@ -81,6 +84,63 @@ describe("rentang urutan peserta untuk konten tahap", () => {
     ];
     expect((await contentVisibleToParticipant(blocks, { ...child, kategoriId: null })).map((block) => block.id))
       .toEqual(["umum"]);
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it("assessment mengurutkan hanya cohort Menunggu Asesmen per jalur lintas kategori", async () => {
+    count.mockResolvedValue(55);
+    const blocks = [
+      { id: "jadwal-1-54", minParticipantOrder: 1, maxParticipantOrder: 54 },
+      { id: "jadwal-55", minParticipantOrder: 55, maxParticipantOrder: 60 },
+      { id: "umum", minParticipantOrder: null, maxParticipantOrder: null },
+    ];
+
+    expect((await contentVisibleToParticipant(blocks, child, TahapKonten.ASSESSMENT)).map((block) => block.id))
+      .toEqual(["jadwal-55", "umum"]);
+    expect(count).toHaveBeenCalledOnce();
+    expect(count).toHaveBeenCalledWith({ where: {
+      statusKeseluruhan: { in: [StatusKeseluruhan.MENUNGGU_ASESMEN] },
+      OR: [
+        { jalurId: child.jalurId },
+        { jalurId: null, menungguFallbackJalurId: child.jalurId },
+      ],
+      AND: [{ OR: [
+        { createdAt: { lt: child.createdAt } },
+        { createdAt: child.createdAt, id: { lte: child.id } },
+      ] }],
+    } });
+    expect(count.mock.calls[0][0].where.kategoriId).toBeUndefined();
+  });
+
+  it("assessment tidak memberi urutan pada peserta di luar cohort operasional", async () => {
+    const blocks = [
+      { id: "jadwal", minParticipantOrder: 1, maxParticipantOrder: 54 },
+      { id: "umum", minParticipantOrder: null, maxParticipantOrder: null },
+    ];
+    const advanced = { ...child, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_PENGUMUMAN };
+    expect((await contentVisibleToParticipant(blocks, advanced, TahapKonten.ASSESSMENT)).map((block) => block.id))
+      .toEqual(["umum"]);
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it("announcement memasukkan peserta yang sudah melewati Menunggu Pengumuman", async () => {
+    count.mockResolvedValue(55);
+    const releasedChild = { ...child, statusKeseluruhan: StatusKeseluruhan.MENUNGGU_DU };
+    const blocks = [
+      { id: "pengumuman-1-54", minParticipantOrder: 1, maxParticipantOrder: 54 },
+      { id: "pengumuman-55", minParticipantOrder: 55, maxParticipantOrder: null },
+    ];
+    expect((await contentVisibleToParticipant(blocks, releasedChild, TahapKonten.ANNOUNCEMENT)).map((block) => block.id))
+      .toEqual(["pengumuman-55"]);
+    const where = count.mock.calls[0][0].where;
+    expect(where.statusKeseluruhan.in).toContain(StatusKeseluruhan.MENUNGGU_PENGUMUMAN);
+    expect(where.statusKeseluruhan.in).toContain(StatusKeseluruhan.MENUNGGU_DU);
+    expect(where.statusKeseluruhan.in).not.toContain(StatusKeseluruhan.MENUNGGU_ASESMEN);
+    expect(where.kategoriId).toBeUndefined();
+  });
+
+  it("announcement menolak urutan peserta yang belum mencapai tahap pengumuman", async () => {
+    expect(await participantOrderForOperationalStage(child, TahapKonten.ANNOUNCEMENT)).toBeNull();
     expect(count).not.toHaveBeenCalled();
   });
 });

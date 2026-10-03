@@ -103,16 +103,19 @@ export function mayViewAssessment(status: StatusKeseluruhan) {
   return !blocked.includes(status);
 }
 
+// A released announcement remains accessible after the participant advances.
+// Keep this cohort aligned with the announcement page authorization rule.
+export const announcementReachedStatuses: StatusKeseluruhan[] = [
+  StatusKeseluruhan.MENUNGGU_PENGUMUMAN,
+  StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR,
+  StatusKeseluruhan.DITERIMA,
+  StatusKeseluruhan.TIDAK_DITERIMA,
+  StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,
+  StatusKeseluruhan.MENUNGGU_DU,
+  StatusKeseluruhan.MENUNGGU_JOIN_WA,
+  StatusKeseluruhan.SELESAI,
+];
+
 export function mayViewAnnouncement(status: StatusKeseluruhan) {
-  const allowed: StatusKeseluruhan[] = [
-    StatusKeseluruhan.MENUNGGU_PENGUMUMAN,
-    StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR,
-    StatusKeseluruhan.DITERIMA,
-    StatusKeseluruhan.TIDAK_DITERIMA,
-    StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,
-    StatusKeseluruhan.MENUNGGU_DU,
-    StatusKeseluruhan.MENUNGGU_JOIN_WA,
-    StatusKeseluruhan.SELESAI,
-  ];
-  return allowed.includes(status);
+  return announcementReachedStatuses.includes(status);
 }
