@@ -40,7 +40,7 @@ export function createWhatsAppChatUrl(
   if (!phone || !child) return null;
 
   const text = message === undefined
-    ? `Halo Bapak/Ibu Wali Murid ${child}, kami dari Panitia SPMB SDIT Fitrah Insani Langkapura.`
+    ? `Assalamualaikum Bapak/Ibu Wali Murid ${child}, kami dari Panitia SPMB SDIT Fitrah Insani Langkapura.`
     : message?.trim();
   const baseUrl = `https://wa.me/${phone}`;
   return text ? `${baseUrl}?text=${encodeURIComponent(text)}` : baseUrl;
