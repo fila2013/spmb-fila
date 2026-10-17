@@ -2,10 +2,8 @@
 
 import { useActionState } from "react";
 
-import {
-  chooseFinalRouteAction,
-  initialFinalRouteChoiceActionState,
-} from "@/app/anak/[id]/pengumuman/actions";
+import { chooseFinalRouteAction } from "@/app/anak/[id]/pengumuman/actions";
+import { initialFinalRouteChoiceActionState } from "@/app/anak/[id]/pengumuman/state";
 import { PilihanJalurFinal } from "@/generated/prisma/enums";
 
 export function FinalRouteChoiceForm({

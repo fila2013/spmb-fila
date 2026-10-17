@@ -9,14 +9,8 @@ import { CalonMuridError } from "@/lib/calon-murid/errors";
 import { finalRouteChoiceSchema } from "@/lib/final-route-choice/schemas";
 import { chooseFinalRoute } from "@/lib/final-route-choice/service";
 
-export type FinalRouteChoiceActionState = {
-  status: "idle" | "success" | "error";
-  message?: string;
-};
+import type { FinalRouteChoiceActionState } from "./state";
 
-export const initialFinalRouteChoiceActionState: FinalRouteChoiceActionState = {
-  status: "idle",
-};
 
 export async function chooseFinalRouteAction(
   _state: FinalRouteChoiceActionState,
