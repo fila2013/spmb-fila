@@ -1,23 +1,19 @@
-import { NextResponse } from "next/server";
-
 import { UserRole } from "@/generated/prisma/enums";
+import { AdmissionError } from "@/lib/admission/errors";
 import { admissionErrorResponse } from "@/lib/admission/http";
 import {
   admissionIdSchema,
-  whatsappInvitationSchema,
 } from "@/lib/admission/schemas";
-import { setWhatsappInvitationLink } from "@/lib/admission/service";
 import { requireRole } from "@/lib/auth/session";
 
 export async function PATCH(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await requireRole(UserRole.ADMIN);
-    const id = admissionIdSchema.parse((await params).id);
-    const input = whatsappInvitationSchema.parse(await request.json());
-    return NextResponse.json({ data: await setWhatsappInvitationLink(id, input, admin.userId) });
+    await requireRole(UserRole.ADMIN);
+    admissionIdSchema.parse((await params).id);
+    throw new AdmissionError("INVITATION_MANAGED_BY_CONTENT", "Link grup dikelola melalui menu Konten Join WhatsApp, bukan per peserta.", 410);
   } catch (error) {
     return admissionErrorResponse(error);
   }

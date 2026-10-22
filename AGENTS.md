@@ -131,8 +131,10 @@ itu memakai environment staging yang sama.
   mengunci jawaban. Pengumuman tidak boleh membocorkan hasil sebelum tanggal
   rilis Asia/Jakarta. DU menunggu diterima dan penyelesaian pilihan kelas bila aktif.
 - DU tetap manual: bukti maksimal **5 MB**, preview/verifikasi admin dan nominal
-  aktual dari admin. Setelah verified, admin menyediakan link WA; wali membuka
-  link lalu mengonfirmasi bergabung untuk mengubah status ke `SELESAI`.
+  aktual dari admin. Setelah verified, link WA berasal dari `Isi informasi` pada
+  blok Konten Join WhatsApp aktif yang cocok jalur/kategori/rentang peserta,
+  bukan isian per peserta. Wali membuka link lalu mengonfirmasi bergabung untuk
+  mengubah status ke `SELESAI`; snapshot klik bukan sumber konfigurasi link.
 
 ### Kuota, fallback, pilihan kelas dan penghapusan
 

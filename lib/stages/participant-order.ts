@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CalonMurid, KontenTahap } from "@/generated/prisma/client";
+import type { CalonMurid, KontenTahap, Prisma } from "@/generated/prisma/client";
 import { StatusKeseluruhan, TahapKonten } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { announcementReachedStatuses } from "@/lib/stages/rules";
@@ -19,13 +19,15 @@ export function matchesParticipantOrder(content: BoundedContent, order: number |
   return (min === null || order >= min) && (max === null || order <= max);
 }
 
-export async function participantOrderForContent(child: ParticipantOrderCandidate) {
+type OrderDatabase = Pick<Prisma.TransactionClient, "calonMurid">;
+
+export async function participantOrderForContent(child: ParticipantOrderCandidate, database: OrderDatabase = prisma) {
   const routeId = child.jalurId ?? child.menungguFallbackJalurId;
   if (!routeId || !child.kategoriId) return null;
 
   // Include the participant and all earlier records in the current route/category.
   // UUID breaks ties when multiple participants have the same created_at.
-  return prisma.calonMurid.count({
+  return database.calonMurid.count({
     where: {
       kategoriId: child.kategoriId,
       OR: [
@@ -77,12 +79,13 @@ export async function contentVisibleToParticipant<T extends BoundedContent>(
   content: T[],
   child: ParticipantOrderCandidate,
   stage?: OperationalContentStage,
+  database: OrderDatabase = prisma,
 ): Promise<T[]> {
   if (!content.some((block) => block.minParticipantOrder !== null || block.maxParticipantOrder !== null)) {
     return content;
   }
   const order = stage
     ? await participantOrderForOperationalStage(child, stage)
-    : await participantOrderForContent(child);
+    : await participantOrderForContent(child, database);
   return content.filter((block) => matchesParticipantOrder(block, order));
 }

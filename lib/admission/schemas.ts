@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeWhatsappInviteUrl } from "@/lib/admission/whatsapp-links";
 
 import { StatusPembayaran } from "@/generated/prisma/enums";
 
@@ -33,25 +34,12 @@ export const admissionVerificationSchema = z.object({
 });
 export const whatsappInvitationSchema = z.object({
   inviteUrl: z.string().trim().max(2_048).transform((value, context) => {
-    let parsed: URL;
-    try {
-      parsed = new URL(value);
-    } catch {
-      context.addIssue({ code: "custom", message: "Link grup WhatsApp tidak valid.", input: value });
-      return z.NEVER;
-    }
-    if (
-      parsed.protocol !== "https:" ||
-      parsed.hostname !== "chat.whatsapp.com" ||
-      parsed.port ||
-      parsed.username ||
-      parsed.password ||
-      !/^\/[A-Za-z0-9_-]+\/?$/.test(parsed.pathname)
-    ) {
+    const url = normalizeWhatsappInviteUrl(value);
+    if (!url) {
       context.addIssue({ code: "custom", message: "Gunakan link grup resmi https://chat.whatsapp.com/....", input: value });
       return z.NEVER;
     }
-    return `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
+    return url;
   }),
 });
 export const whatsappConfirmationSchema = z.object({

@@ -19,6 +19,9 @@ Pembaruan 22 Oktober 2026 menambahkan template master surat pengumuman,
 informasi/gambar/Calendar sebelum rilis, surat teks dinamis setelah rilis,
 serta penolakan final tanpa fallback atau penghapusan otomatis. Migration
 `20261022090000_announcement_letter_templates` menambah tabel template saja.
+Link grup WA dikelola terpusat melalui `Isi informasi` di Konten Join WhatsApp,
+sesuai blok aktif dan filter peserta. Tidak perlu mengisi link per peserta;
+hyperlink dan tombol gabung muncul otomatis setelah DU terverifikasi.
 Status database remote, deployment, SMTP dan merchant Production belum
 diverifikasi dalam audit ini. Phase 12 Production masih memerlukan validasi.
 

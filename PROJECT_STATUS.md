@@ -43,11 +43,32 @@ layanan remote atau sudah beroperasi di production.
 | Hasil seleksi | Input assessment/pengumuman admin, modal edit cepat, template master surat dan mail merge setelah rilis; TIDAK DITERIMA final tanpa fallback/auto-delete. FIFO existing dan pilihan final tetap tersedia |
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
 | Penghapusan | Penghapusan peserta manual dengan konfirmasi/snapshot dan akun wali tanpa anak, retention ledger |
-| DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup per peserta, konfirmasi wali sampai selesai |
+| DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup terpusat dari Konten Join WhatsApp sesuai filter peserta, konfirmasi wali sampai selesai |
 | Reporting | Filter peserta, ekspor CSV/XLSX, sanitasi formula dan audit ekspor |
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Sentralisasi link grup pada 22 Oktober 2026 memakai URL resmi dalam `Isi informasi`
+blok JOIN_WA aktif yang sesuai jalur/kategori dan rentang urutan peserta existing.
+Teks, gambar, hyperlink biru dan CTA hijau tampil bersama di halaman wali setelah
+gate DU verified. Halaman detail admin diarahkan ke pengelolaan Konten Join
+WhatsApp; form dan action pengisian manual dihapus, endpoint lama mengembalikan
+410 untuk admin. Link per peserta historis tidak dihapus dan tidak menjadi
+sumber undangan lagi. Pembukaan/konfirmasi memeriksa konten pusat terbaru pada
+server; snapshot klik dipakai hanya untuk membuktikan link yang masih berlaku
+telah dibuka. Peserta selesai dapat membuka link terbaru tanpa menimpa snapshot
+dan waktu konfirmasi historis (sesuai constraint kronologi SQL). Tidak ada
+perubahan schema/migration atau penulisan data remote untuk implementasi ini.
+Lint, typecheck, Prisma generate, 51 file/251 unit test, dan build Next.js lulus.
+Verifikasi Chromium headless 390 px dengan CSS build juga lulus: hyperlink dan
+CTA dari teks CMS membuka tab tujuan yang benar tanpa overflow horizontal.
+Browser memakai konten sintetis serta intercept request, bukan akun/grup nyata.
+Suite mencakup sumber CMS aktif/scoped, rentang urutan, perubahan link,
+ownership/DU gate, snapshot klik dan preservasi konfirmasi selesai. Script
+integration Phase 9 diperbarui, tetapi tidak dijalankan pada database remote
+karena staging belum terbukti. Belum ada commit/push atau verifikasi deployment
+Vercel untuk sentralisasi ini.
 
 Penyesuaian Join WA dan tutorial DU pada 22 Oktober 2026 menampilkan URL grup
 sebagai hyperlink biru dan CTA hijau dengan tab baru. URL dinamis divalidasi dan

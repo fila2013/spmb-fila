@@ -37,12 +37,12 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - **Beranda memiliki CMS informasi publik.** Admin dapat menambah, melihat, mengubah, mengurutkan, mengaktifkan/nonaktifkan, mengunggah gambar, dan menghapus blok informasi beranda. Perubahan penting dicatat pada audit log.
 - **Konten beranda dapat memuat video YouTube.** Admin memasukkan link YouTube, aplikasi hanya menyimpan video ID tervalidasi, dan video ditampilkan di bawah judul dengan autoplay mute yang kompatibel dengan kebijakan browser.
 - **Konten Daftar Ulang mendukung judul dan video tutorial YouTube opsional.** Judul tutorial disimpan terpisah dari judul blok dan video memakai ID tervalidasi yang sama seperti beranda. Tutorial ditampilkan setelah teks informasi, responsif 16:9 tanpa autoplay, dengan link cadangan ke YouTube. Video tetap dibatasi ke HOME/ADMISSION_FEE.
-- **Halaman Join WA menampilkan hyperlink URL grup dan CTA Gabung Grup WhatsApp secara langsung (22 Oktober 2026).** URL hanya diberikan kepada pemilik peserta setelah gate DU verified dan dinormalisasi ke host resmi `chat.whatsapp.com`. Klik dicatat melalui POST terautentikasi; konfirmasi bergabung tetap terpisah dan wajib setelah link dibuka. Link tetap tersedia setelah konfirmasi.
+- **Link grup WA dikelola terpusat di Konten Join WhatsApp (22 Oktober 2026).** Sumbernya URL resmi `https://chat.whatsapp.com/...` dalam `Isi informasi` blok aktif yang cocok jalur/kategori serta rentang urutan peserta. Halaman Join WA menampilkan teks, gambar, hyperlink biru dan CTA hijau untuk setiap URL pada blok yang sesuai, hanya bagi pemilik setelah DU verified. Link per peserta lama tidak lagi menjadi sumber konfigurasi; API pengisiannya dihentikan. Klik dicatat melalui POST terautentikasi sebagai snapshot URL saat dibuka; konfirmasi bergabung tetap terpisah dan memeriksa link pusat terbaru. Link tetap tersedia setelah konfirmasi. Tidak ada migration atau penghapusan data historis untuk sentralisasi ini.
 - **Konten Assessment dan Announcement bertanggal menyediakan pengingat Google Calendar.** Event all-day dibentuk otomatis dari tahap, nama anak, judul, tanggal, dan catatan admin; wali tetap menekan tombol untuk menambahkan event ke kalender miliknya.
 - **Pengumuman memakai dua template master surat teks (DITERIMA/TIDAK DITERIMA).** Admin mengatur template di atas blok Konten Announcement dengan variabel `{nama_peserta}`, `{jalur}`, dan `{status_keputusan}`. Sebelum tanggal rilis individu di Asia/Jakarta, wali melihat blok informasi, gambar, dan Calendar sesuai scope/rentang; hasil serta surat tetap dirahasiakan. Sejak tanggal rilis, wali melihat surat hasil mail merge tanpa bergantung pada rentang blok informasi. Template menggunakan nama jalur pendaftaran awal bila peserta telah memilih jalur final lain.
 - **Keputusan TIDAK DITERIMA adalah keputusan akhir untuk seluruh jalur (22 Oktober 2026).** Tidak memicu fallback maupun auto-delete meskipun flag lama masih tersimpan. Peserta tetap dapat membaca surat, DU ditutup, dan penghapusan hanya manual Admin dengan konfirmasi/snapshot/retention existing. Tidak ada perubahan massal terhadap hasil historis. Peserta diterima tetap mengikuti pilihan jalur final jika diaktifkan, lalu dapat mengakses DU; hasil dikunci setelah DU dimulai.
 - **Blok konten Assessment dan Announcement dapat dibatasi berdasarkan urutan cohort tahapan per jalur.** Assessment hanya menghitung peserta yang saat itu berstatus `MENUNGGU_ASESMEN`; Announcement menghitung peserta yang sudah mencapai `MENUNGGU_PENGUMUMAN`, termasuk yang telah maju ke tahap berikutnya agar konten rilis tetap terlihat. Semua kategori pada jalur yang sama digabung dalam urutan `created_at ASC` lalu `id ASC`; filter kategori blok hanya menentukan penerima konten, bukan cohort hitung. Blok Daftar Ulang dan Join WhatsApp tetap memakai urutan peserta per jalur/kategori tanpa filter status. Batas minimal/maksimal kosong berarti tidak dibatasi; kedua batas kosong mempertahankan visibilitas lama. Penghapusan peserta, perpindahan jalur, atau perubahan status cohort dapat mengubah urutan berikutnya. Ini berbeda dari `urutan_layout` yang hanya mengatur posisi blok.
-- **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
+- **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, wali membuka link dari Konten Join WhatsApp yang sesuai lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
 - **Prisma** adalah ORM utama untuk akses PostgreSQL.
 - **Supabase** digunakan untuk PostgreSQL, Auth, dan Storage.
@@ -615,14 +615,20 @@ DU:
 
 ## 5.14 Join WA
 
-Admin menyediakan link grup setelah pembayaran DU terverifikasi.
+Admin menaruh link grup resmi dalam `Isi informasi` pada Konten Join WhatsApp.
+Blok aktif beserta teks dan gambarnya ditampilkan setelah DU terverifikasi,
+sesuai jalur, kategori dan rentang urutan peserta. Tidak ada pengisian link manual
+per peserta. Beberapa blok atau URL yang sesuai dapat tampil bersamaan.
 
 Wali murid:
 - membuka hyperlink URL grup atau CTA Gabung Grup WhatsApp di tab baru; URL hanya tersedia bagi pemilik setelah gate DU verified;
 - kembali ke halaman Join WA;
 - mengonfirmasi **Iya, saya sudah masuk**.
 
-Status `selesai` hanya ditetapkan setelah konfirmasi wali. Sistem mencatat waktu link ditetapkan, pertama dibuka, dan dikonfirmasi.
+Status `selesai` hanya ditetapkan setelah konfirmasi wali. Sistem menyimpan URL
+yang dibuka dan timestamp klik sebagai snapshot, bukan sebagai sumber link.
+Jika link pusat diganti atau tidak lagi berlaku, wali perlu membuka link terbaru
+sebelum konfirmasi. Konfirmasi historis yang sudah selesai tidak dibatalkan.
 
 Sistem tidak membuat grup WhatsApp otomatis pada MVP.
 
@@ -1539,7 +1545,7 @@ Codex wajib mengerjakan secara bertahap:
 ### Phase 9 — DU & Join WA
 - DU upload.
 - Preview bukti dan verifikasi manual admin.
-- Admin menyediakan link grup setelah DU terverifikasi.
+- Admin menyediakan link di Konten Join WhatsApp; wali melihat blok yang sesuai setelah DU terverifikasi.
 - Wali membuka link dan wajib mengonfirmasi sudah bergabung.
 - Konfirmasi wali mengubah status pendaftaran menjadi selesai.
 

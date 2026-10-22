@@ -7,10 +7,8 @@ import { AdmissionError } from "@/lib/admission/errors";
 import {
   admissionIdSchema,
   admissionVerificationSchema,
-  whatsappInvitationSchema,
 } from "@/lib/admission/schemas";
 import {
-  setWhatsappInvitationLink,
   verifyAdmissionPayment,
 } from "@/lib/admission/service";
 import { UserRole } from "@/generated/prisma/enums";
@@ -57,27 +55,6 @@ export async function verifyAdmissionPaymentAction(
       message: result.payment.status === "VERIFIED"
         ? "Pembayaran DU terverifikasi; peserta masuk tahap Join WhatsApp."
         : "Bukti DU ditolak dan wali dapat mengunggah ulang.",
-    };
-  } catch (error) {
-    return errorState(error);
-  }
-}
-
-export async function updateWhatsappInvitationAction(
-  _state: StageActionState,
-  formData: FormData,
-): Promise<StageActionState> {
-  try {
-    const admin = await requireRole(UserRole.ADMIN);
-    const childId = admissionIdSchema.parse(formData.get("childId"));
-    const input = whatsappInvitationSchema.parse({ inviteUrl: formData.get("inviteUrl") });
-    await setWhatsappInvitationLink(childId, input, admin.userId);
-    revalidatePath(`/admin/peserta/${childId}`);
-    revalidatePath("/admin/peserta");
-    revalidatePath(`/anak/${childId}/join-wa`);
-    return {
-      status: "success",
-      message: "Link grup WhatsApp tersimpan. Wali sekarang dapat membuka link dan mengonfirmasi sudah bergabung.",
     };
   } catch (error) {
     return errorState(error);

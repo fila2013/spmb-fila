@@ -6,7 +6,6 @@ import { Download } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
 import {
   AdmissionVerificationForm,
-  WhatsappInvitationForm,
 } from "@/components/admin/admission-forms";
 import { DeleteParticipantForm } from "@/components/admin/deletion-forms";
 import { GuardianWhatsAppQr } from "@/components/admin/guardian-whatsapp-qr";
@@ -186,8 +185,10 @@ export default async function ParticipantDetailPage({
           <h2 className="mb-4 text-lg font-bold text-emerald-950">Undangan grup WhatsApp</h2>
           {du?.status === StatusPembayaran.VERIFIED ? (
             <div className="grid gap-4">
-              {whatsapp?.linkDibukaAt && !whatsapp.confirmedAt ? <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-900">Wali sudah membuka link dan belum mengonfirmasi bergabung.</p> : null}
-              <WhatsappInvitationForm childId={participant.id} inviteUrl={whatsapp?.inviteUrl ?? ""} confirmed={whatsapp?.status === StatusUndanganWa.SUDAH_DIUNDANG} confirmedAt={whatsapp?.confirmedAt ?? null} />
+              {whatsapp?.linkDibukaAt && !whatsapp.confirmedAt ? <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-900">Wali pernah membuka link dan belum mengonfirmasi bergabung. Link terbaru akan diperiksa kembali saat konfirmasi.</p> : null}
+              <p className="text-sm leading-6 text-slate-700">Link grup mengikuti blok Konten Join WhatsApp yang aktif sesuai jalur, kategori, dan rentang urutan peserta.</p>
+              <Link href="/admin/konten/join-wa" className="font-bold text-emerald-800 hover:underline">Kelola Konten Join WhatsApp →</Link>
+              {whatsapp?.status === StatusUndanganWa.SUDAH_DIUNDANG ? <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950">Wali sudah mengonfirmasi bergabung{whatsapp.confirmedAt ? ` pada ${whatsapp.confirmedAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}` : ""}. Pendaftaran selesai.</p> : null}
             </div>
           ) : (
             <p className="text-sm text-slate-600">Link undangan tersedia setelah pembayaran DU terverifikasi.</p>

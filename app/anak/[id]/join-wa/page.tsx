@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { WhatsappJoinPanel } from "@/components/admission/whatsapp-join-panel";
-import { StageContentBlocks } from "@/components/stages/stage-content";
 import { getJoinWaPageData } from "@/lib/admission/service";
 import { requireWaliPage } from "@/lib/auth/navigation";
 
@@ -23,14 +22,14 @@ export default async function JoinWaPage({
       <p className="mt-2 text-slate-600">{data.child.jalur} · {data.child.kategori}</p>
       <div className="mt-6">
         <WhatsappJoinPanel
+          key={data.inviteUrls.join("|")}
           childId={data.child.id}
           status={data.status}
-          inviteUrl={data.inviteUrl}
+          content={data.content}
           linkWasOpened={Boolean(data.linkOpenedAt)}
           confirmedAt={data.confirmedAt}
         />
       </div>
-      <div className="mt-6"><StageContentBlocks content={data.content} /></div>
     </main>
   );
 }

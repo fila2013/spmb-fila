@@ -195,10 +195,11 @@ try {
   const waRoleGuard = await api(`/api/admin/peserta/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl }) });
   if (waRoleGuard.response.status !== 403) throw new Error("Pengelolaan link WhatsApp tidak dilindungi role admin.");
 
-  const invited = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl: `${inviteUrl}?mode=invite` }) });
-  if (invited.response.status !== 200) throw new Error("Penyimpanan link undangan WhatsApp gagal.");
+  const joinContentPayload = { tahap: "JOIN_WA", judul: `Informasi Grup ${marker}`, tanggal: null, isiTeks: `Selamat datang. Gabung melalui ${inviteUrl}?mode=invite`, gambarUrl: null, urutanLayout: 1, statusAktif: true, jalurId: route.id, kategoriId: category.id };
+  const invited = await api(`/api/admin/konten-tahap/${contentIds[1]}`, admin.cookie, { method: "PATCH", body: JSON.stringify(joinContentPayload) });
+  if (invited.response.status !== 200) throw new Error("Penyimpanan link pusat pada Konten Join WhatsApp gagal.");
   const afterLink = await prisma.calonMurid.findUniqueOrThrow({ where: { id: child.id }, include: { statusGrupWa: true } });
-  if (afterLink.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA || afterLink.statusGrupWa?.linkUndangan !== inviteUrl || !afterLink.statusGrupWa.linkDitetapkanAt) throw new Error("Link undangan tidak tersimpan tanpa menyelesaikan pendaftaran.");
+  if (afterLink.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA || afterLink.statusGrupWa?.linkUndangan) throw new Error("Pengaturan pusat masih bergantung pada link manual peserta.");
 
   const waWithLink = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie);
   if (waWithLink.response.status !== 200 || waWithLink.body.data?.hasInviteLink !== true || waWithLink.body.data?.inviteUrl !== inviteUrl) throw new Error("Link WhatsApp langsung tidak tersedia bagi wali pemilik setelah DU verified.");
@@ -208,7 +209,7 @@ try {
 
   const foreignOpen = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliB.cookie }, redirect: "manual" });
   if (foreignOpen.status !== 403) throw new Error("Redirect link WhatsApp bocor antar wali.");
-  const trackedOpen = await api(`/api/calon-murid/${child.id}/status-wa/join`, waliA.cookie, { method: "POST" });
+  const trackedOpen = await api(`/api/calon-murid/${child.id}/status-wa/join`, waliA.cookie, { method: "POST", body: JSON.stringify({ inviteUrl }) });
   if (trackedOpen.response.status !== 200 || trackedOpen.body.data?.opened !== true) throw new Error("Klik link langsung tidak tercatat melalui POST.");
   const opened = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliA.cookie }, redirect: "manual" });
   if (opened.status !== 307 || opened.headers.get("location") !== inviteUrl) throw new Error("Redirect terotorisasi ke grup WhatsApp gagal.");
@@ -219,13 +220,29 @@ try {
   if (finished.statusKeseluruhan !== StatusKeseluruhan.SELESAI || finished.statusGrupWa?.status !== StatusUndanganWa.SUDAH_DIUNDANG || !finished.statusGrupWa.linkDibukaAt || !finished.statusGrupWa.dikonfirmasiWaliAt) throw new Error("Status selesai tidak sinkron dengan konfirmasi wali.");
 
   const changeAfterConfirmation = await api(`/api/admin/peserta/${child.id}/status-wa`, admin.cookie, { method: "PATCH", body: JSON.stringify({ inviteUrl: "https://chat.whatsapp.com/New_Group" }) });
-  if (changeAfterConfirmation.response.status !== 409 || changeAfterConfirmation.body.error?.code !== "INVALID_STAGE") throw new Error("Link masih dapat diubah setelah pendaftaran selesai.");
+  if (changeAfterConfirmation.response.status !== 410 || changeAfterConfirmation.body.error?.code !== "INVITATION_MANAGED_BY_CONTENT") throw new Error("Endpoint manual peserta belum dinonaktifkan.");
+  const updatedCentral = await api(`/api/admin/konten-tahap/${contentIds[1]}`, admin.cookie, { method: "PATCH", body: JSON.stringify({ ...joinContentPayload, isiTeks: "https://chat.whatsapp.com/New_Group" }) });
+  if (updatedCentral.response.status !== 200) throw new Error("Perubahan link CMS gagal.");
+  const latestLink = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie);
+  if (latestLink.body.data?.inviteUrl !== "https://chat.whatsapp.com/New_Group") throw new Error("Dashboard tidak mengikuti link pusat terbaru.");
+  const reopened = await api(`/api/calon-murid/${child.id}/status-wa/join`, waliA.cookie, { method: "POST", body: JSON.stringify({ inviteUrl: "https://chat.whatsapp.com/New_Group" }) });
+  if (reopened.response.status !== 200) throw new Error("Link pusat terbaru tidak dapat dibuka setelah selesai.");
+  const preservedMembership = await prisma.statusGrupWa.findUniqueOrThrow({ where: { calonMuridId: child.id } });
+  if (preservedMembership.dikonfirmasiWaliAt?.getTime() !== finished.statusGrupWa.dikonfirmasiWaliAt.getTime() || preservedMembership.linkDibukaAt?.getTime() !== finished.statusGrupWa.linkDibukaAt.getTime()) throw new Error("Membuka link baru menimpa konfirmasi historis.");
 
   const siblingAfter = await prisma.calonMurid.findUniqueOrThrow({ where: { id: sibling.id } });
   const siblingPayments = await prisma.pembayaran.count({ where: { calonMuridReference: sibling.id, jenis: JenisPembayaran.DU } });
   if (siblingAfter.statusKeseluruhan !== StatusKeseluruhan.DITERIMA || siblingPayments !== 0) throw new Error("Alur DU satu anak memengaruhi saudara dalam akun yang sama.");
-  const audits = await prisma.auditLog.count({ where: { actorId: { in: [admin.profile.id, waliA.profile.id] }, action: { in: ["UPLOAD_DU_PROOF", "VERIFY_DU_PAYMENT", "SET_WHATSAPP_INVITATION_LINK", "OPEN_WHATSAPP_INVITATION", "CONFIRM_WHATSAPP_MEMBERSHIP"] } } });
-  if (audits < 7) throw new Error("Audit Phase 9 tidak lengkap.");
+  for (const [action, entityIds, minimum] of [
+    ["UPLOAD_DU_PROOF", paymentIds, 2],
+    ["VERIFY_DU_PAYMENT", paymentIds, 2],
+    ["UPDATE_STAGE_CONTENT", [contentIds[1]], 2],
+    ["OPEN_WHATSAPP_INVITATION", [child.id], 1],
+    ["CONFIRM_WHATSAPP_MEMBERSHIP", [child.id], 1],
+  ] as const) {
+    const audits = await prisma.auditLog.count({ where: { actorId: { in: [admin.profile.id, waliA.profile.id] }, action, entityId: { in: [...entityIds] } } });
+    if (audits < minimum) throw new Error(`Audit Phase 9 ${action} tidak lengkap.`);
+  }
 
   console.log("Phase 9 DU manual & Join WhatsApp integration: OK");
 } finally {

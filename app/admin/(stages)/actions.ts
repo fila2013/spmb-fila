@@ -42,6 +42,7 @@ export async function saveAnnouncementTemplatesAction(_state: StageActionState, 
 function revalidateContentPaths(tahap: string) {
   revalidatePath(`/admin/konten/${stageContentSlug(tahap)}`);
   if (tahap === "HOME") revalidatePath("/");
+  if (tahap === "JOIN_WA") revalidatePath("/anak/[id]/join-wa", "page");
 }
 
 function errorState(error: unknown): StageActionState {

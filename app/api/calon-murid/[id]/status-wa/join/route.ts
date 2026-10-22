@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { UserRole } from "@/generated/prisma/enums";
 import { admissionErrorResponse } from "@/lib/admission/http";
-import { admissionIdSchema } from "@/lib/admission/schemas";
+import { AdmissionError } from "@/lib/admission/errors";
+import { admissionIdSchema, whatsappInvitationSchema } from "@/lib/admission/schemas";
 import { openWhatsappInvitation } from "@/lib/admission/service";
 import { requireRole } from "@/lib/auth/session";
 
@@ -21,15 +22,17 @@ export async function GET(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const wali = await requireRole(UserRole.WALI_MURID);
     const id = admissionIdSchema.parse((await params).id);
-    await openWhatsappInvitation(id, wali.userId);
+    const text = await request.text();
+    const input = text ? whatsappInvitationSchema.parse(JSON.parse(text)) : null;
+    await openWhatsappInvitation(id, wali.userId, input?.inviteUrl);
     return NextResponse.json({ data: { opened: true } });
   } catch (error) {
-    return admissionErrorResponse(error);
+    return admissionErrorResponse(error instanceof SyntaxError ? new AdmissionError("INVALID_JSON", "Data pembukaan link tidak valid.", 400) : error);
   }
 }

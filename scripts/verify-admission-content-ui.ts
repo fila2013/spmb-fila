@@ -6,13 +6,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium } from "@playwright/test";
 
-import { WhatsappGroupLinks } from "../components/admission/whatsapp-group-links";
 import { StageContentBlocks } from "../components/stages/stage-content";
 
 const inviteUrl = "https://chat.whatsapp.com/Browser_Test_Group_1234567890";
 const tutorialTitle = "Tutorial Cara Pembayaran Daftar Ulang";
 const markup = renderToStaticMarkup(createElement("main", { style: { maxWidth: 600, padding: 16, margin: "auto" } },
-  createElement(WhatsappGroupLinks, { inviteUrl }),
+  createElement(StageContentBlocks, { whatsappMode: true, content: [{ id: "join", judul: "Informasi Grup WhatsApp", tanggal: null, isiTeks: `Silakan bergabung melalui ${inviteUrl}.`, gambarUrl: null, youtubeVideoId: null, urutanLayout: 0 }] }),
   createElement(StageContentBlocks, { tutorialMode: true, content: [{ id: "demo", judul: "Informasi Daftar Ulang", tanggal: null, isiTeks: "Petunjuk pembayaran dari panitia.", gambarUrl: null, youtubeVideoId: "dQw4w9WgXcQ", judulTutorial: tutorialTitle, urutanLayout: 0 }] }),
 ));
 const cssRoot = join(process.cwd(), ".next/static/chunks");
