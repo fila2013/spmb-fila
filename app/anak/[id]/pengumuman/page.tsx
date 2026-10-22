@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { FinalRouteChoiceForm } from "@/components/stages/final-route-choice-form";
+import { AnnouncementLetter } from "@/components/stages/announcement-letter";
 import {
   AnnouncementBanner,
   StageContentBlocks,
 } from "@/components/stages/stage-content";
-import { PilihanJalurFinal } from "@/generated/prisma/enums";
+import { PilihanJalurFinal, StatusPengumuman } from "@/generated/prisma/enums";
 import { requireWaliPage } from "@/lib/auth/navigation";
 import { getAnnouncementForWali } from "@/lib/stages/service";
 
@@ -40,15 +41,19 @@ export default async function AnnouncementPage({
       <p className="mt-2 text-slate-600">
         {displayedRoute} · {data.child.kategori}
       </p>
-      <div className="mt-6">
+      {data.released && data.letter && data.statusAkhir ? <div className="mt-6"><AnnouncementLetter text={data.letter} status={data.statusAkhir} /></div> : null}
+      {data.released && data.waitingQuota ? <div className="mt-6">
         <AnnouncementBanner
           released={data.released}
           status={data.statusAkhir}
-          tanggalRilis={data.tanggalRilis}
           waitingQuota={data.waitingQuota}
           fallbackJalur={data.fallbackJalur}
         />
-      </div>
+      </div> : null}
+
+      {!data.released ? <div className="mt-6"><StageContentBlocks content={data.content} calendarContext={{ stageLabel: "Pengumuman", childName: data.child.namaAnak }} /></div> : null}
+
+      {data.released && data.statusAkhir === StatusPengumuman.TIDAK_DITERIMA ? <p className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">Proses pendaftaran berakhir pada hasil seleksi ini. Tahap Daftar Ulang dan pembayaran lanjutan tidak tersedia.</p> : null}
 
       {choice?.required && choice.source && choice.target ? (
         <FinalRouteChoiceForm
@@ -73,28 +78,10 @@ export default async function AnnouncementPage({
               ? `Kuota ${choice.source.nama} telah dilepas. Pendaftaran menunggu penambahan kuota ${choice.target.nama}.`
               : "Pilihan sudah final dan tercatat pada data pendaftaran."}
           </p>
-          {!data.waitingQuota ? (
-            <Link
-              href={`/anak/${data.child.id}/daftar-ulang`}
-              className="mt-4 inline-flex rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800"
-            >
-              Lanjut ke daftar ulang
-            </Link>
-          ) : null}
         </section>
       ) : null}
 
-      {data.released ? (
-        <div className="mt-6">
-          <StageContentBlocks
-            content={data.content}
-            calendarContext={{
-              stageLabel: "Pengumuman",
-              childName: data.child.namaAnak,
-            }}
-          />
-        </div>
-      ) : null}
+      {data.canContinueToAdmission ? <Link href={`/anak/${data.child.id}/daftar-ulang`} className="mt-6 inline-flex rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800">Lanjut ke daftar ulang</Link> : null}
     </main>
   );
 }

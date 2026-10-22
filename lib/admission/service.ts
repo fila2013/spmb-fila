@@ -61,6 +61,7 @@ function publicContent(content: KontenTahap) {
     isiTeks: content.isiTeks,
     gambarUrl: content.gambarUrl,
     youtubeVideoId: content.youtubeVideoId,
+    judulTutorial: content.judulTutorial,
     urutanLayout: content.urutanLayout,
   };
 }
@@ -360,10 +361,14 @@ export async function getJoinWaPageData(childId: string, userId: string) {
   ]);
   if (!payment) throw new AdmissionError("PAYMENT_REQUIRED", "Pembayaran DU belum terverifikasi.", 403);
   const visibleContent = await contentVisibleToParticipant(content, child);
+  const inviteUrl = child.statusGrupWa?.linkUndangan
+    ? validatedWhatsappInviteUrl(child.statusGrupWa.linkUndangan)
+    : null;
   return {
     child: { id: child.id, namaAnak: child.namaAnak, jalur: child.jalur?.nama ?? null, kategori: child.kategori?.nama ?? null },
     status: child.statusGrupWa?.status ?? StatusUndanganWa.MENUNGGU,
-    hasInviteLink: Boolean(child.statusGrupWa?.linkUndangan),
+    hasInviteLink: Boolean(inviteUrl),
+    inviteUrl,
     linkOpenedAt: child.statusGrupWa?.linkDibukaAt ?? null,
     confirmedAt: child.statusGrupWa?.dikonfirmasiWaliAt ?? null,
     content: visibleContent.map(publicContent),
@@ -472,7 +477,7 @@ export async function openWhatsappInvitation(childId: string, userId: string) {
           action: "OPEN_WHATSAPP_INVITATION",
           entity: "status_grup_wa",
           entityId: childId,
-          detail: { openedAt, inviteUrlExposedInPage: false },
+          detail: { openedAt },
         },
       });
     }

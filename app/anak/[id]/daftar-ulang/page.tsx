@@ -23,7 +23,7 @@ export default async function AdmissionFeePage({ params }: { params: Promise<{ i
       <p className="mt-8 text-sm font-bold uppercase tracking-[0.17em] text-amber-700">Admission Fee</p>
       <h1 className="mt-2 text-3xl font-bold text-emerald-950">Daftar ulang · {data.child.namaAnak}</h1>
       <p className="mt-2 text-slate-600">{data.child.jalur} · {data.child.kategori}</p>
-      <div className="mt-6"><StageContentBlocks content={data.content} /></div>
+      <div className="mt-6"><StageContentBlocks content={data.content} tutorialMode /></div>
       {data.content.length === 0 ? <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">Informasi kebijakan DU belum diterbitkan panitia.</p> : null}
       <section className="mt-6 rounded-2xl border border-emerald-950/10 bg-white p-5">
         <h2 className="font-bold text-emerald-950">Status pembayaran DU</h2>

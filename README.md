@@ -15,6 +15,10 @@ assessment/pengumuman,
 TCP fallback FIFO dan pilihan kelas final, DU/konfirmasi WA, penghapusan dengan
 retention, laporan CSV/XLSX, serta temporary hold kuota pembayaran. Ketersediaan
 kode bukan bukti kesiapan live.
+Pembaruan 22 Oktober 2026 menambahkan template master surat pengumuman,
+informasi/gambar/Calendar sebelum rilis, surat teks dinamis setelah rilis,
+serta penolakan final tanpa fallback atau penghapusan otomatis. Migration
+`20261022090000_announcement_letter_templates` menambah tabel template saja.
 Status database remote, deployment, SMTP dan merchant Production belum
 diverifikasi dalam audit ini. Phase 12 Production masih memerlukan validasi.
 

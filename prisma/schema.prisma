@@ -152,11 +152,12 @@ model User {
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   calonMurid                 CalonMurid[]
-  pembayaranDiverifikasi     Pembayaran[]           @relation("PembayaranVerifier")
-  pengumumanDiubah           Pengumuman[]           @relation("PengumumanUpdater")
-  statusGrupWaDiubah         StatusGrupWa[]         @relation("StatusGrupWaUpdater")
-  pengaturanPembayaranDiubah PengaturanPembayaran[] @relation("PengaturanPembayaranUpdater")
-  auditLogs                  AuditLog[]             @relation("AuditActor")
+  pembayaranDiverifikasi     Pembayaran[]              @relation("PembayaranVerifier")
+  pengumumanDiubah           Pengumuman[]              @relation("PengumumanUpdater")
+  templateSuratDiubah        TemplateSuratPengumuman[] @relation("TemplateSuratUpdater")
+  statusGrupWaDiubah         StatusGrupWa[]            @relation("StatusGrupWaUpdater")
+  pengaturanPembayaranDiubah PengaturanPembayaran[]    @relation("PengaturanPembayaranUpdater")
+  auditLogs                  AuditLog[]                @relation("AuditActor")
 
   @@index([role, emailVerifiedAt, statusAktif])
   @@map("users")
@@ -396,6 +397,7 @@ model KontenTahap {
   isiTeks             String?     @map("isi_teks")
   gambarUrl           String?     @map("gambar_url")
   youtubeVideoId      String?     @map("youtube_video_id") @db.VarChar(11)
+  judulTutorial       String?     @map("judul_tutorial") @db.VarChar(200)
   urutanLayout        Int         @default(0) @map("urutan_layout")
   minParticipantOrder Int?        @map("min_participant_order")
   maxParticipantOrder Int?        @map("max_participant_order")
@@ -411,6 +413,18 @@ model KontenTahap {
   @@index([tahap, statusAktif, urutanLayout])
   @@index([jalurId, kategoriId])
   @@map("konten_tahap")
+}
+
+model TemplateSuratPengumuman {
+  id            String   @id @default("utama") @db.VarChar(30)
+  diterima      String
+  tidakDiterima String   @map("tidak_diterima")
+  updatedById   String?  @map("updated_by") @db.Uuid
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("TemplateSuratUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("template_surat_pengumuman")
 }
 
 model HasilAssessment {

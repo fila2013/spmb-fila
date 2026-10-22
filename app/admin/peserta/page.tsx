@@ -81,7 +81,6 @@ export default async function ParticipantsPage({
     announcementLocked: Boolean(item.pilihanJalurFinal) ||
       item.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR ||
       item.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK,
-    requiresDeleteConfirmation: Boolean(item.jalur?.hapusDataJikaGagal && !item.jalur.fallbackJalurId),
     finalRouteChoiceEnabled: Boolean(item.jalur?.pilihanJalurFinalAktif),
   }));
 

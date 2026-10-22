@@ -36,7 +36,11 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - **Konfirmasi email wajib aktif di Supabase Auth.** Jika signup menghasilkan session langsung, aplikasi memperlakukannya sebagai salah konfigurasi dan tidak mengaktifkan akun tersebut.
 - **Beranda memiliki CMS informasi publik.** Admin dapat menambah, melihat, mengubah, mengurutkan, mengaktifkan/nonaktifkan, mengunggah gambar, dan menghapus blok informasi beranda. Perubahan penting dicatat pada audit log.
 - **Konten beranda dapat memuat video YouTube.** Admin memasukkan link YouTube, aplikasi hanya menyimpan video ID tervalidasi, dan video ditampilkan di bawah judul dengan autoplay mute yang kompatibel dengan kebijakan browser.
+- **Konten Daftar Ulang mendukung judul dan video tutorial YouTube opsional.** Judul tutorial disimpan terpisah dari judul blok dan video memakai ID tervalidasi yang sama seperti beranda. Tutorial ditampilkan setelah teks informasi, responsif 16:9 tanpa autoplay, dengan link cadangan ke YouTube. Video tetap dibatasi ke HOME/ADMISSION_FEE.
+- **Halaman Join WA menampilkan hyperlink URL grup dan CTA Gabung Grup WhatsApp secara langsung (22 Oktober 2026).** URL hanya diberikan kepada pemilik peserta setelah gate DU verified dan dinormalisasi ke host resmi `chat.whatsapp.com`. Klik dicatat melalui POST terautentikasi; konfirmasi bergabung tetap terpisah dan wajib setelah link dibuka. Link tetap tersedia setelah konfirmasi.
 - **Konten Assessment dan Announcement bertanggal menyediakan pengingat Google Calendar.** Event all-day dibentuk otomatis dari tahap, nama anak, judul, tanggal, dan catatan admin; wali tetap menekan tombol untuk menambahkan event ke kalender miliknya.
+- **Pengumuman memakai dua template master surat teks (DITERIMA/TIDAK DITERIMA).** Admin mengatur template di atas blok Konten Announcement dengan variabel `{nama_peserta}`, `{jalur}`, dan `{status_keputusan}`. Sebelum tanggal rilis individu di Asia/Jakarta, wali melihat blok informasi, gambar, dan Calendar sesuai scope/rentang; hasil serta surat tetap dirahasiakan. Sejak tanggal rilis, wali melihat surat hasil mail merge tanpa bergantung pada rentang blok informasi. Template menggunakan nama jalur pendaftaran awal bila peserta telah memilih jalur final lain.
+- **Keputusan TIDAK DITERIMA adalah keputusan akhir untuk seluruh jalur (22 Oktober 2026).** Tidak memicu fallback maupun auto-delete meskipun flag lama masih tersimpan. Peserta tetap dapat membaca surat, DU ditutup, dan penghapusan hanya manual Admin dengan konfirmasi/snapshot/retention existing. Tidak ada perubahan massal terhadap hasil historis. Peserta diterima tetap mengikuti pilihan jalur final jika diaktifkan, lalu dapat mengakses DU; hasil dikunci setelah DU dimulai.
 - **Blok konten Assessment dan Announcement dapat dibatasi berdasarkan urutan cohort tahapan per jalur.** Assessment hanya menghitung peserta yang saat itu berstatus `MENUNGGU_ASESMEN`; Announcement menghitung peserta yang sudah mencapai `MENUNGGU_PENGUMUMAN`, termasuk yang telah maju ke tahap berikutnya agar konten rilis tetap terlihat. Semua kategori pada jalur yang sama digabung dalam urutan `created_at ASC` lalu `id ASC`; filter kategori blok hanya menentukan penerima konten, bukan cohort hitung. Blok Daftar Ulang dan Join WhatsApp tetap memakai urutan peserta per jalur/kategori tanpa filter status. Batas minimal/maksimal kosong berarti tidak dibatasi; kedua batas kosong mempertahankan visibilitas lama. Penghapusan peserta, perpindahan jalur, atau perubahan status cohort dapat mengubah urutan berikutnya. Ini berbeda dari `urutan_layout` yang hanya mengatur posisi blok.
 - **Penyelesaian Join WA = konfirmasi wali**. Setelah DU terverifikasi, admin menyediakan link grup per peserta. Wali membuka link melalui tombol aplikasi lalu wajib mengonfirmasi sudah bergabung; hanya konfirmasi wali yang mengubah pendaftaran menjadi `selesai`.
 - **Supabase Auth** adalah mekanisme authentication. Jangan membuat password hashing/authentication sendiri di tabel `users`.
@@ -45,9 +49,9 @@ Beberapa dokumen sumber berasal dari tahap desain yang berbeda. Untuk implementa
 - Akses database/storage sensitif dilakukan server-side.
 - `MIDTRANS_SERVER_KEY` hanya server-side.
 - Nominal pembayaran pendaftaran berasal dari matrix `Jalur × Kategori`; wali murid tidak pernah mengisi nominal.
-- Auto-transfer TCP → Reguler dan fallback FIFO adalah business rule inti.
+- Antrean FIFO existing dan perpindahan dari pilihan jalur final peserta diterima tetap dipertahankan. Penolakan baru tidak lagi memicu auto-transfer TCP → Reguler.
 - **Pilihan kelas final untuk peserta yang diterima bersifat opsional per jalur dan dikendalikan Admin secara independen dari fallback peserta gagal.** Jika aktif, Admin menentukan jalur tujuan pilihan final dan semua kategori pada jalur asal wajib memilih satu kali antara tetap di jalur asal atau pindah ke jalur tujuan sebelum DU. Pilihan tidak dapat diubah. Pindah langsung melepaskan kuota jalur asal; bila tujuan penuh, peserta masuk FIFO tujuan tanpa kembali menahan kuota asal.
-- Auto-delete hanya menghapus data calon murid yang gagal, bukan akun wali murid atau anak lain.
+- Penghapusan manual peserta tidak menghapus akun wali murid atau anak lain.
 - Jejak keuangan pembayaran tetap disimpan ketika calon murid dihapus. Relasi aktif `calon_murid_id` menggunakan `ON DELETE SET NULL`, sedangkan UUID referensi non-PII, nominal, metode, status, referensi Midtrans, payload audit yang sudah disanitasi, dan timestamp dipertahankan untuk audit keuangan.
 - MVP hanya memiliki dua role: Wali Murid dan Admin.
 - Multi-tenant, role Bendahara/Asesor terpisah, notifikasi otomatis, dan WhatsApp API otomatis ditunda ke Phase 2.
@@ -478,6 +482,10 @@ Webhook harus aman dipanggil berulang.
 
 ## 5.7 Auto-transfer TCP → Reguler
 
+> Catatan historis: alur penolakan di bawah dihentikan pada 22 Oktober 2026.
+> Keputusan baru TIDAK DITERIMA bersifat final dan tidak membuat transfer/antrean.
+> Antrean lama dan antrean pilihan jalur final tetap dapat diproses.
+
 Jika TCP memiliki `fallback_jalur_id = Reguler`:
 
 ```text
@@ -554,6 +562,9 @@ Sediakan:
 
 ## 5.10 Auto-delete
 
+> Catatan historis: flag ini tidak lagi dijalankan dari pengumuman sejak
+> 22 Oktober 2026. Pembersihan peserta dilakukan melalui penghapusan manual Admin.
+
 Untuk jalur dengan `hapus_data_jika_gagal = true`:
 
 1. Admin menandai Tidak Diterima.
@@ -607,7 +618,7 @@ DU:
 Admin menyediakan link grup setelah pembayaran DU terverifikasi.
 
 Wali murid:
-- membuka link melalui tombol aplikasi; URL mentah tidak ditampilkan pada UI wali;
+- membuka hyperlink URL grup atau CTA Gabung Grup WhatsApp di tab baru; URL hanya tersedia bagi pemilik setelah gate DU verified;
 - kembali ke halaman Join WA;
 - mengonfirmasi **Iya, saya sudah masuk**.
 

@@ -18,7 +18,6 @@ export type QuickEditParticipant = {
   announcementStatus: StatusPengumuman | null;
   releaseDate: string;
   announcementLocked: boolean;
-  requiresDeleteConfirmation: boolean;
   finalRouteChoiceEnabled: boolean;
 };
 

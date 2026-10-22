@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
 import { StatusAssessment, StatusKeseluruhan, UserRole } from "@/generated/prisma/enums";
@@ -11,6 +10,7 @@ import type { StageActionState } from "@/lib/stages/action-state";
 import { StageError } from "@/lib/stages/errors";
 import {
   announcementInputSchema,
+  announcementTemplateSchema,
   assessmentInputSchema,
   deleteStageContentSchema,
   stageContentInputSchema,
@@ -26,6 +26,18 @@ import {
   updateStageContent,
   uploadStageImage,
 } from "@/lib/stages/service";
+import { saveAnnouncementTemplates } from "@/lib/stages/announcement-template-service";
+
+export async function saveAnnouncementTemplatesAction(_state: StageActionState, formData: FormData): Promise<StageActionState> {
+  try {
+    const admin = await requireRole(UserRole.ADMIN);
+    const input = announcementTemplateSchema.parse({ diterima: formData.get("diterima"), tidakDiterima: formData.get("tidakDiterima") });
+    const templates = await saveAnnouncementTemplates(input, admin.userId);
+    revalidatePath("/admin/konten/announcement");
+    revalidatePath("/anak/[id]/pengumuman", "page");
+    return { status: "success", message: "Template surat pengumuman berhasil disimpan.", templates };
+  } catch (error) { return errorState(error); }
+}
 
 function revalidateContentPaths(tahap: string) {
   revalidatePath(`/admin/konten/${stageContentSlug(tahap)}`);
@@ -49,6 +61,7 @@ function contentValues(formData: FormData, gambarUrl: string | null) {
     isiTeks: formData.get("isiTeks"),
     gambarUrl,
     youtubeVideoId: formData.get("youtubeVideoId"),
+    judulTutorial: formData.get("judulTutorial"),
     urutanLayout: formData.get("urutanLayout"),
     minParticipantOrder: formData.get("minParticipantOrder"),
     maxParticipantOrder: formData.get("maxParticipantOrder"),
@@ -146,7 +159,6 @@ export async function updateAnnouncementAction(_state: StageActionState, formDat
   } catch (error) { return errorState(error); }
   revalidatePath("/admin/peserta");
   revalidatePath(`/anak/${id}/pengumuman`);
-  if (result.deleted) redirect("/admin/peserta?deleted=1");
   revalidatePath(`/admin/peserta/${id}`);
   return { status: "success", message: announcementSuccessMessage(result) };
 }
@@ -154,7 +166,7 @@ export async function updateAnnouncementAction(_state: StageActionState, formDat
 async function saveAnnouncement(formData: FormData) {
   const admin = await requireRole(UserRole.ADMIN);
   const id = stageIdSchema.parse(formData.get("id"));
-  const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis"), deletionConfirmation: formData.get("deletionConfirmation") });
+  const input = announcementInputSchema.parse({ statusAkhir: formData.get("statusAkhir"), tanggalRilis: formData.get("tanggalRilis") });
   const result = await updateAnnouncement(id, input, admin.userId);
   return { id, result };
 }
@@ -162,11 +174,7 @@ async function saveAnnouncement(formData: FormData) {
 function announcementSuccessMessage(result: Awaited<ReturnType<typeof updateAnnouncement>>) {
   return result.nextStatus === "MENUNGGU_PILIHAN_JALUR"
     ? "Pengumuman dirilis; wali perlu memilih kelas final sebelum daftar ulang."
-    : result.effect.type === "TRANSFERRED"
-    ? "Peserta otomatis dipindahkan ke jalur fallback dan diterima."
-    : result.effect.type === "QUEUED"
-      ? "Jalur fallback penuh; peserta masuk antrian FIFO."
-      : result.released
+    : result.released
         ? "Pengumuman disimpan dan sudah dirilis."
         : "Pengumuman disimpan untuk tanggal rilis tersebut.";
 }
@@ -175,12 +183,10 @@ export async function quickUpdateAnnouncementAction(_state: StageActionState, fo
   try {
     const { id, result } = await saveAnnouncement(formData);
     revalidatePath(`/anak/${id}/pengumuman`);
-    if (!result.deleted) revalidatePath(`/admin/peserta/${id}`);
+    revalidatePath(`/admin/peserta/${id}`);
     return {
       status: "success",
-      message: result.deleted
-        ? "Keputusan disimpan; data pribadi anak dihapus sesuai konfirmasi."
-        : announcementSuccessMessage(result),
+      message: announcementSuccessMessage(result),
       quickEdit: {
         nextStatus: result.nextStatus,
         deleted: result.deleted,

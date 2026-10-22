@@ -8,6 +8,7 @@ import { requireWaliPage } from "@/lib/auth/navigation";
 import { statusPresentation } from "@/lib/calon-murid/presentation";
 import { listOwnedCalonMurid } from "@/lib/calon-murid/service";
 import { parsePaymentReturnState } from "@/lib/payment/navigation";
+import { mayViewAnnouncement } from "@/lib/stages/rules";
 
 export const metadata: Metadata = { title: "Dashboard wali murid" };
 
@@ -112,6 +113,7 @@ export default async function DashboardPage({
                   <div><dt className="text-slate-500">Jalur</dt><dd className="font-semibold text-slate-800">{child.jalur?.nama ?? child.menungguFallbackJalur?.nama ?? child.jalurAsal?.nama ?? "Belum dipilih"}</dd></div>
                   <div><dt className="text-slate-500">Kategori</dt><dd className="font-semibold text-slate-800">{child.kategori?.nama ?? "Belum dipilih"}</dd></div>
                 </dl>
+                {mayViewAnnouncement(child.statusKeseluruhan) && href !== `/anak/${child.id}/pengumuman` ? <Link href={`/anak/${child.id}/pengumuman`} className="mt-5 inline-flex text-sm font-bold text-emerald-800 hover:underline">Lihat pengumuman hasil seleksi</Link> : null}
                 {href ? (
                   <Link href={href} className="mt-6 inline-flex w-full justify-center rounded-xl bg-emerald-900 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">Lihat tahap saat ini</Link>
                 ) : (

@@ -25,7 +25,7 @@ export default async function JoinWaPage({
         <WhatsappJoinPanel
           childId={data.child.id}
           status={data.status}
-          hasInviteLink={data.hasInviteLink}
+          inviteUrl={data.inviteUrl}
           linkWasOpened={Boolean(data.linkOpenedAt)}
           confirmedAt={data.confirmedAt}
         />

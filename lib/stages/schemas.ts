@@ -7,6 +7,7 @@ import {
   TahapKonten,
 } from "@/generated/prisma/enums";
 import { youtubeVideoId } from "@/lib/stages/rules";
+import { unknownAnnouncementVariables } from "@/lib/stages/announcement-letter";
 
 const uuid = z.uuid("ID tidak valid.");
 const optionalUuid = z.preprocess((value) => value === "" ? null : value, uuid.nullable());
@@ -81,6 +82,7 @@ export const stageContentInputSchema = z.object({
   isiTeks: optionalText(10_000),
   gambarUrl: optionalText(2_000).default(null),
   youtubeVideoId: optionalYoutubeVideoId.default(null),
+  judulTutorial: optionalText(200).default(null),
   urutanLayout: z.coerce.number().int().min(0).max(10_000),
   minParticipantOrder: optionalParticipantOrder,
   maxParticipantOrder: optionalParticipantOrder,
@@ -95,6 +97,12 @@ export const stageContentInputSchema = z.object({
   ({ tahap, minParticipantOrder, maxParticipantOrder }) =>
     tahap !== TahapKonten.HOME || (minParticipantOrder === null && maxParticipantOrder === null),
   { path: ["minParticipantOrder"], message: "Rentang urutan peserta tidak berlaku untuk konten beranda." },
+).refine(
+  ({ tahap, youtubeVideoId }) => youtubeVideoId === null || tahap === TahapKonten.HOME || tahap === TahapKonten.ADMISSION_FEE,
+  { path: ["youtubeVideoId"], message: "Video YouTube hanya tersedia pada konten beranda dan daftar ulang." },
+).refine(
+  ({ tahap, judulTutorial }) => judulTutorial === null || tahap === TahapKonten.ADMISSION_FEE,
+  { path: ["judulTutorial"], message: "Judul tutorial hanya tersedia pada konten daftar ulang." },
 );
 
 export const updateStageContentSchema = stageContentInputSchema.safeExtend({ id: uuid });
@@ -118,11 +126,21 @@ export const announcementInputSchema = z.object({
     StatusPengumuman.TIDAK_DITERIMA,
   ]),
   tanggalRilis: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal rilis wajib diisi."),
-  deletionConfirmation: z.preprocess(
-    (value) => typeof value === "string" && value === "" ? null : value,
-    z.string().max(200).nullable().optional(),
-  ),
 });
+
+const announcementTemplateText = z.string().trim()
+  .min(1, "Template surat wajib diisi.")
+  .max(10_000, "Template surat maksimal 10.000 karakter.")
+  .refine((text) => unknownAnnouncementVariables(text).length === 0, {
+    message: "Gunakan hanya variabel {nama_peserta}, {jalur}, dan {status_keputusan}.",
+  });
+
+export const announcementTemplateSchema = z.object({
+  diterima: announcementTemplateText,
+  tidakDiterima: announcementTemplateText,
+});
+
+export type AnnouncementTemplateInput = z.infer<typeof announcementTemplateSchema>;
 
 export type StageContentInput = z.infer<typeof stageContentInputSchema>;
 export type ParticipantListFilters = z.infer<typeof participantListFilterSchema>;

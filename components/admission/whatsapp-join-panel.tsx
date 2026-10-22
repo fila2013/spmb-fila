@@ -4,25 +4,43 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { StatusUndanganWa } from "@/generated/prisma/enums";
+import { WhatsappGroupLinks } from "@/components/admission/whatsapp-group-links";
 
 export function WhatsappJoinPanel({
   childId,
   status,
-  hasInviteLink,
+  inviteUrl,
   linkWasOpened,
   confirmedAt,
 }: {
   childId: string;
   status: StatusUndanganWa;
-  hasInviteLink: boolean;
+  inviteUrl: string | null;
   linkWasOpened: boolean;
   confirmedAt: Date | null;
 }) {
   const router = useRouter();
   const [opened, setOpened] = useState(linkWasOpened);
   const [pending, setPending] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const confirmed = status === StatusUndanganWa.SUDAH_DIUNDANG;
+
+  async function recordOpened() {
+    if (opened || opening) return;
+    setOpening(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/calon-murid/${childId}/status-wa/join`, { method: "POST", keepalive: true });
+      const body = await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(body.error?.message ?? "Pembukaan link belum tercatat. Klik kembali link grup sebelum konfirmasi.");
+      setOpened(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Pembukaan link belum tercatat. Silakan coba kembali.");
+    } finally {
+      setOpening(false);
+    }
+  }
 
   async function confirmMembership() {
     setPending(true);
@@ -51,11 +69,12 @@ export function WhatsappJoinPanel({
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
         <h2 className="font-bold">Pendaftaran selesai</h2>
         <p className="mt-1 text-sm leading-6">Anda telah mengonfirmasi bergabung ke grup WhatsApp{confirmedAt ? ` pada ${confirmedAt.toLocaleString("id-ID")}` : ""}.</p>
+        {inviteUrl ? <div className="mt-4"><WhatsappGroupLinks inviteUrl={inviteUrl} /></div> : null}
       </div>
     );
   }
 
-  if (!hasInviteLink) {
+  if (!inviteUrl) {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
         <h2 className="font-bold">Menunggu link grup</h2>
@@ -70,20 +89,12 @@ export function WhatsappJoinPanel({
         <h2 className="font-bold text-emerald-950">Link grup sudah tersedia</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">Klik tombol berikut untuk membuka WhatsApp. Setelah berhasil masuk grup, kembali ke halaman ini dan lakukan konfirmasi.</p>
       </div>
-      <a
-        href={`/api/calon-murid/${childId}/status-wa/join`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => setOpened(true)}
-        className="inline-flex justify-center rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800"
-      >
-        Buka grup WhatsApp
-      </a>
+      <WhatsappGroupLinks inviteUrl={inviteUrl} onOpen={recordOpened} />
       <div className="border-t border-slate-200 pt-4">
         <p className="text-sm font-semibold text-slate-800">Sudah berhasil bergabung ke grup?</p>
         <button
           type="button"
-          disabled={!opened || pending}
+          disabled={!opened || pending || opening}
           onClick={confirmMembership}
           className="mt-3 w-full rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-amber-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
         >

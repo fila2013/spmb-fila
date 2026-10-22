@@ -164,8 +164,8 @@ try {
 
   const [first, second, third] = await Promise.all([
     createSelectionChild({ userId: wali.profile.id, name: `FIFO Pertama ${marker}`, jalurId: tcp.id, kategoriId: category.id, createdAt: "2026-01-01T00:00:00.000Z" }),
-    createSelectionChild({ userId: wali.profile.id, name: `FIFO Kedua ${marker}`, jalurId: tcp.id, kategoriId: category.id, createdAt: "2026-01-02T00:00:00.000Z" }),
-    createSelectionChild({ userId: wali.profile.id, name: `FIFO Ketiga ${marker}`, jalurId: tcp.id, kategoriId: category.id, createdAt: "2026-01-03T00:00:00.000Z" }),
+    createSelectionChild({ userId: wali.profile.id, name: `FIFO Kedua ${marker}`, jalurId: tcp.id, kategoriId: category.id, createdAt: "2026-01-02T00:00:00.000Z", status: StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK, waitingTargetId: regular.id }),
+    createSelectionChild({ userId: wali.profile.id, name: `FIFO Ketiga ${marker}`, jalurId: tcp.id, kategoriId: category.id, createdAt: "2026-01-03T00:00:00.000Z", status: StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK, waitingTargetId: regular.id }),
   ]);
   await prisma.jalur.update({ where: { id: tcp.id }, data: { kuotaTerpakai: 3 } });
 
@@ -185,13 +185,14 @@ try {
   paymentIds.push(payment.id);
 
   const decision = (id: string, extra?: Record<string, unknown>) => api(`/api/admin/peserta/${id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "TIDAK_DITERIMA", tanggalRilis: "2020-01-01", ...extra }) });
-  const transferred = await decision(first.id);
-  if (transferred.response.status !== 200 || (transferred.body.data?.effect as { type?: string })?.type !== "TRANSFERRED") throw new Error("Fallback dengan kuota tidak langsung transfer.");
+  const rejected = await decision(first.id);
+  if (rejected.response.status !== 200 || (rejected.body.data?.effect as { type?: string })?.type !== "NONE") throw new Error("Penolakan masih menjalankan efek fallback otomatis.");
   const firstAfter = await prisma.calonMurid.findUniqueOrThrow({ where: { id: first.id }, include: { pengumuman: true, pembayaran: true } });
-  if (firstAfter.jalurId !== regular.id || firstAfter.jalurAsalId !== tcp.id || firstAfter.statusKeseluruhan !== StatusKeseluruhan.DITERIMA || firstAfter.pengumuman?.statusAkhir !== "DITERIMA" || firstAfter.pembayaran.length !== 1) throw new Error("Efek transfer langsung tidak lengkap atau pembayaran tidak dipakai ulang.");
+  if (firstAfter.jalurId !== tcp.id || firstAfter.statusKeseluruhan !== StatusKeseluruhan.TIDAK_DITERIMA || firstAfter.pengumuman?.statusAkhir !== "TIDAK_DITERIMA" || firstAfter.pembayaran.length !== 1) throw new Error("Keputusan akhir atau retention pembayaran tidak sesuai.");
 
-  const [queuedSecond, queuedThird] = await Promise.all([decision(second.id), decision(third.id)]);
-  if (queuedSecond.response.status !== 200 || queuedThird.response.status !== 200) throw new Error("Peserta gagal masuk antrian fallback.");
+  // Existing queues remain processable; new rejected decisions never enter them.
+  await createSelectionChild({ userId: wali.profile.id, name: `Kursi Reguler ${marker}`, jalurId: regular.id, kategoriId: category.id, createdAt: "2025-12-01T00:00:00.000Z", status: StatusKeseluruhan.DITERIMA });
+  await prisma.jalur.update({ where: { id: regular.id }, data: { kuotaTerpakai: 1 } });
   const queue = await api(`/api/admin/jalur/${regular.id}/antrian-fallback`, admin.cookie);
   const queueItems = queue.body.data?.queue as Array<{ id: string; position: number }>;
   if (queue.response.status !== 200 || queueItems?.[0]?.id !== second.id || queueItems?.[1]?.id !== third.id) throw new Error("Urutan FIFO tidak sesuai created_at.");
@@ -255,27 +256,27 @@ try {
     },
   });
   paymentIds.push(retainedPayment.id);
-  const unconfirmed = await decision(deleteChild.id);
-  if (unconfirmed.response.status !== 409 || unconfirmed.body.error?.code !== "AUTO_DELETE_CONFIRMATION_REQUIRED" || !await prisma.calonMurid.findUnique({ where: { id: deleteChild.id } })) throw new Error("Auto-delete berjalan tanpa konfirmasi sah.");
-  const deleted = await decision(deleteChild.id, { deletionConfirmation: `HAPUS ${deleteChild.namaAnak}` });
-  if (deleted.response.status !== 200 || deleted.body.data?.deleted !== true) throw new Error(`Auto-delete terkonfirmasi gagal: ${deleted.response.status}`);
+  const retained = await decision(deleteChild.id);
+  if (retained.response.status !== 200 || retained.body.data?.deleted !== false || !await prisma.calonMurid.findUnique({ where: { id: deleteChild.id } })) throw new Error("Penolakan menghapus peserta secara otomatis.");
+  const deleted = await api(`/api/admin/peserta/${deleteChild.id}`, admin.cookie, { method: "DELETE", body: JSON.stringify({ confirmation: `HAPUS ${deleteChild.namaAnak}` }) });
+  if (deleted.response.status !== 200) throw new Error(`Penghapusan manual terkonfirmasi gagal: ${deleted.response.status}`);
   const [deletedChild, preservedSibling, preservedUser, preservedPayment, deleteAudit] = await Promise.all([
     prisma.calonMurid.findUnique({ where: { id: deleteChild.id } }),
     prisma.calonMurid.findUnique({ where: { id: sibling.id } }),
     prisma.user.findUnique({ where: { id: wali.profile.id } }),
     prisma.pembayaran.findUniqueOrThrow({ where: { id: retainedPayment.id } }),
-    prisma.auditLog.findFirst({ where: { action: "AUTO_DELETE_CALON_MURID", entityId: deleteChild.id } }),
+    prisma.auditLog.findFirst({ where: { action: "MANUAL_DELETE_CALON_MURID", entityId: deleteChild.id } }),
   ]);
-  if (deletedChild || !preservedSibling || !preservedUser || preservedPayment.calonMuridId !== null || preservedPayment.calonMuridReference !== deleteChild.id || !deleteAudit) throw new Error("Retention auto-delete tidak aman.");
+  if (deletedChild || !preservedSibling || !preservedUser || preservedPayment.calonMuridId !== null || preservedPayment.calonMuridReference !== deleteChild.id || !deleteAudit) throw new Error("Retention penghapusan manual tidak aman.");
   const deleteDetail = deleteAudit.detail as {
     snapshot?: { id?: string; payments?: unknown[] };
     retention?: { paymentsRetained?: number; userAccountPreserved?: boolean; siblingCountPreserved?: number };
   };
-  if (deleteDetail.snapshot?.id !== deleteChild.id || deleteDetail.snapshot.payments?.length !== 1 || deleteDetail.retention?.paymentsRetained !== 1 || deleteDetail.retention.userAccountPreserved !== true || deleteDetail.retention.siblingCountPreserved !== siblingCountBeforeDelete) throw new Error("Snapshot audit auto-delete tidak lengkap.");
+  if (deleteDetail.snapshot?.id !== deleteChild.id || deleteDetail.snapshot.payments?.length !== 1 || deleteDetail.retention?.paymentsRetained !== 1 || deleteDetail.retention.userAccountPreserved !== true || deleteDetail.retention.siblingCountPreserved !== siblingCountBeforeDelete) throw new Error("Snapshot audit penghapusan manual tidak lengkap.");
 
-  const audits = await prisma.auditLog.count({ where: { actorId: admin.profile.id, action: { in: ["AUTO_TRANSFER_FALLBACK", "QUEUE_FALLBACK", "REPROCESS_FALLBACK_QUEUE", "AUTO_DELETE_CALON_MURID"] } } });
-  if (audits < 8) throw new Error("Audit Phase 8 tidak lengkap.");
-  console.log("Phase 8 fallback, FIFO, reprocess & auto-delete integration: OK");
+  const audits = await prisma.auditLog.count({ where: { actorId: admin.profile.id, action: { in: ["UPDATE_ANNOUNCEMENT_RESULT", "AUTO_TRANSFER_FALLBACK", "REPROCESS_FALLBACK_QUEUE", "MANUAL_DELETE_CALON_MURID"] } } });
+  if (audits < 6) throw new Error("Audit Phase 8 tidak lengkap.");
+  console.log("Phase 8 final rejection, legacy FIFO/reprocess & manual deletion integration: OK");
 } finally {
   await retry(() => prisma.auditLog.deleteMany({ where: { OR: [{ actorId: { in: profileIds } }, { entityId: { in: childIds } }, { entityId: { in: routeIds } }] } }));
   if (paymentIds.length) await retry(() => prisma.pembayaran.deleteMany({ where: { id: { in: paymentIds } } }));

@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 2 Oktober 2026
+**Tanggal snapshot:** 22 Oktober 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -40,14 +40,55 @@ layanan remote atau sudah beroperasi di production.
 | Pembayaran pendaftaran | Snap token server-side dengan expiry selaras hold, webhook signature/merchant/nominal, idempotency dan retry; upload transfer manual langsung verified; promosi hold/counter hanya saat verified |
 | Enrollment | Form builder sederhana, draft Data Pribadi/Observasi, validasi final, gate payment verified, unduh PDF A4, dan QR chat WhatsApp Ayah/Bunda pada detail peserta admin |
 | CMS dan tahap | Beranda, gambar/YouTube, konten assessment/pengumuman/DU/WA, rentang urutan peserta per jalur/kategori untuk empat tahap wali, tanggal rilis dan tombol Google Calendar |
-| Hasil seleksi | Input assessment/pengumuman admin di halaman detail dan modal edit cepat dari badge status daftar peserta, TCP gagal ke Reguler, FIFO ketika penuh, reprocess otomatis/manual |
+| Hasil seleksi | Input assessment/pengumuman admin, modal edit cepat, template master surat dan mail merge setelah rilis; TIDAK DITERIMA final tanpa fallback/auto-delete. FIFO existing dan pilihan final tetap tersedia |
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
-| Penghapusan | Auto-delete anak gagal dengan konfirmasi/snapshot, penghapusan peserta manual dan akun wali tanpa anak, retention ledger |
+| Penghapusan | Penghapusan peserta manual dengan konfirmasi/snapshot dan akun wali tanpa anak, retention ledger |
 | DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup per peserta, konfirmasi wali sampai selesai |
 | Reporting | Filter peserta, ekspor CSV/XLSX, sanitasi formula dan audit ekspor |
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Penyesuaian Join WA dan tutorial DU pada 22 Oktober 2026 menampilkan URL grup
+sebagai hyperlink biru dan CTA hijau dengan tab baru. URL dinamis divalidasi dan
+hanya diberikan setelah ownership/tahap/DU verified terpenuhi; klik dicatat lewat
+POST sehingga konfirmasi bergabung tetap memerlukan catatan pembukaan di server.
+Konten DU mendapat judul tutorial opsional dan input YouTube pada form tambah/edit.
+ID video tervalidasi diteruskan ke pemutar responsif setelah teks informasi,
+tanpa autoplay dan dengan link cadangan ke YouTube. Beranda mempertahankan video
+existing. Migration `20261022100000_admission_fee_video_tutorial` menambah kolom
+judul nullable dan memperluas constraint video untuk HOME/ADMISSION_FEE.
+Migration ini sudah diterapkan pada database `.env.local`; SELECT mengonfirmasi
+kolom judul nullable (maksimal 200 karakter) dan kedua constraint aktif. Lint,
+typecheck, Prisma validate/generate, 48 file/237 unit test, serta build Next.js
+lulus. Script `scripts/verify-admission-content-ui.ts` lulus di Chromium headless
+390 px dengan CSS hasil build: URL dan CTA membuka tab tujuan yang benar,
+judul/iframe tampil dan tidak ada overflow horizontal. Browser memakai data
+sintetis dan intercept request, bukan akun atau grup pengguna sungguhan.
+Penyimpanan diuji pada service create/edit dan DTO; integration remote staging
+tidak dijalankan. Pembaruan ini belum di-commit/push atau dideploy ke Vercel.
+
+Pembaruan Pengumuman 22 Oktober 2026 menambahkan dua template master surat di
+bagian atas Konten Announcement. Variabel nama peserta, jalur pendaftaran, dan
+keputusan digabung di server hanya setelah tanggal rilis individu Asia/Jakarta.
+Sebelum rilis, wali melihat blok informasi/gambar/Calendar sesuai filter yang
+existing. Setelah rilis tampil surat teks; peserta diterima dapat melanjutkan DU
+setelah pilihan jalur final selesai bila aktif. TIDAK DITERIMA kini keputusan
+akhir untuk semua jalur: tidak memicu fallback/auto-delete, DU ditutup, dan
+penghapusan hanya melalui fitur manual Admin. Keputusan historis tidak diubah.
+Migration additive `20261022090000_announcement_letter_templates` membuat tabel
+singleton dengan RLS; data peserta dan blok konten lama tidak diubah.
+Migration tersebut sudah diterapkan ke database yang dikonfigurasi `.env.local`;
+pemeriksaan SELECT mengonfirmasi record applied dan RLS tabel baru aktif.
+Lint, typecheck, Prisma validate/generate, 47 file/232 unit test, dan build Next.js
+lulus. Unit mencakup penyimpanan template + otorisasi action, render informasi/
+gambar/Calendar prarilis, surat dinamis pascarilis, batas tengah malam Jakarta,
+ownership, penolakan final dan gate DU. Satu assertion WhatsApp lama diselaraskan
+dengan sapaan Assalamualaikum yang sudah di-commit sebelumnya. Test sementara
+memakai direktori cache workspace karena rename temp sandbox ditolak; build
+Turbopack lulus di luar sandbox setelah dua proses kompilasi terbatas dihentikan.
+Integration staging/E2E login browser tidak dijalankan. Kode belum di-commit/push
+atau diverifikasi sebagai deployment Vercel untuk pembaruan ini.
 
 Pemisahan Tempat/Tanggal lahir dan aturan usia bulanan pada Form Builder serta
 validasi sebelum pembayaran diimplementasikan di source 2 Oktober 2026.
@@ -208,6 +249,9 @@ audit ini. Daftar ini membedakan temuan kode/config, konten belum final, dan
 batas verifikasi agar tidak dianggap semuanya insiden production.
 
 ## Hasil verifikasi terakhir
+
+Hasil 22 Oktober 2026 untuk pembaruan Pengumuman tercatat di bagian pekerjaan
+aktif di atas. Tabel berikut mempertahankan catatan audit historis 1 Oktober.
 
 Pemeriksaan kode dan migration terbaru dijalankan 1 Oktober 2026; Auth
 integration terakhir dijalankan 26 September. Pemeriksaan database/cron

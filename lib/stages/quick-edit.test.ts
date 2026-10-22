@@ -16,7 +16,6 @@ const participant: QuickEditParticipant = {
   announcementStatus: null,
   releaseDate: "",
   announcementLocked: false,
-  requiresDeleteConfirmation: false,
   finalRouteChoiceEnabled: false,
 };
 

@@ -19,3 +19,17 @@ export async function GET(
     return admissionErrorResponse(error);
   }
 }
+
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const wali = await requireRole(UserRole.WALI_MURID);
+    const id = admissionIdSchema.parse((await params).id);
+    await openWhatsappInvitation(id, wali.userId);
+    return NextResponse.json({ data: { opened: true } });
+  } catch (error) {
+    return admissionErrorResponse(error);
+  }
+}

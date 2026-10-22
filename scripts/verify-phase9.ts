@@ -112,7 +112,7 @@ try {
   childIds.push(child.id, sibling.id, otherChild.id, blockedChild.id);
 
   for (const payload of [
-    { tahap: "ADMISSION_FEE", judul: `Kebijakan DU ${marker}`, tanggal: "2026-11-30", isiTeks: "Nominal dan periode pembayaran ditetapkan panitia.", gambarUrl: null, urutanLayout: 1, statusAktif: true, jalurId: route.id, kategoriId: category.id },
+    { tahap: "ADMISSION_FEE", judul: `Kebijakan DU ${marker}`, tanggal: "2026-11-30", isiTeks: "Nominal dan periode pembayaran ditetapkan panitia.", judulTutorial: "Tutorial Pembayaran DU", youtubeVideoId: "https://youtu.be/dQw4w9WgXcQ", gambarUrl: null, urutanLayout: 1, statusAktif: true, jalurId: route.id, kategoriId: category.id },
     { tahap: "JOIN_WA", judul: `Informasi Grup ${marker}`, tanggal: null, isiTeks: "Undangan dilakukan manual oleh panitia.", gambarUrl: null, urutanLayout: 1, statusAktif: true, jalurId: route.id, kategoriId: category.id },
   ]) {
     const created = await api("/api/admin/konten-tahap", admin.cookie, { method: "POST", body: JSON.stringify(payload) });
@@ -125,8 +125,9 @@ try {
   const ownership = await api(`/api/calon-murid/${otherChild.id}/du`, waliA.cookie);
   if (ownership.response.status !== 403) throw new Error("Ownership DU bocor antar wali.");
   const admissionContent = await api(`/api/konten-tahap/admission-fee?calon_murid_id=${child.id}`, waliA.cookie);
-  const admissionBlocks = admissionContent.body.data?.content as Array<{ id?: string }> | undefined;
+  const admissionBlocks = admissionContent.body.data?.content as Array<{ id?: string; judulTutorial?: string; youtubeVideoId?: string }> | undefined;
   if (admissionContent.response.status !== 200 || !Array.isArray(admissionBlocks) || !admissionBlocks.some((item) => item.id === contentIds[0])) throw new Error(`Konten DU scoped tidak tersedia melalui kontrak info (${admissionContent.response.status}: ${admissionContent.body.error?.code ?? "unknown"}).`);
+  if (!admissionBlocks.some((item) => item.judulTutorial === "Tutorial Pembayaran DU" && item.youtubeVideoId === "dQw4w9WgXcQ")) throw new Error("Judul/ID video tutorial tidak tersimpan atau tidak tampil di konten DU.");
 
   const fake = await api(`/api/calon-murid/${child.id}/du`, waliA.cookie, { method: "POST", body: proofBody(new File(["fake"], "fake.png", { type: "image/png" })) });
   if (fake.response.status !== 422 || fake.body.error?.code !== "INVALID_FILE") throw new Error("Signature file palsu diterima.");
@@ -200,13 +201,15 @@ try {
   if (afterLink.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_JOIN_WA || afterLink.statusGrupWa?.linkUndangan !== inviteUrl || !afterLink.statusGrupWa.linkDitetapkanAt) throw new Error("Link undangan tidak tersimpan tanpa menyelesaikan pendaftaran.");
 
   const waWithLink = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie);
-  if (waWithLink.response.status !== 200 || waWithLink.body.data?.hasInviteLink !== true || JSON.stringify(waWithLink.body).includes(inviteUrl)) throw new Error("Link mentah WhatsApp terekspos pada payload halaman wali.");
+  if (waWithLink.response.status !== 200 || waWithLink.body.data?.hasInviteLink !== true || waWithLink.body.data?.inviteUrl !== inviteUrl) throw new Error("Link WhatsApp langsung tidak tersedia bagi wali pemilik setelah DU verified.");
 
   const prematureConfirmation = await api(`/api/calon-murid/${child.id}/status-wa`, waliA.cookie, { method: "PATCH", body: JSON.stringify({ confirmed: true }) });
   if (prematureConfirmation.response.status !== 409 || prematureConfirmation.body.error?.code !== "INVITE_LINK_NOT_OPENED") throw new Error("Wali dapat mengonfirmasi sebelum membuka link grup.");
 
   const foreignOpen = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliB.cookie }, redirect: "manual" });
   if (foreignOpen.status !== 403) throw new Error("Redirect link WhatsApp bocor antar wali.");
+  const trackedOpen = await api(`/api/calon-murid/${child.id}/status-wa/join`, waliA.cookie, { method: "POST" });
+  if (trackedOpen.response.status !== 200 || trackedOpen.body.data?.opened !== true) throw new Error("Klik link langsung tidak tercatat melalui POST.");
   const opened = await fetch(`${appUrl}/api/calon-murid/${child.id}/status-wa/join`, { headers: { cookie: waliA.cookie }, redirect: "manual" });
   if (opened.status !== 307 || opened.headers.get("location") !== inviteUrl) throw new Error("Redirect terotorisasi ke grup WhatsApp gagal.");
 

@@ -94,16 +94,18 @@ try {
   const future = await api(`/api/admin/peserta/${child.id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "DITERIMA", tanggalRilis: "2099-12-31" }) });
   if (future.response.status !== 200) throw new Error(`Pengumuman future gagal: ${future.response.status}`);
   const hidden = await api(`/api/calon-murid/${child.id}/pengumuman`, waliA.cookie);
-  if (hidden.response.status !== 200 || hidden.body.data?.released !== false || hidden.body.data?.statusAkhir !== null || (hidden.body.data?.content as unknown[])?.length) throw new Error("Hasil/konten pengumuman bocor sebelum rilis.");
+  if (hidden.response.status !== 200 || hidden.body.data?.released !== false || hidden.body.data?.statusAkhir !== null || hidden.body.data?.letter !== null || (hidden.body.data?.content as unknown[])?.length !== 1) throw new Error("Informasi prarilis tidak tampil atau hasil/surat bocor sebelum rilis.");
 
   const released = await api(`/api/admin/peserta/${child.id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "DITERIMA", tanggalRilis: "2020-01-01" }) });
   if (released.response.status !== 200) throw new Error(`Pengumuman rilis gagal: ${released.response.status}`);
   const visible = await api(`/api/calon-murid/${child.id}/pengumuman`, waliA.cookie);
-  if (visible.body.data?.released !== true || visible.body.data?.statusAkhir !== "DITERIMA" || !Array.isArray(visible.body.data?.content) || visible.body.data.content.length !== 1) throw new Error("Pengumuman rilis tidak tampil lengkap.");
+  if (visible.body.data?.released !== true || visible.body.data?.statusAkhir !== "DITERIMA" || typeof visible.body.data?.letter !== "string" || visible.body.data?.canContinueToAdmission !== true) throw new Error("Surat rilis atau kelanjutan DU tidak tampil lengkap.");
 
   await api(`/api/admin/peserta/${deleteChild.id}/hasil-assessment`, admin.cookie, { method: "PATCH", body: JSON.stringify({ status: "TIDAK_HADIR", catatan: null }) });
-  const blocked = await api(`/api/admin/peserta/${deleteChild.id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "TIDAK_DITERIMA", tanggalRilis: "2020-01-01" }) });
-  if (blocked.response.status !== 409 || blocked.body.error?.code !== "AUTO_DELETE_CONFIRMATION_REQUIRED") throw new Error("Kasus auto-delete tidak meminta konfirmasi eksplisit.");
+  const rejected = await api(`/api/admin/peserta/${deleteChild.id}/pengumuman`, admin.cookie, { method: "PATCH", body: JSON.stringify({ statusAkhir: "TIDAK_DITERIMA", tanggalRilis: "2020-01-01" }) });
+  if (rejected.response.status !== 200 || rejected.body.data?.deleted !== false || !await prisma.calonMurid.findUnique({ where: { id: deleteChild.id } })) throw new Error("Penolakan tidak mempertahankan peserta untuk surat resmi.");
+  const rejectionLetter = await api(`/api/calon-murid/${deleteChild.id}/pengumuman`, waliA.cookie);
+  if (rejectionLetter.body.data?.statusAkhir !== "TIDAK_DITERIMA" || typeof rejectionLetter.body.data?.letter !== "string" || rejectionLetter.body.data?.canContinueToAdmission !== false) throw new Error("Surat penolakan atau kunci DU tidak sesuai.");
 
   const audits = await prisma.auditLog.count({ where: { actorId: admin.profile.id, action: { in: ["CREATE_STAGE_CONTENT", "UPDATE_ASSESSMENT_RESULT", "UPDATE_ANNOUNCEMENT_RESULT"] } } });
   if (audits < 4) throw new Error("Audit Phase 7 tidak lengkap.");

@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AnnouncementTemplateForm } from "@/components/admin/announcement-template-form";
 import { DeleteStageContentForm, StageContentForm } from "@/components/admin/stage-forms";
 import { TahapKonten, UserRole } from "@/generated/prisma/enums";
 import { requireRolePage } from "@/lib/auth/navigation";
 import { listJalur, listKategori } from "@/lib/master-data/service";
 import { dateOnly } from "@/lib/stages/rules";
 import { listStageContent } from "@/lib/stages/service";
+import { getAnnouncementTemplates } from "@/lib/stages/announcement-template-service";
 
 export const metadata: Metadata = { title: "Konten tahap" };
 
@@ -26,7 +28,7 @@ export default async function StageContentPage({ params }: { params: Promise<{ t
             ? TahapKonten.HOME
           : null;
   if (!tahap) notFound();
-  const [content, jalur, kategori] = await Promise.all([listStageContent(tahap), listJalur(), listKategori()]);
+  const [content, jalur, kategori, templates] = await Promise.all([listStageContent(tahap), listJalur(), listKategori(), tahap === TahapKonten.ANNOUNCEMENT ? getAnnouncementTemplates() : null]);
   const label = tahap === TahapKonten.ASSESSMENT
     ? "Assessment"
     : tahap === TahapKonten.ANNOUNCEMENT
@@ -40,8 +42,9 @@ export default async function StageContentPage({ params }: { params: Promise<{ t
   const choicesJalur = jalur.map(({ id, nama }) => ({ id, nama }));
   const choicesKategori = kategori.map(({ id, nama }) => ({ id, nama }));
   return <AdminShell activePath={`/admin/konten/${slug}`} title={`Konten ${label}`} description={globalOnly ? "Tambah, ubah, urutkan, aktifkan, atau hapus informasi publik pada halaman beranda." : `Atur blok informasi ${label.toLowerCase()} berdasarkan jalur, kategori, dan rentang urutan peserta. Konten ditampilkan sebagai teks aman, bukan HTML.`} email={admin.email}>
+    {templates ? <section className="mb-6 rounded-2xl border border-emerald-950/10 bg-white p-5 sm:p-6"><h2 className="mb-2 text-xl font-bold text-emerald-950">Template Surat Pengumuman Hasil Seleksi</h2><p className="mb-5 text-sm leading-6 text-slate-600">Template berlaku untuk seluruh peserta sesuai keputusan masing-masing. Tanggal rilis dan hasil seleksi tetap diatur melalui menu Peserta.</p><AnnouncementTemplateForm value={templates} /></section> : null}
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section className="grid gap-4"><h2 className="text-lg font-bold text-emerald-950">Konten tersimpan</h2>{content.length ? content.map((item) => <details key={item.id} className="rounded-2xl border border-emerald-950/10 bg-white p-5"><summary className="cursor-pointer font-bold text-emerald-950">{item.judul} <span className="ml-2 text-xs font-normal text-slate-500">{item.statusAktif ? "Aktif" : "Nonaktif"}{globalOnly ? " · Beranda global" : ` · ${item.jalur?.nama ?? "Semua jalur"} · ${item.kategori?.nama ?? "Semua kategori"}`}{!globalOnly && (item.minParticipantOrder !== null || item.maxParticipantOrder !== null) ? ` · Urutan peserta ${item.minParticipantOrder ?? 1}–${item.maxParticipantOrder ?? "∞"}` : ""}</span></summary><div className="mt-5"><StageContentForm tahap={tahap} jalur={choicesJalur} kategori={choicesKategori} globalOnly={globalOnly} value={{ id: item.id, judul: item.judul, tanggal: dateOnly(item.tanggal) ?? "", isiTeks: item.isiTeks ?? "", gambarUrl: item.gambarUrl ?? "", youtubeVideoId: item.youtubeVideoId ?? "", urutanLayout: item.urutanLayout, minParticipantOrder: item.minParticipantOrder, maxParticipantOrder: item.maxParticipantOrder, statusAktif: item.statusAktif, jalurId: item.jalurId ?? "", kategoriId: item.kategoriId ?? "" }} />{globalOnly ? <DeleteStageContentForm id={item.id} /> : null}</div></details>) : <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">Belum ada konten {label.toLowerCase()}.</p>}</section>
+      <section className="grid gap-4"><h2 className="text-lg font-bold text-emerald-950">Konten tersimpan</h2>{content.length ? content.map((item) => <details key={item.id} className="rounded-2xl border border-emerald-950/10 bg-white p-5"><summary className="cursor-pointer font-bold text-emerald-950">{item.judul} <span className="ml-2 text-xs font-normal text-slate-500">{item.statusAktif ? "Aktif" : "Nonaktif"}{globalOnly ? " · Beranda global" : ` · ${item.jalur?.nama ?? "Semua jalur"} · ${item.kategori?.nama ?? "Semua kategori"}`}{!globalOnly && (item.minParticipantOrder !== null || item.maxParticipantOrder !== null) ? ` · Urutan peserta ${item.minParticipantOrder ?? 1}–${item.maxParticipantOrder ?? "∞"}` : ""}</span></summary><div className="mt-5"><StageContentForm tahap={tahap} jalur={choicesJalur} kategori={choicesKategori} globalOnly={globalOnly} value={{ id: item.id, judul: item.judul, tanggal: dateOnly(item.tanggal) ?? "", isiTeks: item.isiTeks ?? "", gambarUrl: item.gambarUrl ?? "", youtubeVideoId: item.youtubeVideoId ?? "", judulTutorial: item.judulTutorial ?? "", urutanLayout: item.urutanLayout, minParticipantOrder: item.minParticipantOrder, maxParticipantOrder: item.maxParticipantOrder, statusAktif: item.statusAktif, jalurId: item.jalurId ?? "", kategoriId: item.kategoriId ?? "" }} />{globalOnly ? <DeleteStageContentForm id={item.id} /> : null}</div></details>) : <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">Belum ada konten {label.toLowerCase()}.</p>}</section>
       <aside className="h-fit rounded-2xl border border-emerald-950/10 bg-white p-5 xl:sticky xl:top-6"><h2 className="mb-4 text-lg font-bold text-emerald-950">Tambah blok</h2><StageContentForm tahap={tahap} jalur={choicesJalur} kategori={choicesKategori} globalOnly={globalOnly} /></aside>
     </div>
   </AdminShell>;

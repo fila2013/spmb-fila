@@ -146,15 +146,15 @@ itu memakai environment staging yang sama.
 - Semua alokasi/perubahan kuota, auto-transfer, pilihan final dan reprocess FIFO
   harus atomik melalui transaction + row locking/strategi setara. Jangan
   mengandalkan pengecekan frontend; pertahankan constraint SQL custom.
-- TCP gagal → Reguler tersedia: langsung diterima tanpa asesmen/pembayaran ulang.
-  Jika penuh: `MENUNGGU_KUOTA_FALLBACK`, FIFO berdasarkan `created_at`.
-  Tambah kuota memicu reprocess; admin juga dapat memproses manual.
+- Keputusan `TIDAK_DITERIMA` baru bersifat final untuk semua jalur (22 Oktober
+  2026): tidak memicu transfer fallback, antrean baru, atau auto-delete. Data dan
+  surat tetap ada; DU terkunci. Antrean existing dan pilihan jalur final peserta
+  diterima tetap memakai FIFO/reprocess otomatis atau manual.
 - Pilihan final TCP diterima bersifat opsional per jalur, berlaku semua kategori.
   Jika aktif, wali wajib memilih sekali sebelum DU. Pilih Reguler langsung
   melepas kuota TCP; bila penuh masuk FIFO tanpa kembali menahan kuota TCP.
-- Auto-delete Reguler/Pindahan dengan `hapus_data_jika_gagal=true` memerlukan
-  konfirmasi admin dan audit snapshot sebelum delete. Hanya anak gagal itu
-  yang dihapus; akun wali dan anak lain tetap.
+- Flag auto-delete lama tidak dijalankan dari pengumuman. Penghapusan peserta
+  hanya manual Admin dengan konfirmasi, audit snapshot, dan retention ledger.
 - Penghapusan peserta manual admin adalah operasi terpisah. Penghapusan akun
   wali hanya boleh setelah tidak ada anak, dengan konfirmasi eksplisit;
   jangan mengubah auto-delete menjadi penghapusan akun otomatis.

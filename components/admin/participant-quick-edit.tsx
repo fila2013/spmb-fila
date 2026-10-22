@@ -114,7 +114,7 @@ export function ParticipantQuickEditTable({
           <section><h3 className="mb-3 text-lg font-bold text-emerald-950">Pengumuman</h3>
             {selected.announcementLocked
               ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Hasil sudah dirilis dan dikunci oleh pilihan jalur final atau antrean kuota.</p>
-              : <AnnouncementResultForm id={selected.id} statusAkhir={selected.announcementStatus} tanggalRilis={selected.releaseDate} childName={selected.namaAnak} requiresDeleteConfirmation={selected.requiresDeleteConfirmation} finalRouteChoiceEnabled={selected.finalRouteChoiceEnabled} quickEdit onSaved={handleSaved} />}
+              : <AnnouncementResultForm id={selected.id} statusAkhir={selected.announcementStatus} tanggalRilis={selected.releaseDate} childName={selected.namaAnak} finalRouteChoiceEnabled={selected.finalRouteChoiceEnabled} quickEdit onSaved={handleSaved} />}
           </section>
         </div>
         <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-4"><Link href={`/admin/peserta/${selected.id}`} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Buka halaman detail</Link><button type="button" onClick={closeModal} className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 hover:bg-slate-200">Batal / Tutup</button></div>

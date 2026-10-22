@@ -10,12 +10,14 @@ import {
 } from "@/generated/prisma/enums";
 import { assertOwnership } from "@/lib/auth/authorization";
 import { FallbackError } from "@/lib/fallback/errors";
-import { handleRejectedDecisionInTransaction } from "@/lib/fallback/service";
+import { admissionFeeVisibleStatuses } from "@/lib/admission/rules";
 import { releasedStatusAfterAcceptedDecision } from "@/lib/final-route-choice/rules";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { StageError } from "@/lib/stages/errors";
 import { contentVisibleToParticipant } from "@/lib/stages/participant-order";
+import { getAnnouncementTemplates } from "@/lib/stages/announcement-template-service";
+import { renderAnnouncementLetter } from "@/lib/stages/announcement-letter";
 import {
   dateOnly,
   isAnnouncementReleased,
@@ -45,6 +47,7 @@ function contentSnapshot(content: KontenTahap) {
     isiTeks: content.isiTeks,
     gambarUrl: content.gambarUrl,
     youtubeVideoId: content.youtubeVideoId,
+    judulTutorial: content.judulTutorial,
     urutanLayout: content.urutanLayout,
     minParticipantOrder: content.minParticipantOrder,
     maxParticipantOrder: content.maxParticipantOrder,
@@ -73,12 +76,15 @@ function assertContentScope(input: StageContentInput) {
       422,
     );
   }
-  if (input.tahap !== TahapKonten.HOME && input.youtubeVideoId !== null) {
+  if (input.tahap !== TahapKonten.HOME && input.tahap !== TahapKonten.ADMISSION_FEE && input.youtubeVideoId !== null) {
     throw new StageError(
       "INVALID_VIDEO_SCOPE",
-      "Video YouTube hanya dapat digunakan pada konten beranda.",
+      "Video YouTube hanya dapat digunakan pada konten beranda dan daftar ulang.",
       422,
     );
+  }
+  if (input.judulTutorial !== null && input.tahap !== TahapKonten.ADMISSION_FEE) {
+    throw new StageError("INVALID_TUTORIAL_SCOPE", "Judul tutorial hanya tersedia pada konten daftar ulang.", 422);
   }
 }
 
@@ -234,7 +240,7 @@ function matchingContentWhere(tahap: TahapKonten, child: { jalurId: string | nul
 }
 
 function publicContent(content: KontenTahap) {
-  return { id: content.id, judul: content.judul, tanggal: dateOnly(content.tanggal), isiTeks: content.isiTeks, gambarUrl: content.gambarUrl, youtubeVideoId: content.youtubeVideoId, urutanLayout: content.urutanLayout };
+  return { id: content.id, judul: content.judul, tanggal: dateOnly(content.tanggal), isiTeks: content.isiTeks, gambarUrl: content.gambarUrl, youtubeVideoId: content.youtubeVideoId, judulTutorial: content.judulTutorial, urutanLayout: content.urutanLayout };
 }
 
 export async function listHomeContent() {
@@ -272,10 +278,6 @@ async function synchronizeReleasedAnnouncement(transaction: Transaction, childId
   if (!child?.jalur || !announcement?.statusAkhir || !isAnnouncementReleased(announcement.tanggalRilis)) return;
   if (child.statusKeseluruhan !== StatusKeseluruhan.MENUNGGU_PENGUMUMAN) return;
 
-  if (announcement.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
-    const effect = await handleRejectedDecisionInTransaction(transaction, childId, null);
-    if (effect.type !== "NONE") return;
-  }
   const nextStatus = releasedStatusAfterAcceptedDecision({
     statusAkhir: announcement.statusAkhir,
     finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
@@ -296,8 +298,15 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
   const announcement = current.pengumuman;
   const waitingQuota = current.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
   const released = Boolean(announcement?.statusAkhir && isAnnouncementReleased(announcement.tanggalRilis));
-  const content = released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
+  const content = !released ? await prisma.kontenTahap.findMany({ where: matchingContentWhere(TahapKonten.ANNOUNCEMENT, current), orderBy: [{ urutanLayout: "asc" }, { createdAt: "asc" }] }) : [];
   const visibleContent = await contentVisibleToParticipant(content, current, TahapKonten.ANNOUNCEMENT);
+  const letter = released && announcement?.statusAkhir
+    ? renderAnnouncementLetter(await getAnnouncementTemplates(), {
+        namaPeserta: current.namaAnak,
+        jalur: current.jalurAsal?.nama ?? current.jalur?.nama ?? current.menungguFallbackJalur?.nama ?? "Belum ditentukan",
+        status: announcement.statusAkhir,
+      })
+    : null;
   const choiceRequired =
     current.statusKeseluruhan ===
     StatusKeseluruhan.MENUNGGU_PILIHAN_JALUR;
@@ -313,8 +322,11 @@ export async function getAnnouncementForWali(childId: string, userId: string) {
     fallbackJalur: current.menungguFallbackJalur?.nama ?? null,
     tanggalRilis: dateOnly(announcement?.tanggalRilis ?? null),
     statusAkhir: released ? announcement?.statusAkhir ?? null : null,
+    letter,
+    canContinueToAdmission: released && announcement?.statusAkhir === StatusPengumuman.DITERIMA &&
+      admissionFeeVisibleStatuses.includes(current.statusKeseluruhan),
     finalRouteChoice:
-      choiceRequired || current.pilihanJalurFinal
+      released && announcement?.statusAkhir === StatusPengumuman.DITERIMA && (choiceRequired || current.pilihanJalurFinal)
         ? {
             required: choiceRequired,
             selected: current.pilihanJalurFinal,
@@ -434,47 +446,33 @@ export async function updateAnnouncement(childId: string, input: AnnouncementInp
       );
     }
     if (!child.jalur) throw new StageError("NOT_FOUND", "Jalur peserta tidak ditemukan.", 404);
+    const editableStages: StatusKeseluruhan[] = [StatusKeseluruhan.MENUNGGU_PENGUMUMAN, StatusKeseluruhan.DITERIMA, StatusKeseluruhan.TIDAK_DITERIMA];
+    if (!editableStages.includes(child.statusKeseluruhan)) {
+      throw new StageError("INVALID_STAGE", "Pengumuman hanya dapat diubah sebelum peserta melanjutkan daftar ulang.", 409);
+    }
     if (!child.hasilAssessment || child.hasilAssessment.status === StatusAssessment.BELUM) throw new StageError("ASSESSMENT_REQUIRED", "Hasil assessment harus diisi terlebih dahulu.", 409);
     const tanggalRilis = new Date(`${input.tanggalRilis}T00:00:00.000Z`);
     const released = isAnnouncementReleased(tanggalRilis);
-    if (
-      input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA &&
-      child.jalur.hapusDataJikaGagal &&
-      !released
-    ) {
-      throw new FallbackError(
-        "AUTO_DELETE_FUTURE_UNSUPPORTED",
-        "Keputusan yang menghapus data hanya dapat disimpan pada atau setelah tanggal rilis agar konfirmasi tidak menimbulkan kebocoran hasil.",
-        422,
-      );
-    }
-    const { deletionConfirmation, ...announcementData } = input;
-    const result = await transaction.pengumuman.upsert({ where: { calonMuridId: childId }, update: { ...announcementData, tanggalRilis, updatedById: actorId }, create: { calonMuridId: childId, ...announcementData, tanggalRilis, updatedById: actorId } });
+    const result = await transaction.pengumuman.upsert({ where: { calonMuridId: childId }, update: { ...input, tanggalRilis, updatedById: actorId }, create: { calonMuridId: childId, ...input, tanggalRilis, updatedById: actorId } });
 
-    let effect: Awaited<ReturnType<typeof handleRejectedDecisionInTransaction>> = { type: "NONE" };
-    let nextStatus: StatusKeseluruhan = released
+    const nextStatus: StatusKeseluruhan = released
       ? releasedStatusAfterAcceptedDecision({
           statusAkhir: input.statusAkhir,
           finalChoiceEnabled: child.jalur.pilihanJalurFinalAktif,
           finalChoiceTargetId: child.jalur.pilihanJalurFinalTargetId,
         })
       : StatusKeseluruhan.MENUNGGU_PENGUMUMAN;
-    if (released && input.statusAkhir === StatusPengumuman.TIDAK_DITERIMA) {
-      effect = await handleRejectedDecisionInTransaction(transaction, childId, actorId, deletionConfirmation);
-      if (effect.type === "TRANSFERRED") nextStatus = StatusKeseluruhan.DITERIMA;
-      if (effect.type === "QUEUED") nextStatus = StatusKeseluruhan.MENUNGGU_KUOTA_FALLBACK;
-    }
-    if (effect.type === "NONE") {
-      await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
-    }
-    await transaction.auditLog.create({ data: { actorId, action: "UPDATE_ANNOUNCEMENT_RESULT", entity: "pengumuman", entityId: childId, detail: { before: child.pengumuman ? { statusAkhir: child.pengumuman.statusAkhir, tanggalRilis: dateOnly(child.pengumuman.tanggalRilis) } : null, after: { statusAkhir: result.statusAkhir, tanggalRilis: dateOnly(result.tanggalRilis) }, released, nextStatus, effect: effect.type } } });
+    // Rejection is final for every route. Retain the participant and financial
+    // records; only the separate, confirmed admin deletion flow may remove data.
+    await transaction.calonMurid.update({ where: { id: childId }, data: { statusKeseluruhan: nextStatus } });
+    await transaction.auditLog.create({ data: { actorId, action: "UPDATE_ANNOUNCEMENT_RESULT", entity: "pengumuman", entityId: childId, detail: { before: child.pengumuman ? { statusAkhir: child.pengumuman.statusAkhir, tanggalRilis: dateOnly(child.pengumuman.tanggalRilis) } : null, after: { statusAkhir: result.statusAkhir, tanggalRilis: dateOnly(result.tanggalRilis) }, released, nextStatus, effect: "NONE" } } });
     return {
-      statusAkhir: effect.type === "TRANSFERRED" ? StatusPengumuman.DITERIMA : effect.type === "QUEUED" ? null : result.statusAkhir,
+      statusAkhir: result.statusAkhir,
       tanggalRilis: result.tanggalRilis,
       released,
       nextStatus,
-      effect,
-      deleted: effect.type === "DELETED",
+      effect: { type: "NONE" as const },
+      deleted: false,
     };
   }, { maxWait: 20_000, timeout: 60_000 });
 }

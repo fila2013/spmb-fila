@@ -15,10 +15,10 @@ menggunakan Midtrans Sandbox (`MIDTRANS_IS_PRODUCTION=false`).
 | Matrix biaya, mode dinamis, upload dan retention bukti | Master-data/payment rules | Phase 4, 5, dan dynamic payment | — |
 | Signature, status, sanitasi, idempotency webhook dan promosi hold tepat satu kali | Payment/quota-hold rules | Phase 5 | — |
 | Gate enrollment setelah payment verified | Enrollment rules/schema | Phase 5 dan 6 | — |
-| Assessment dan release announcement | Stage rules/schema | Phase 7 | — |
-| TCP → Reguler dan FIFO | Fallback rules | Phase 8 | — |
+| Assessment, template master, surat mail merge, informasi prarilis, ownership dan gate DU | Stage rules/schema dan `announcement-*.test.ts` | Phase 7 | Render halaman diuji lokal; browser staging terpisah |
+| Keputusan penolakan final dan FIFO existing/pilihan final | Stage/fallback rules | Phase 8 | — |
 | Race reprocess fallback | Fallback quota rules | Phase 8 (dua reprocess paralel) | — |
-| Auto-delete, konfirmasi, snapshot, retention pembayaran | Fallback rules | Phase 8 | — |
+| Penghapusan manual, konfirmasi, snapshot, retention pembayaran | Admin-deletion rules | Phase 8 dan admin-deletion | — |
 | DU manual dan status WhatsApp | Admission rules/schema | Phase 9 | — |
 | Filter dan Excel/CSV aman | Reporting rules/schema/export | Phase 10 | Admin memfilter laporan |
 | Routing publik dan UI mobile | — | — | Chromium viewport 390×844 |
@@ -33,6 +33,17 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+Verifikasi UI link grup dan tutorial DU secara terisolasi setelah build:
+
+```bash
+npm exec -- tsx scripts/verify-admission-content-ui.ts
+```
+
+Memakai Chromium terpasang (atau Chrome lokal), CSS hasil build dan data sintetis.
+Semua request browser diintersep; tidak memerlukan Auth/database staging. Ini
+memverifikasi klik tab baru dan layout mobile, bukan keanggotaan grup WhatsApp
+atau pemutaran video di layanan sungguhan.
 
 Install browser satu kali:
 

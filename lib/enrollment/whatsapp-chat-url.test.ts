@@ -31,7 +31,7 @@ describe("URL WhatsApp wali enrollment", () => {
     expect(parsed.origin).toBe("https://wa.me");
     expect(parsed.pathname).toBe("/6282280179007");
     expect(parsed.searchParams.get("text")).toBe(
-      "Halo Bapak/Ibu Wali Murid Alya & Bima, kami dari Panitia SPMB SDIT Fitrah Insani Langkapura.",
+      "Assalamualaikum Bapak/Ibu Wali Murid Alya & Bima, kami dari Panitia SPMB SDIT Fitrah Insani Langkapura.",
     );
     expect(url).toContain("Alya%20%26%20Bima");
   });
