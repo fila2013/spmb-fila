@@ -8,6 +8,9 @@ import { UserRole } from "@/generated/prisma/enums";
 import { requireRole } from "@/lib/auth/session";
 import type { CalonMuridActionState } from "@/lib/calon-murid/action-state";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
+import { PaymentError } from "@/lib/payment/errors";
+import { AuthorizationError } from "@/lib/auth/errors";
+import { registrationErrorDetails, registrationErrorMessage } from "@/lib/diagnostics/registration-errors";
 import {
   calonMuridIdSchema,
   birthDetailsSchema,
@@ -24,7 +27,7 @@ function actionError(error: unknown): CalonMuridActionState {
   if (error instanceof ZodError) {
     return {
       status: "error",
-      message: "Periksa kembali data yang dimasukkan.",
+      message: registrationErrorMessage(error, "Periksa kembali data yang dimasukkan."),
       fieldErrors: Object.fromEntries(
         Object.entries(error.flatten().fieldErrors).filter(
           (entry): entry is [string, string[]] => Boolean(entry[1]),
@@ -32,12 +35,12 @@ function actionError(error: unknown): CalonMuridActionState {
       ),
     };
   }
-  if (error instanceof CalonMuridError) {
+  if (error instanceof CalonMuridError || error instanceof PaymentError || error instanceof AuthorizationError) {
     return { status: "error", message: error.message };
   }
   return {
     status: "error",
-    message: "Pendaftaran belum dapat disimpan. Silakan coba kembali.",
+    message: registrationErrorMessage(error, "Pendaftaran belum dapat disimpan. Silakan coba kembali. Jika tetap gagal, hubungi panitia."),
   };
 }
 
@@ -58,6 +61,7 @@ export async function createChildWithRouteAction(
     childId = child.id;
     revalidatePath("/dashboard");
   } catch (error) {
+    console.error("DEBUG createChildWithRouteAction ERROR:", registrationErrorDetails(error));
     return actionError(error);
   }
   redirect(`/anak/${childId}/kategori`);
@@ -80,6 +84,7 @@ export async function selectCategoryAction(
     revalidatePath("/dashboard");
     revalidatePath(`/anak/${childId}/kategori`);
   } catch (error) {
+    console.error("DEBUG selectCategoryAction ERROR:", registrationErrorDetails(error));
     return actionError(error);
   }
   redirect(`/anak/${childId}/pembayaran-pendaftaran`);
@@ -100,6 +105,7 @@ export async function updateBirthDetailsAction(
     await updateBirthDetails(childId, input, user.userId);
     revalidatePath(`/anak/${childId}/kategori`);
   } catch (error) {
+    console.error("DEBUG updateBirthDetailsAction ERROR:", registrationErrorDetails(error));
     return actionError(error);
   }
   redirect(`/anak/${childId}/kategori`);

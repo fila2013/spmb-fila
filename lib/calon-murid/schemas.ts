@@ -14,8 +14,8 @@ export const createCalonMuridSchema = z.object({
     .trim()
     .min(2, "Nama anak minimal 2 karakter.")
     .max(150, "Nama anak maksimal 150 karakter."),
-  tempatLahir: z.string().trim().min(2, "Tempat lahir wajib diisi (minimal 2 karakter).").max(150),
-  tanggalLahir: z.string().refine(
+  tempatLahir: z.string({ error: "Tempat lahir wajib diisi." }).trim().min(2, "Tempat lahir wajib diisi (minimal 2 karakter).").max(150, "Tempat lahir maksimal 150 karakter."),
+  tanggalLahir: z.string({ error: "Tanggal lahir wajib diisi." }).refine(
     (value) => !fieldValueError({ id: "tanggalLahir", tipeInput: TipeInput.DATE, wajib: true, validasi: null }, value, true),
     "Masukkan tanggal lahir yang valid.",
   ),
@@ -31,9 +31,9 @@ export const selectJalurSchema = z.object({ jalurId: requiredUuid });
 
 export const selectKategoriSchema = z
   .object({
-    kategoriId: requiredUuid,
-    subKategoriEnum: z.enum(SubKategoriAlumni).nullable().optional(),
-    subKategoriText: z.string().trim().max(150).nullable().optional(),
+    kategoriId: z.string({ error: "Pilih kategori pendaftar terlebih dahulu." }).uuid("Pilihan kategori tidak valid. Pilih kembali kategori yang tersedia."),
+    subKategoriEnum: z.enum(SubKategoriAlumni, { error: "Pilih asal TKIT Fitrah Insani yang tersedia." }).nullable().optional(),
+    subKategoriText: z.string().trim().max(150, "Nama asal TK maksimal 150 karakter.").nullable().optional(),
   })
   .transform((value) => ({
     ...value,

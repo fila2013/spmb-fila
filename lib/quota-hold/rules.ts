@@ -7,6 +7,8 @@ export const MAX_HOLD_DURATION_MINUTES = 7 * 24 * 60;
 export const CRITICAL_QUOTA_HOLD_MESSAGE =
   "Mohon maaf, kuota terakhir sedang dalam proses pembayaran oleh pendaftar lain. Silakan tunggu beberapa saat atau coba kembali nanti.";
 
+export const HOLD_EXPIRED_MESSAGE = "Hold kuota pembayaran sudah berakhir atau tidak aktif. Periksa kuota dan minta hold baru melalui pilihan kategori; penahanan ulang hanya tersedia jika masih ada kursi.";
+
 export type QuotaWithHolds = {
   kuotaMaks: number | null;
   kuotaTerpakai: number;

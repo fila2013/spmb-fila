@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 
 import {
   createChildWithRouteAction,
@@ -36,6 +36,7 @@ function Notice({ message }: { message?: string }) {
   if (!message) return null;
   return (
     <p
+      role="alert"
       aria-live="polite"
       className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
     >
@@ -184,19 +185,32 @@ type CategoryChoice = Choice & {
 export function SelectCategoryForm({
   childId,
   categories,
+  initialSelection,
+  renewingHold = false,
 }: {
   childId: string;
   categories: CategoryChoice[];
+  initialSelection?: { kategoriId: string | null; subKategoriEnum: SubKategoriAlumni | null; subKategoriText: string | null };
+  renewingHold?: boolean;
 }) {
   const [state, action, pending] = useActionState(
     selectCategoryAction,
     initialCalonMuridActionState,
   );
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialSelection?.kategoriId ?? "");
+  const [subEnum, setSubEnum] = useState(initialSelection?.subKategoriEnum ?? "");
+  const [subText, setSubText] = useState(initialSelection?.subKategoriText ?? "");
   const selected = categories.find((item) => item.id === selectedId);
+  const canSelect = selected?.available && selected.feeConfigured;
 
+  // Dispatch explicitly: native form actions reset controls after resolving,
+  // including validation-error responses. Keep the draft until navigation.
   return (
-    <form action={action} className="grid gap-6">
+    <form action={action} onSubmit={(event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      startTransition(() => action(data));
+    }} className="grid gap-6">
       <input type="hidden" name="calonMuridId" value={childId} />
       <fieldset className="grid gap-3">
         <legend className="mb-2 text-sm font-semibold text-slate-800">
@@ -218,6 +232,7 @@ export function SelectCategoryForm({
                 type="radio"
                 name="kategoriId"
                 value={category.id}
+                checked={selectedId === category.id}
                 disabled={!available}
                 required
                 onChange={() => setSelectedId(category.id)}
@@ -243,11 +258,11 @@ export function SelectCategoryForm({
             Asal TKIT Fitrah Insani
           </legend>
           <label className="flex items-center gap-2 text-sm font-semibold">
-            <input type="radio" name="subKategoriEnum" required value={SubKategoriAlumni.TKIT_FI_1} />
+            <input type="radio" name="subKategoriEnum" required value={SubKategoriAlumni.TKIT_FI_1} checked={subEnum === SubKategoriAlumni.TKIT_FI_1} onChange={() => setSubEnum(SubKategoriAlumni.TKIT_FI_1)} />
             TKIT Fitrah Insani 1
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold">
-            <input type="radio" name="subKategoriEnum" required value={SubKategoriAlumni.TKIT_FI_2} />
+            <input type="radio" name="subKategoriEnum" required value={SubKategoriAlumni.TKIT_FI_2} checked={subEnum === SubKategoriAlumni.TKIT_FI_2} onChange={() => setSubEnum(SubKategoriAlumni.TKIT_FI_2)} />
             TKIT Fitrah Insani 2
           </label>
         </fieldset>
@@ -259,7 +274,10 @@ export function SelectCategoryForm({
           <input
             name="subKategoriText"
             required
+            minLength={2}
             maxLength={150}
+            value={subText}
+            onChange={(event) => setSubText(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-700 focus:ring-4 focus:ring-emerald-700/10"
             placeholder="Contoh: TK Harapan Bangsa"
           />
@@ -268,10 +286,10 @@ export function SelectCategoryForm({
 
       <Notice message={state.message} />
       <button
-        disabled={pending || !selected}
+        disabled={pending || !canSelect}
         className="rounded-xl bg-emerald-900 px-5 py-3.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Menyimpan kategori…" : "Lanjut ke pembayaran"}
+        {pending ? "Memeriksa kuota & menyimpan…" : renewingHold ? "Minta hold baru & lanjut ke pembayaran" : "Lanjut ke pembayaran"}
       </button>
     </form>
   );

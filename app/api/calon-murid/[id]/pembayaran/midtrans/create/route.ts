@@ -7,6 +7,7 @@ import { getMidtransEnvironment } from "@/lib/env/server";
 import { paymentErrorResponse } from "@/lib/payment/http";
 import { midtransUrls } from "@/lib/payment/rules";
 import { createRegistrationSnapPayment } from "@/lib/payment/service";
+import { registrationErrorDetails } from "@/lib/diagnostics/registration-errors";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,7 @@ export async function POST(
       { status: result.reused ? 200 : 201 },
     );
   } catch (error) {
+    console.error("DEBUG Pembayaran ERROR:", registrationErrorDetails(error));
     return paymentErrorResponse(error);
   }
 }

@@ -5,6 +5,7 @@ import { AuthorizationError } from "@/lib/auth/errors";
 import { authorizationErrorResponse } from "@/lib/auth/http";
 import { CalonMuridError } from "@/lib/calon-murid/errors";
 import { PaymentError } from "@/lib/payment/errors";
+import { registrationErrorMessage } from "@/lib/diagnostics/registration-errors";
 
 export function paymentErrorResponse(error: unknown) {
   if (error instanceof AuthorizationError) {
@@ -15,7 +16,7 @@ export function paymentErrorResponse(error: unknown) {
       {
         error: {
           code: "VALIDATION_ERROR",
-          message: "Data pembayaran tidak valid.",
+          message: registrationErrorMessage(error, "Data pembayaran tidak valid."),
           fields: error.flatten().fieldErrors,
         },
       },
@@ -32,7 +33,7 @@ export function paymentErrorResponse(error: unknown) {
     {
       error: {
         code: "INTERNAL_ERROR",
-        message: "Layanan pembayaran belum dapat memproses permintaan.",
+        message: registrationErrorMessage(error, "Layanan pembayaran belum dapat memproses permintaan."),
       },
     },
     { status: 500 },

@@ -88,7 +88,7 @@ export default async function SelectCategoryPage({
           <details className="mt-6"><summary className="cursor-pointer text-sm font-semibold text-emerald-800">Lihat atau koreksi tempat dan tanggal lahir sebelum pembayaran</summary>
             <div className="mt-3"><BirthDetailsForm childId={child.id} tempatLahir={child.tempatLahir} tanggalLahir={child.tanggalLahir?.toISOString().slice(0, 10) ?? null} ageRule={ageRule} /></div>
           </details>
-          <div className="mt-7"><SelectCategoryForm childId={child.id} categories={categories} /></div>
+          <div className="mt-7"><SelectCategoryForm childId={child.id} categories={categories} initialSelection={{ kategoriId: child.kategoriId, subKategoriEnum: child.subKategoriEnum, subKategoriText: child.subKategoriText }} renewingHold={query.hold === "expired"} /></div>
         </>}
       </div>
     </div>

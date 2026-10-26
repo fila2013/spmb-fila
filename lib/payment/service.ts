@@ -32,12 +32,14 @@ import { REGISTRATION_PAYMENT_SETTING_ID } from "@/lib/payment-settings/service"
 import { prisma } from "@/lib/prisma";
 import {
   releaseRegistrationQuotaHoldInTransaction,
+  getRegistrationQuotaHold,
   requireActiveRegistrationHoldInTransaction,
   verifyRegistrationQuotaHoldInTransaction,
 } from "@/lib/quota-hold/service";
 import {
   isActivePendingHold,
   MIN_HOLD_DURATION_MINUTES,
+  HOLD_EXPIRED_MESSAGE,
   remainingHoldMinutes,
 } from "@/lib/quota-hold/rules";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -203,8 +205,8 @@ export async function createRegistrationSnapPayment(
       const expiryDurationMinutes = remainingHoldMinutes(hold.expiresAt);
       if (expiryDurationMinutes < MIN_HOLD_DURATION_MINUTES) {
         throw new PaymentError(
-          "HOLD_EXPIRED",
-          "Sisa waktu pembayaran kurang dari 5 menit. Silakan kembali memilih jalur dan kategori untuk membuat hold baru.",
+          "HOLD_EXPIRING",
+          "Sisa hold kurang dari 5 menit, terlalu singkat untuk membuat transaksi Midtrans baru. Tunggu timer hold berakhir, lalu periksa kuota dan minta hold baru jika kursi masih tersedia.",
           409,
         );
       }
@@ -389,6 +391,10 @@ export async function uploadManualRegistrationProof(
   const bytes = new Uint8Array(await file.arrayBuffer());
   const extension = validateRegistrationProof(file, bytes);
   const child = await getOwnedCalonMurid(childId, userId);
+  const hold = await getRegistrationQuotaHold(childId);
+  if ((child.statusKeseluruhan === StatusKeseluruhan.PILIH_JALUR || child.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR) && !isActivePendingHold(hold)) {
+    throw new PaymentError("HOLD_EXPIRED", HOLD_EXPIRED_MESSAGE, 409);
+  }
   if (
     child.statusKeseluruhan !==
     StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR
@@ -426,6 +432,9 @@ export async function uploadManualRegistrationProof(
             "Transfer manual sedang tidak aktif. Gunakan pembayaran Midtrans.",
             409,
           );
+        }
+        if (lockedChild.statusKeseluruhan === StatusKeseluruhan.PILIH_JALUR || lockedChild.statusKeseluruhan === StatusKeseluruhan.MENUNGGU_VERIFIKASI_BAYAR) {
+          await requireActiveRegistrationHoldInTransaction(transaction, childId);
         }
         if (
           lockedChild.statusKeseluruhan !==

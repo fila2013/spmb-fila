@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 22 Oktober 2026
+**Tanggal snapshot:** 26 Oktober 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -48,6 +48,31 @@ layanan remote atau sudah beroperasi di production.
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Perbaikan diagnostik kategori dan pembayaran pada 26 Oktober 2026 meneruskan
+pesan domain/Zod spesifik ke UI. Log server memiliki label DEBUG yang diminta,
+seluruh flatten validasi, kode error, frame stack, serta metadata DB yang
+diizinkan (SQLSTATE/constraint); query mentah, credential dan PII tidak dicetak.
+Transaksi pemilihan kategori memakai maxWait 10 detik dan timeout 30 detik,
+selaras transaksi pembayaran; timeout dilaporkan dengan kode aman ke UI.
+Form kategori memakai input terkontrol dan dispatch eksplisit agar reset native
+React 19 tidak mengosongkan radio/asal TK setelah respons validasi.
+Manual/Snap menampilkan CTA pemulihan saat server menolak hold atau timer habis,
+dan menonaktifkan tombol pembayaran terlambat. Wali meminta hold ulang lewat
+pemilihan kategori existing, hanya jika kapasitas masih tersedia. Tidak ada
+perpanjangan otomatis; counter permanen tetap hanya saat VERIFIED.
+Server memeriksa hold sebelum upload, setelah upload dalam transaksi, dan setelah
+menunggu lock kuota. File sementara dibersihkan bila transaksi ditolak.
+Tidak ada schema/migration, penulisan data remote, atau commit/push pada task ini.
+Lint, typecheck, Prisma generate, 56 file/278 unit test, build Next.js dan
+2 tes browser terisolasi lulus. Diff diperiksa tanpa whitespace error.
+Midtrans membedakan HOLD_EXPIRING (sisa kurang dari 5 menit, tunggu timer)
+dari HOLD_EXPIRED agar pemulihan tidak berputar kembali ke hold yang masih aktif.
+Browser Chromium 390 px terisolasi telah
+mereproduksi reset input lalu lulus setelah perbaikan: error spesifik, state
+tetap utuh, hold ulang, upload ulang dan navigasi enrollment. Action/API asli
+dipakai melalui adapter tes; Auth, service DB/Storage/Midtrans dan navigasi Next
+dimock. Ini bukan pengujian akun/ledger produksi atau runtime deployment Vercel.
 
 Sentralisasi link grup pada 22 Oktober 2026 memakai URL resmi dalam `Isi informasi`
 blok JOIN_WA aktif yang sesuai jalur/kategori dan rentang urutan peserta existing.

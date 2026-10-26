@@ -297,6 +297,20 @@ hasil build secara lokal:
 npm start
 ```
 
+Uji UI pemulihan pendaftaran/pembayaran tanpa layanan remote:
+
+```bash
+npm run build
+npm run test:registration-recovery-ui
+```
+
+Suite ini membutuhkan Chromium Playwright atau Chrome lokal. Komponen UI,
+action kategori, schema dan Route Handler pembayaran asli diuji melalui adapter
+browser, dengan Auth serta layanan DB/Storage/Midtrans dimock. Seluruh request
+di-intercept; tidak mengunggah bukti atau membuat transaksi remote. Log DEBUG
+dan perilaku kategori, timer, hold ulang serta redirect enrollment diperiksa.
+Ini bukan pengganti integration staging maupun pemeriksaan log produksi.
+
 Integration/E2E **menulis dan membersihkan fixture staging**, menggunakan Auth,
 PostgreSQL, Storage dan sebagian transaksi Snap Sandbox nyata. Jangan jalankan
 terhadap production. Siapkan environment staging lengkap, build dan port 3000:

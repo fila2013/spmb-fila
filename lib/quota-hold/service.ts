@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import {
   CRITICAL_QUOTA_HOLD_MESSAGE,
   DEFAULT_HOLD_DURATION_MINUTES,
+  HOLD_EXPIRED_MESSAGE,
   holdExpiry,
   isActivePendingHold,
   quotaBlockingReason,
@@ -150,7 +151,6 @@ export async function reserveRegistrationQuotaInTransaction(
   child: { id: string; jalurId: string; kategoriId: string },
   actorId: string,
 ) {
-  const now = new Date();
   await lockChild(transaction, child.id);
   await lockHold(transaction, child.id);
   await lockRouteAndCategory(transaction, child.jalurId, child.kategoriId);
@@ -158,6 +158,7 @@ export async function reserveRegistrationQuotaInTransaction(
   const previous = await transaction.holdKuotaPendaftaran.findUnique({
     where: { calonMuridId: child.id },
   });
+  const now = new Date();
   if (
     isActivePendingHold(previous, now) &&
     previous?.jalurId === child.jalurId &&
@@ -216,7 +217,6 @@ export async function reserveRegistrationQuotaInTransaction(
 
   const expiresAt = holdExpiry(
     setting?.holdDurationMinutes ?? DEFAULT_HOLD_DURATION_MINUTES,
-    now,
   );
   await transaction.pembayaran.updateMany({
     where: {
@@ -285,7 +285,7 @@ export async function requireActiveRegistrationHoldInTransaction(
   if (!isActivePendingHold(hold)) {
     throw new PaymentError(
       "HOLD_EXPIRED",
-      "Waktu pembayaran telah berakhir. Silakan kembali memilih jalur dan kategori untuk mencoba lagi.",
+      HOLD_EXPIRED_MESSAGE,
       409,
     );
   }
@@ -298,17 +298,16 @@ export async function verifyRegistrationQuotaHoldInTransaction(
   paymentId: string,
   actorId: string | null,
 ) {
-  const now = new Date();
   await lockChild(transaction, childId);
   await lockHold(transaction, childId);
   const hold = await transaction.holdKuotaPendaftaran.findUnique({
     where: { calonMuridId: childId },
   });
   if (hold?.status === StatusHoldKuota.VERIFIED) return hold;
-  if (!isActivePendingHold(hold, now) || !hold?.jalurId) {
+  if (!isActivePendingHold(hold) || !hold?.jalurId) {
     throw new PaymentError(
       "HOLD_EXPIRED",
-      "Hold kuota pembayaran sudah berakhir. Pembayaran tidak dapat dikonfirmasi otomatis; hubungi panitia.",
+      HOLD_EXPIRED_MESSAGE,
       409,
     );
   }
@@ -320,6 +319,10 @@ export async function verifyRegistrationQuotaHoldInTransaction(
       where: { id: hold.kategoriId },
     }),
   ]);
+  // Locks and database reads may have waited past expiry. Check the server's
+  // current instant immediately before modifying permanent quota counters.
+  const now = new Date();
+  if (!isActivePendingHold(hold, now)) throw new PaymentError("HOLD_EXPIRED", HOLD_EXPIRED_MESSAGE, 409);
   if (!route || !category) {
     throw new PaymentError(
       "QUOTA_INTEGRITY_ERROR",

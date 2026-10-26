@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StatusPembayaran } from "@/generated/prisma/enums";
+import { HoldRecoveryLink } from "@/components/payment/hold-recovery-link";
+import { useHoldExpired } from "@/components/payment/use-hold-expired";
 import {
   paymentReturnUrl,
   type PaymentReturnState,
@@ -41,7 +43,7 @@ type CreatePaymentResponse = {
     status: StatusPembayaran;
     environment: "sandbox" | "production";
   };
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
 };
 
 function delay(milliseconds: number) {
@@ -56,6 +58,7 @@ export function SnapPaymentPanel({
   initialSnapToken,
   environment,
   localWebhookWarning,
+  expiresAt,
 }: {
   childId: string;
   clientKey: string;
@@ -64,6 +67,7 @@ export function SnapPaymentPanel({
   initialSnapToken: string | null;
   environment: "sandbox" | "production";
   localWebhookWarning: boolean;
+  expiresAt: string;
 }) {
   const router = useRouter();
   const environmentLabel = environment === "sandbox" ? "Sandbox" : "Production";
@@ -73,6 +77,10 @@ export function SnapPaymentPanel({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const navigationStarted = useRef(false);
+  const [serverExpired, setServerExpired] = useState(false);
+  const [serverExpiring, setServerExpiring] = useState(false);
+  const clockExpired = useHoldExpired(expiresAt);
+  const expired = serverExpired || clockExpired;
 
   const goToDashboard = useCallback((returnState: PaymentReturnState) => {
     if (navigationStarted.current) return;
@@ -113,6 +121,7 @@ export function SnapPaymentPanel({
   }, [initialSnapToken, initialStatus, pollStatus]);
 
   async function openSnap() {
+    if (expired) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -124,6 +133,8 @@ export function SnapPaymentPanel({
         );
         const body = (await response.json()) as CreatePaymentResponse;
         if (!response.ok || !body.data) {
+          if (body.error?.code === "HOLD_EXPIRED") setServerExpired(true);
+          if (body.error?.code === "HOLD_EXPIRING") setServerExpiring(true);
           throw new Error(
             body.error?.message ??
               `Transaksi ${environmentLabel} belum dapat dibuat.`,
@@ -213,7 +224,7 @@ export function SnapPaymentPanel({
         <button
           type="button"
           onClick={openSnap}
-          disabled={busy || !scriptReady}
+          disabled={busy || !scriptReady || expired || serverExpiring}
           className="w-full rounded-xl bg-emerald-900 px-5 py-3.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60"
         >
           {busy
@@ -231,6 +242,7 @@ export function SnapPaymentPanel({
           {message}
         </p>
       ) : null}
+      {expired && !verified ? <HoldRecoveryLink childId={childId} /> : null}
     </div>
   );
 }

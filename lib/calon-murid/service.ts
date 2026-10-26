@@ -420,7 +420,7 @@ export async function selectKategori(
       },
     });
     return child;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function listSelectableJalur() {

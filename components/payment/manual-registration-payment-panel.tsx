@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { MAX_REGISTRATION_PROOF_BYTES } from "@/lib/payment/constants";
+import { HoldRecoveryLink } from "@/components/payment/hold-recovery-link";
+import { useHoldExpired } from "@/components/payment/use-hold-expired";
 
 type BankAccount = {
   id: string;
@@ -12,25 +14,30 @@ type BankAccount = {
   atasNama: string;
 };
 
-async function errorMessage(response: Response) {
+async function paymentFailure(response: Response) {
   const body = (await response.json().catch(() => null)) as
-    | { error?: { message?: string } }
+    | { error?: { code?: string; message?: string } }
     | null;
-  return body?.error?.message ?? "Bukti transfer belum dapat diproses.";
+  return { code: body?.error?.code, message: body?.error?.message ?? "Bukti transfer belum dapat diproses." };
 }
 
 export function ManualRegistrationPaymentPanel({
   childId,
   bankAccounts,
+  expiresAt,
 }: {
   childId: string;
   bankAccounts: BankAccount[];
+  expiresAt: string;
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [serverExpired, setServerExpired] = useState(false);
+  const clockExpired = useHoldExpired(expiresAt);
+  const expired = serverExpired || clockExpired;
 
   async function copy(value: string, key: string) {
     try {
@@ -44,6 +51,7 @@ export function ManualRegistrationPaymentPanel({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (expired) return;
     if (!file) {
       setMessage("Pilih bukti transfer terlebih dahulu.");
       return;
@@ -61,7 +69,11 @@ export function ManualRegistrationPaymentPanel({
         `/api/calon-murid/${childId}/pembayaran/manual`,
         { method: "POST", body: formData },
       );
-      if (!response.ok) throw new Error(await errorMessage(response));
+      if (!response.ok) {
+        const failure = await paymentFailure(response);
+        if (failure.code === "HOLD_EXPIRED") setServerExpired(true);
+        throw new Error(failure.message);
+      }
       router.replace(`/anak/${childId}/enrollment/data-pribadi`);
       router.refresh();
     } catch (error) {
@@ -116,7 +128,7 @@ export function ManualRegistrationPaymentPanel({
             type="file"
             accept="image/jpeg,image/png,application/pdf"
             required
-            disabled={pending}
+            disabled={pending || expired}
             onChange={(event) => {
               const nextFile = event.target.files?.[0] ?? null;
               setFile(nextFile);
@@ -136,7 +148,8 @@ export function ManualRegistrationPaymentPanel({
           Dengan mengirim bukti, pembayaran langsung ditandai terverifikasi dan Anda dapat melanjutkan formulir enrollment.
         </p>
         {message ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{message}</p> : null}
-        <button disabled={pending || !file || Boolean(file && file.size > MAX_REGISTRATION_PROOF_BYTES)} className="rounded-xl bg-emerald-900 px-5 py-3 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
+        {expired ? <HoldRecoveryLink childId={childId} manual /> : null}
+        <button disabled={pending || expired || !file || Boolean(file && file.size > MAX_REGISTRATION_PROOF_BYTES)} className="rounded-xl bg-emerald-900 px-5 py-3 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
           {pending ? "Mengunggah dan memverifikasi…" : "Kirim bukti & lanjutkan"}
         </button>
       </form>

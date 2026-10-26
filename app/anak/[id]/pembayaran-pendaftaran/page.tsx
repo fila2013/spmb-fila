@@ -123,6 +123,7 @@ export default async function PaymentPreparationPage({
           {midtrans && urls ? (
             <SnapPaymentPanel
               childId={child.id}
+              expiresAt={hold.expiresAt.toISOString()}
               clientKey={midtrans.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
               snapScriptUrl={urls.snapScriptUrl}
               environment={urls.environment}
@@ -138,6 +139,7 @@ export default async function PaymentPreparationPage({
           ) : (
             <ManualRegistrationPaymentPanel
               childId={child.id}
+              expiresAt={hold.expiresAt.toISOString()}
               bankAccounts={bankAccounts}
             />
           )}

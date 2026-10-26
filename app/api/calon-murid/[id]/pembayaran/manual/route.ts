@@ -7,6 +7,7 @@ import { PaymentError } from "@/lib/payment/errors";
 import { paymentErrorResponse } from "@/lib/payment/http";
 import { MAX_REGISTRATION_PROOF_BYTES } from "@/lib/payment/constants";
 import { uploadManualRegistrationProof } from "@/lib/payment/service";
+import { registrationErrorDetails } from "@/lib/diagnostics/registration-errors";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,7 @@ export async function POST(
       { status: 201 },
     );
   } catch (error) {
+    console.error("DEBUG Pembayaran ERROR:", registrationErrorDetails(error));
     return paymentErrorResponse(error);
   }
 }
