@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
 
 import {
   AnnouncementResultForm,
   AssessmentResultForm,
 } from "@/components/admin/stage-forms";
+import { ParticipantWhatsappDialog } from "@/components/admin/participant-whatsapp-dialog";
 import { StatusKeseluruhan } from "@/generated/prisma/enums";
 import {
   formatParticipantRegistrationDate,
@@ -30,10 +31,12 @@ export function ParticipantQuickEditTable({
   const router = useRouter();
   const [participants, setParticipants] = useState(initialParticipants);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [whatsappId, setWhatsappId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const selected = participants.find((item) => item.id === selectedId) ?? null;
+  const whatsappParticipant = participants.find((item) => item.id === whatsappId);
 
   const closeModal = useCallback(() => setSelectedId(null), []);
   const handleSaved = useCallback((state: StageActionState) => {
@@ -92,13 +95,35 @@ export function ParticipantQuickEditTable({
               <td className="px-4 py-3"><p className="font-semibold text-slate-900">{item.namaAnak}</p><p className="text-xs text-slate-500">{item.email}</p><time dateTime={item.createdAt} className="mt-1 block text-xs text-slate-500">Tgl daftar: {formatParticipantRegistrationDate(new Date(item.createdAt))}</time></td>
               <td className="px-4 py-3 text-slate-700">{item.jalurKategori}</td>
               <td className="px-4 py-3"><button type="button" onClick={() => setSelectedId(item.id)} aria-label={`Edit cepat assessment dan pengumuman ${item.namaAnak}`} className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-bold transition hover:brightness-90 hover:ring-2 hover:ring-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 ${status.className}`}>{status.label}</button></td>
-              <td className="px-4 py-3"><Link href={`/admin/peserta/${item.id}`} className="font-bold text-emerald-800 hover:underline">Kelola</Link></td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Link href={`/admin/peserta/${item.id}`} className="font-bold text-emerald-800 hover:underline">Kelola</Link>
+                  <button
+                    type="button"
+                    onClick={() => setWhatsappId(item.id)}
+                    aria-label={`Kirim WhatsApp untuk ${item.namaAnak}`}
+                    aria-haspopup="dialog"
+                    title="Kirim WhatsApp"
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  >
+                    <MessageCircle aria-hidden="true" className="size-4" />
+                  </button>
+                </div>
+              </td>
             </tr>;
           })}
         </tbody>
       </table>
       {participants.length === 0 ? <p className="p-6 text-center text-sm text-slate-600">Tidak ada peserta yang cocok dengan filter.</p> : null}
     </div>
+    {whatsappParticipant ? (
+      <ParticipantWhatsappDialog
+        key={whatsappParticipant.id}
+        participantId={whatsappParticipant.id}
+        participantName={whatsappParticipant.namaAnak}
+        onClose={() => setWhatsappId(null)}
+      />
+    ) : null}
     {selected ? <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
       <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="quick-edit-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4">

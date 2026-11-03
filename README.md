@@ -311,6 +311,21 @@ di-intercept; tidak mengunggah bukti atau membuat transaksi remote. Log DEBUG
 dan perilaku kategori, timer, hold ulang serta redirect enrollment diperiksa.
 Ini bukan pengganti integration staging maupun pemeriksaan log produksi.
 
+Untuk uji browser tombol WhatsApp Admin secara terisolasi, jalankan
+`npm run test:whatsapp-drafts-ui`. Suite menggunakan data sintetis dan
+mencegat navigasi `wa.me`; tidak membaca kontak atau mengirim pesan nyata.
+
+### Template WhatsApp Admin
+
+Setelah migrasi `20261103090000_whatsapp_message_templates` diterapkan ke
+database target, buka **Konten Kirim WhatsApp** di sidebar. Buat dan aktifkan
+template, lalu pilih ikon WhatsApp pada baris **Peserta**, pilih penerima
+dan template, dan periksa pratinjau. **Buka WhatsApp** membuka draf di tab baru;
+admin tetap menekan Kirim secara manual. Kontak ayah/bunda berasal dari
+Data Pribadi peserta. Template yang tidak aktif tidak muncul di daftar pilihan.
+
+### Integration/E2E staging
+
 Integration/E2E **menulis dan membersihkan fixture staging**, menggunakan Auth,
 PostgreSQL, Storage dan sebagian transaksi Snap Sandbox nyata. Jangan jalankan
 terhadap production. Siapkan environment staging lengkap, build dan port 3000:

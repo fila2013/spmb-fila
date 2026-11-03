@@ -34,6 +34,7 @@
     "test:admin-deletion-integration": "tsx scripts/verify-admin-deletion.ts",
     "test:e2e": "playwright test",
     "test:registration-recovery-ui": "vitest run --config scripts/registration-browser.config.ts",
+    "test:whatsapp-drafts-ui": "vitest run --config scripts/whatsapp-browser.config.ts",
     "test:e2e:install": "playwright install chromium",
     "test:integration": "node scripts/run-phase11.mjs --integration-only",
     "test:phase11": "npm run lint && npm run typecheck && npm test && npm run build && node scripts/run-phase11.mjs",

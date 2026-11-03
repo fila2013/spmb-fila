@@ -17,6 +17,7 @@ const navigation = [
   { href: "/admin/konten/announcement", label: "Konten announcement" },
   { href: "/admin/konten/admission-fee", label: "Konten daftar ulang" },
   { href: "/admin/konten/join-wa", label: "Konten Join WhatsApp" },
+  { href: "/admin/konten/kirim-wa", label: "Konten Kirim WhatsApp" },
   { href: "/admin/laporan", label: "Laporan" },
 ];
 

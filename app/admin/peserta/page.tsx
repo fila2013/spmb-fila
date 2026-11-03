@@ -88,7 +88,7 @@ export default async function ParticipantsPage({
     <AdminShell
       activePath="/admin/peserta"
       title="Peserta"
-      description="Kelola assessment, pengumuman, pembayaran DU, link grup, dan konfirmasi WhatsApp setiap calon murid."
+      description="Kelola assessment, pengumuman, dan pembayaran DU, atau siapkan draf WhatsApp untuk wali calon murid."
       email={admin.email}
     >
       {rawFilters.deleted === "1" ? (

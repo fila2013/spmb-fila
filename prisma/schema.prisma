@@ -119,6 +119,14 @@ enum TahapKonten {
   @@map("tahap_konten")
 }
 
+enum KategoriTemplateWhatsapp {
+  PENGUMUMAN_SELEKSI   @map("pengumuman_seleksi")
+  PENGINGAT_PEMBAYARAN @map("pengingat_pembayaran")
+  INFORMASI_UMUM       @map("informasi_umum")
+
+  @@map("kategori_template_whatsapp")
+}
+
 enum StatusAssessment {
   BELUM       @map("belum")
   HADIR       @map("hadir")
@@ -155,6 +163,7 @@ model User {
   pembayaranDiverifikasi     Pembayaran[]              @relation("PembayaranVerifier")
   pengumumanDiubah           Pengumuman[]              @relation("PengumumanUpdater")
   templateSuratDiubah        TemplateSuratPengumuman[] @relation("TemplateSuratUpdater")
+  templateWhatsappDiubah     TemplatePesanWhatsapp[]   @relation("TemplateWhatsappUpdater")
   statusGrupWaDiubah         StatusGrupWa[]            @relation("StatusGrupWaUpdater")
   pengaturanPembayaranDiubah PengaturanPembayaran[]    @relation("PengaturanPembayaranUpdater")
   auditLogs                  AuditLog[]                @relation("AuditActor")
@@ -425,6 +434,22 @@ model TemplateSuratPengumuman {
   updatedBy User? @relation("TemplateSuratUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@map("template_surat_pengumuman")
+}
+
+model TemplatePesanWhatsapp {
+  id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  judul       String                   @db.VarChar(120)
+  kategori    KategoriTemplateWhatsapp
+  isiPesan    String                   @map("isi_pesan") @db.VarChar(1000)
+  statusAktif Boolean                  @default(true) @map("status_aktif")
+  updatedById String?                  @map("updated_by") @db.Uuid
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedBy User? @relation("TemplateWhatsappUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([statusAktif, kategori, judul])
+  @@map("template_pesan_whatsapp")
 }
 
 model HasilAssessment {

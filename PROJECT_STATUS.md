@@ -1,6 +1,6 @@
 # Project Status — SPMB Fila
 
-**Tanggal snapshot:** 26 Oktober 2026
+**Tanggal snapshot:** 3 November 2026
 **Project:** Sistem Penerimaan Murid Baru SDIT Fitrah Insani Langkapura  
 **Tujuan:** serah terima konteks dan pekerjaan berikutnya untuk Codex di komputer lain.
 
@@ -44,10 +44,33 @@ layanan remote atau sudah beroperasi di production.
 | Pilihan kelas final | Fitur opsional per jalur diterima dengan target pilihan final terpisah dari fallback gagal; pilihan sekali sebelum DU, pelepasan kuota asal dan antrean target bila penuh |
 | Penghapusan | Penghapusan peserta manual dengan konfirmasi/snapshot dan akun wali tanpa anak, retention ledger |
 | DU dan WhatsApp | Upload bukti DU, preview/verifikasi admin dengan nominal aktual, link grup terpusat dari Konten Join WhatsApp sesuai filter peserta, konfirmasi wali sampai selesai |
+| Draf WhatsApp Admin | Template aktif yang dikelola Admin, kontak wali dari Data Pribadi, pratinjau pesan personal dan buka draf `wa.me` secara manual dari tabel Peserta |
 | Reporting | Filter peserta, ekspor CSV/XLSX, sanitasi formula dan audit ekspor |
 | Pengujian | Unit test, integration staging per domain dan smoke E2E Chromium mobile |
 
 ## In-progress features / pekerjaan aktif
+
+Fitur Konten Kirim WhatsApp ditambahkan 3 November 2026. Template kategori
+pengumuman, pembayaran, atau informasi umum dapat dibuat, diubah, dan
+dinonaktifkan oleh Admin; kelima variabel pesan bisa disisipkan di posisi
+kursor. Tombol di tabel Peserta meminta kontak ayah/bunda dan template aktif
+hanya saat diklik, menjaga embargo hasil seleksi sebelum rilis Jakarta, lalu
+menampilkan penerima dan pratinjau. Admin membuka draf di tab baru dan tetap
+menekan Kirim di WhatsApp. Tidak ada akses WhatsApp API, pencatatan kiriman,
+atau perubahan data peserta. Nomor harus sudah tersedia di Data Pribadi.
+Migration `20261103090000_whatsapp_message_templates` menambah tabel dan enum
+tanpa mengubah data lama, dengan RLS dan audit metadata penyimpanan.
+Lint, typecheck, Prisma validate, 60 file/304 unit test, build Next.js, dan
+4 uji Chromium terisolasi lulus. Uji browser memakai kontak sintetis dan
+mencegat `wa.me`, termasuk pemeriksaan pesan lengkap dan tab baru.
+Pada PostgreSQL 18 sekali pakai, SQL migrasi serta simpan/ubah/nonaktifkan
+template lulus, dan RLS mencegah baca/tulis langsung oleh role `authenticated`.
+Pada 3 November 2026, migrasi diterapkan ke project Supabase yang dikonfigurasi
+di `.env.local`. Target `DIRECT_URL` dan `DATABASE_URL` dikonfirmasi cocok
+dengan project aplikasi. Prisma melaporkan 26 migrasi mutakhir; SELECT lewat
+koneksi aplikasi mengonfirmasi tabel dapat dibaca, RLS aktif, dan belum ada
+template tersimpan. Tidak ada fixture yang ditulis ke Supabase dan belum ada
+commit, push, atau deploy aplikasi untuk fitur ini.
 
 Perbaikan diagnostik kategori dan pembayaran pada 26 Oktober 2026 meneruskan
 pesan domain/Zod spesifik ke UI. Log server memiliki label DEBUG yang diminta,
